@@ -4378,7 +4378,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"autoprefixer@npm:~10.4.20":
+"autoprefixer@npm:^10.4.20, autoprefixer@npm:~10.4.20":
   version: 10.4.20
   resolution: "autoprefixer@npm:10.4.20"
   dependencies:
@@ -10766,7 +10766,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"postcss@npm:^8.4.47, postcss@npm:~8.4.45":
+"postcss@npm:^8.4.47, postcss@npm:^8.4.49, postcss@npm:~8.4.45":
   version: 8.4.49
   resolution: "postcss@npm:8.4.49"
   dependencies:
@@ -11646,8 +11646,11 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "se-2@workspace:."
   dependencies:
+    autoprefixer: ^10.4.20
     husky: ~8.0.3
     lint-staged: ~13.2.2
+    postcss: ^8.4.49
+    tailwindcss: ^3.4.17
   languageName: unknown
   linkType: soft
 
@@ -12504,7 +12507,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"tailwindcss@npm:~3.4.11":
+"tailwindcss@npm:^3.4.17, tailwindcss@npm:~3.4.11":
   version: 3.4.17
   resolution: "tailwindcss@npm:3.4.17"
   dependencies:
