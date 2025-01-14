@@ -1,24 +1,39 @@
 "use client"
 
 import { useEffect, useRef } from "react"
-import mermaid from "mermaid"
-
-mermaid.initialize({ startOnLoad: true })
 
 export default function Mermaid({ chart }: { chart: string }) {
-  const ref = useRef(null)
+  const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (ref.current) {
-      mermaid.render("mermaid", chart).then((result: any) => {
-        const currentRef = ref.current;
-        if (currentRef) {
-          (currentRef as HTMLElement).innerHTML = result.svg;
-        }
-      })
-    }
-  }, [chart])
+    let isMounted = true;
 
-  return <div ref={ref} className="mermaid" />
+    const renderMermaid = async () => {
+      if (ref.current && isMounted) {
+        try {
+          const mermaid = await import("mermaid");
+          if (!mermaid.initialized) {
+            mermaid.initialize({ startOnLoad: false });
+            mermaid.initialized = true;
+          }
+          mermaid.render("mermaidChart", chart, (svgCode) => {
+            if (ref.current) {
+              ref.current.innerHTML = svgCode;
+            }
+          });
+        } catch (error) {
+          console.error("Error rendering Mermaid diagram:", error);
+        }
+      }
+    };
+
+    renderMermaid();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [chart]);
+
+  return <div ref={ref} />;
 }
 

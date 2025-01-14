@@ -4,6 +4,7 @@ import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { VariantProps, cva } from "class-variance-authority"
 import { PanelLeft } from "lucide-react"
+import { useState } from 'react';
 
 import { useIsMobile } from "~~/hooks/use-mobile"
 import { cn } from "~~/lib/utils"
@@ -69,6 +70,7 @@ const SidebarProvider = React.forwardRef<
   ) => {
     const isMobile = useIsMobile()
     const [openMobile, setOpenMobile] = React.useState(false)
+    const [selectedProcedure, setSelectedProcedure] = useState<string | null>(null);
 
     // This is the internal state of the sidebar.
     // We use openProp and setOpenProp for control from outside the component.
@@ -129,6 +131,12 @@ const SidebarProvider = React.forwardRef<
       [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar]
     )
 
+    const handleProcedureClick = (procedureName: string) => {
+        setSelectedProcedure(procedureName);
+        // Logic to set the first tab (events) as active
+        // This might involve setting a state or calling a function to update the tab
+    };
+
     return (
       <SidebarContext.Provider value={contextValue}>
         <TooltipProvider delayDuration={0}>
@@ -148,6 +156,8 @@ const SidebarProvider = React.forwardRef<
             {...props}
           >
             {children}
+            <button onClick={() => handleProcedureClick('Procedure 1')}>Procedure 1</button>
+            <button onClick={() => handleProcedureClick('Procedure 2')}>Procedure 2</button>
           </div>
         </TooltipProvider>
       </SidebarContext.Provider>

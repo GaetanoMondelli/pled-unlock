@@ -1,51 +1,45 @@
 "use client"
 
-import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import EventList from "@/components/ui/event-list"
 import MessageRules from "@/components/ui/message-rules"
 import ProcedureState from "@/components/ui/procedure-state"
 import ActionList from "@/components/ui/action-list"
+import { useEffect } from 'react';
 
-const mockProcedure = {
-  id: 1,
-  name: "Customer Onboarding",
-  description: "Process for onboarding new customers"
+interface ProcedureContentProps {
+  procedureId: number;
+  activeSubsection: string;
+  selectedProcedure: string | null;
 }
 
-export default function ProcedureContent() {
-  const [selectedProcedure] = useState(mockProcedure)
+export default function ProcedureContent({ procedureId, activeSubsection, selectedProcedure }: ProcedureContentProps) {
+  const procedure = {
+    id: procedureId,
+    name: "Procedure Name", // You might want to fetch the actual name based on the ID
+    description: "Procedure Description" // Fetch the actual description
+  };
+
+  useEffect(() => {
+    if (selectedProcedure) {
+      // Logic to set the first tab (events) as active
+      // This might involve setting a state or calling a function to update the tab
+    }
+  }, [selectedProcedure]);
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{selectedProcedure.name}</CardTitle>
-        <CardDescription>{selectedProcedure.description}</CardDescription>
+        <CardTitle>{selectedProcedure ? selectedProcedure : 'Select a procedure'}</CardTitle>
+        <CardDescription>{procedure.description}</CardDescription>
       </CardHeader>
       <CardContent>
-        <Tabs defaultValue="events">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="events">Events</TabsTrigger>
-            <TabsTrigger value="messages">Messages</TabsTrigger>
-            <TabsTrigger value="state">State</TabsTrigger>
-            <TabsTrigger value="actions">Actions</TabsTrigger>
-          </TabsList>
-          <TabsContent value="events">
-            <EventList procedureId={selectedProcedure.id.toString()} />
-          </TabsContent>
-          <TabsContent value="messages">
-            <MessageRules procedureId={selectedProcedure.id.toString()} />
-          </TabsContent>
-          <TabsContent value="state">
-            <ProcedureState procedureId={selectedProcedure.id.toString()} />
-          </TabsContent>
-          <TabsContent value="actions">
-            <ActionList procedureId={selectedProcedure.id.toString()} />
-          </TabsContent>
-        </Tabs>
+        {activeSubsection === "Events" && <EventList procedureId={procedureId.toString()} />}
+        {activeSubsection === "Messages" && <MessageRules procedureId={procedureId.toString()} />}
+        {activeSubsection === "State" && <ProcedureState procedureId={procedureId.toString()} />}
+        {activeSubsection === "Actions" && <ActionList procedureId={procedureId.toString()} />}
       </CardContent>
     </Card>
-  )
+  );
 }
 
