@@ -1,52 +1,28 @@
-import Link from 'next/link'
-import { Button } from "@/components/ui/button"
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarRail,
-} from "@/components/ui/sidebar"
+import Link from "next/link"
+import { Home, Wallet, BadgeIcon as Certificate } from 'lucide-react'
 
-export function AppSidebar() {
+export function Sidebar() {
   return (
-    <Sidebar className="border-r">
-      <SidebarHeader>
-        <Link href="/" className="flex items-center space-x-2 px-4 py-2">
-          {/* <img src="/placeholder.svg?height=30&width=30" alt="PLED Logo" className="h-6 w-6" /> */}
-          <span className="font-bold">PLED</span>
+    <div className="w-64 bg-gray-100 p-4">
+      <nav className="space-y-2">
+        <Link href="/" className="flex items-center space-x-2 p-2 hover:bg-gray-200 rounded">
+          <Home size={20} />
+          <span>Procedures</span>
         </Link>
-      </SidebarHeader>
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Main Menu</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <Link href="/">Dashboard</Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <Link href="/contracts">Contracts</Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <Link href="/templates">Templates</Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
-      <SidebarRail />
-    </Sidebar>
+        <Link href="/wallet" className="flex items-center space-x-2 p-2 hover:bg-gray-200 rounded">
+          <Wallet size={20} />
+          <span>Events</span>
+        </Link>
+        <Link href="/certificates" className="flex items-center space-x-2 p-2 hover:bg-gray-200 rounded">
+          <Certificate size={20} />
+          <span>Messages</span>
+        </Link>
+        <Link href="/certificates" className="flex items-center space-x-2 p-2 hover:bg-gray-200 rounded">
+          <Certificate size={20} />
+          <span>Actions</span>
+        </Link>
+      </nav>
+    </div>
   )
 }
+

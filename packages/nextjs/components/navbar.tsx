@@ -1,31 +1,29 @@
-import Image from "next/image";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import Link from "next/link"
+import { Button } from "@/components/ui/button"
+import { RainbowKitCustomConnectButton } from "./scaffold-eth/RainbowKitCustomConnectButton"
+import { FaucetButton } from "./scaffold-eth/FaucetButton"
 
 export function Navbar() {
-  return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-14 items-center">
-        <div className="mr-4 hidden md:flex">
-          {/* <Image src="/placeholder.svg" alt="PLED Logo" height={30} width={30} className="h-6 w-6" /> */}
-          {/* <img src="/placeholder.svg?height=30&width=30" alt="PLED Logo" className="h-6 w-6" /> */}
-          <span className="hidden font-bold sm:inline-block">PLED</span>
-        </div>
-        <nav className="flex items-center space-x-6 text-sm font-medium">
-          <Link href="/about">About</Link>
-          <Link href="/pricing">Pricing</Link>
-          <Link href="/docs">Docs</Link>
-        </nav>
-      </div>
-      <div className="flex flex-1 items-center justify-between space-x-2 md:justify-end">
-        <div className="w-full flex-1 md:w-auto md:flex-none">{/* Add search functionality here if needed */}</div>
-        <nav className="flex items-center">
-          <Button variant="ghost" className="mr-2">
-            Sign In
+    return (
+        <nav className="bg-white border-b border-gray-200 px-4 py-2.5 dark:bg-gray-800 dark:border-gray-700">
+            <div className="flex flex-wrap justify-between items-center">
+                <div className="flex items-center">
+                    <Link href="/" className="flex items-center">
+                        <span className="self-center text-2xl font-semibold whitespace-nowrap dark:text-white">Pled</span>
+                    </Link>
+                </div>
+                <div className="flex items-center lg:order-2">
+                    {/* <Button variant="ghost" size="sm">
+            Log in
           </Button>
-          <Button>Get Started</Button>
+          <Button size="sm" className="ml-2">
+            Sign up
+          </Button> */}
+                        <RainbowKitCustomConnectButton />
+                        <FaucetButton />
+                    </div>
+            </div>
         </nav>
-      </div>
-    </header>
-  );
+    )
 }
+
