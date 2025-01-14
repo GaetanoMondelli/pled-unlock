@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import Mermaid from "./mermaid"
+import Mermaid from "@/components/ui/mermaid"
 
 const initialState = {
   currentState: "B",
@@ -36,7 +36,7 @@ graph TD
   ],
 }
 
-export default function ProcedureState({ procedureId }) {
+export default function ProcedureState({ procedureId }: { procedureId: string }) {
   const [state, setState] = useState(initialState)
   const [showPDF, setShowPDF] = useState(false)
   const [editableText, setEditableText] = useState(state.textRepresentation)
@@ -58,11 +58,11 @@ export default function ProcedureState({ procedureId }) {
       }));
       setError(null);
     } catch (err) {
-      setError("Invalid Mermaid syntax. Please check your diagram code.");
+      setError("Invalid Mermaid syntax. Please check your diagram code." as any);
     }
   }, [editableText, state.currentState]);
 
-  const updateCurrentState = (newState) => {
+  const updateCurrentState = (newState: string) => {
     setState(prevState => ({
       ...prevState,
       currentState: newState

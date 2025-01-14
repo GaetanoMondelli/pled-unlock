@@ -11,10 +11,10 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import EventList from "./event-list"
-import MessageRules from "./message-rules"
-import ProcedureState from "./procedure-state"
-import ActionList from "./action-list"
+import EventList from "@/components/ui/event-list"
+import MessageRules from "@/components/ui/message-rules"
+import ProcedureState from "@/components/ui/procedure-state"
+import ActionList from "@/components/ui/action-list"
 
 const mockProcedures = [
   { id: 1, name: "Customer Onboarding", description: "Process for onboarding new customers" },
@@ -23,7 +23,7 @@ const mockProcedures = [
 ]
 
 export default function ProcedureList() {
-  const [selectedProcedure, setSelectedProcedure] = useState(null)
+  const [selectedProcedure, setSelectedProcedure] = useState<any | null>(null)
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
