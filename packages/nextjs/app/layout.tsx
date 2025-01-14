@@ -1,12 +1,11 @@
 import "@rainbow-me/rainbowkit/styles.css";
-import { RowanEthAppWithProviders } from "~~/components/RowanEthProviders";
-import { Sidebar } from "~~/components/sidebar";
+import { CustomEthAppWithProviders } from "~~/components/CustomEthProvider";
+import Sidebar from "@/components/sidebar";
 import { Navbar } from "@/components/navbar"
 import { Inter } from 'next/font/google'
 import { ThemeProvider } from "~~/components/ThemeProvider";
 import "~~/styles/globals.css";
 import { getMetadata } from "~~/utils/scaffold-eth/getMetadata";
-import { CustomEthAppWithProviders } from "~~/components/CustomEthProvider";
 
 export const metadata = getMetadata({
   title: "Smart Miner Dashboard",
