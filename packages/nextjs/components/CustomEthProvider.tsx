@@ -1,5 +1,8 @@
 "use client";
+
 import { useEffect, useState } from "react";
+import { Navbar } from "./navbar";
+import { Sidebar } from "./sidebar";
 import { RainbowKitProvider, darkTheme, lightTheme } from "@rainbow-me/rainbowkit";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AppProgressBar as ProgressBar } from "next-nprogress-bar";
@@ -11,22 +14,18 @@ import { Header } from "~~/components/Header";
 import { BlockieAvatar } from "~~/components/scaffold-eth";
 import { useInitializeNativeCurrencyPrice } from "~~/hooks/scaffold-eth";
 import { wagmiConfig } from "~~/services/web3/wagmiConfig";
-import { Navbar } from "./navbar";
-import { Sidebar } from "./sidebar";
 
 const CustomEthApp = ({ children }: { children: React.ReactNode }) => {
   useInitializeNativeCurrencyPrice();
 
   return (
-        <div className="flex flex-col h-screen">
-          <Navbar />
-          <div className="flex flex-1 overflow-hidden">
-            <Sidebar />
-            <main className="flex-1 overflow-y-auto p-8">
-            {children}
-            </main>
-          </div>
-        </div>
+    <div className="flex flex-col h-screen">
+      <Navbar />
+      <div className="flex flex-1 overflow-hidden">
+        <Sidebar />
+        <main className="flex-1 overflow-y-auto p-8">{children}</main>
+      </div>
+    </div>
   );
 };
 
@@ -55,7 +54,7 @@ export const CustomEthAppWithProviders = ({ children }: { children: React.ReactN
           avatar={BlockieAvatar}
           // theme={mounted ? (isDarkMode ? darkTheme() : lightTheme()) : lightTheme()}
         >
-          <RowanEthApp>{children}</RowanEthApp>
+          <CustomEthApp>{children}</CustomEthApp>
         </RainbowKitProvider>
       </QueryClientProvider>
     </WagmiProvider>

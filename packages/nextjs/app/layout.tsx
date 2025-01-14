@@ -6,6 +6,7 @@ import { Inter } from 'next/font/google'
 import { ThemeProvider } from "~~/components/ThemeProvider";
 import "~~/styles/globals.css";
 import { getMetadata } from "~~/utils/scaffold-eth/getMetadata";
+import { CustomEthAppWithProviders } from "~~/components/CustomEthProvider";
 
 export const metadata = getMetadata({
   title: "Smart Miner Dashboard",
@@ -23,15 +24,6 @@ const ScaffoldEthApp = ({ children }: { children: React.ReactNode }) => {
       </body> */}
       <body className={inter.className}>
         <CustomEthAppWithProviders>{children}</CustomEthAppWithProviders>
-        {/* <div className="flex flex-col h-screen">
-          <Navbar />
-          <div className="flex flex-1 overflow-hidden">
-            <Sidebar />
-            <main className="flex-1 overflow-y-auto p-8">
-            <RowanEthAppWithProviders>{children}</RowanEthAppWithProviders>
-            </main>
-          </div>
-        </div> */}
       </body>
     </html>
   );

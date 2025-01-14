@@ -9,15 +9,15 @@ export function Sidebar() {
           <Home size={20} />
           <span>Procedures</span>
         </Link>
-        <Link href="/wallet" className="flex items-center space-x-2 p-2 hover:bg-gray-200 rounded">
+        <Link href="/events" className="flex items-center space-x-2 p-2 hover:bg-gray-200 rounded">
           <Wallet size={20} />
           <span>Events</span>
         </Link>
-        <Link href="/certificates" className="flex items-center space-x-2 p-2 hover:bg-gray-200 rounded">
+        <Link href="/messages" className="flex items-center space-x-2 p-2 hover:bg-gray-200 rounded">
           <Certificate size={20} />
           <span>Messages</span>
         </Link>
-        <Link href="/certificates" className="flex items-center space-x-2 p-2 hover:bg-gray-200 rounded">
+        <Link href="/actions" className="flex items-center space-x-2 p-2 hover:bg-gray-200 rounded">
           <Certificate size={20} />
           <span>Actions</span>
         </Link>
