@@ -12,6 +12,11 @@ import MessageRules from "@/components/ui/message-rules";
 import ProcedureState from "@/components/ui/procedure-state";
 import ActionList from "@/components/ui/action-list";
 
+type Variables = {
+  candidate: { email: string; name: string };
+  company: { email: string; department: string };
+};
+
 export default function ProcedureLayout({ 
   children, 
   params 
@@ -56,7 +61,7 @@ export default function ProcedureLayout({
                               <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">Required</span>
                             )}
                             <span className="text-sm text-primary">
-                              {instance.variables[section as keyof typeof instance.variables]?.[field] || '-'}
+                              {instance.variables[section as keyof Variables]?.[field as keyof Variables[keyof Variables]] || '-'}
                             </span>
                           </div>
                         </div>
@@ -88,9 +93,7 @@ export default function ProcedureLayout({
         return (
           <Card className="p-4">
             <ScrollArea className="h-[calc(100vh-12rem)]">
-              <ProcedureState procedureId={params.id} state={{
-                messages: []
-              }} />
+              <ProcedureState procedureId={params.id} />
             </ScrollArea>
           </Card>
         );
