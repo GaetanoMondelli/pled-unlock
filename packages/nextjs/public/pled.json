@@ -51,6 +51,30 @@
             "status": "completed",
             "recipient": "recipient_2"
           }
+        ],
+        "actions": [
+          {
+            "actionId": "action_1",
+            "type": "DOCUSIGN",
+            "status": "PENDING",
+            "description": "Send document for signature",
+            "timestamp": "2025-01-15T12:00:00Z",
+            "metadata": {
+              "envelopeId": "envelope_1",
+              "recipient": "recipient_1"
+            }
+          },
+          {
+            "actionId": "action_2",
+            "type": "NOTIFICATION",
+            "status": "COMPLETED",
+            "description": "Send notification to user",
+            "timestamp": "2025-01-15T12:05:00Z",
+            "metadata": {
+              "notificationType": "EMAIL",
+              "recipient": "user@example.com"
+            }
+          }
         ]
       }
     ],

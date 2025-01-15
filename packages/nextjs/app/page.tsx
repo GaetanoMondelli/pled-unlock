@@ -1,56 +1,63 @@
-"use client";
-
 import Link from "next/link";
-import type { NextPage } from "next";
-import { useState } from "react";
-import { useAccount } from "wagmi";
-import { BugAntIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline";
-import { Address } from "~~/components/scaffold-eth";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PlusCircle } from "lucide-react";
-import Sidebar from "@/components/sidebar";
-import ProcedureContent from "@/components/ui/procedure-content";
+import pledData from "@/public/pled.json";
 
-const Home: NextPage = () => {
-  const { address: connectedAddress } = useAccount();
+interface Procedure {
+  id: string;
+  name: string;
+  events: Array<{
+    eventId: string;
+    timestamp: string;
+    content: string;
+    description: string;
+    link: string;
+  }>;
+  messages: Array<{
+    messageId: string;
+    title: string;
+    timestamp: string;
+    events: string[];
+    messageContent: string;
+    eventIds: string[];
+  }>;
+  messageRules: any[];
+  stateMachineDefinition: string;
+}
 
-  // State management for selected procedure and subsection
-  const [selectedProcedure, setSelectedProcedure] = useState<string | null>(null);
-  const [activeSubsection, setActiveSubsection] = useState<string | null>(null);
+export default function Home() {
+  const procedures = pledData.procedures;
 
   return (
-    <>
-      <main className="flex-1 h-screen p-6 overflow-auto">
-        {/* <div className="max-w-4xl mx-auto space-y-6">
-          <div className="flex justify-between items-center">
-            <h1 className="text-3xl font-bold">Procedures</h1>
-            <Button>
-              <PlusCircle className="mr-2 h-4 w-4" /> Add Procedure
-            </Button>
-          </div> */}
-        <div className="flex">
-          <Sidebar
-            selectedProcedure={selectedProcedure}
-            setSelectedProcedure={setSelectedProcedure}
-            activeSubsection={activeSubsection}
-            setActiveSubsection={setActiveSubsection}
-          />
-          {selectedProcedure !== null && activeSubsection !== null && (
-            <div className="flex-1 
-              ml-4
-            ">
-              <ProcedureContent
-                procedureId={Number(selectedProcedure)}
-                activeSubsection={activeSubsection}
-                selectedProcedure={selectedProcedure}
-              />
-            </div>
-          )}
-        </div>
-        {/* </div> */}
-      </main>
-    </>
+    <div className="p-8">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">Available Procedures</h1>
+        <Button>
+          <PlusCircle className="mr-2 h-4 w-4" /> Add Procedure
+        </Button>
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {procedures.map((procedure: Procedure) => (
+          <Link 
+            href={`/procedures/${procedure.id}`} 
+            key={procedure.id}
+            className="block hover:opacity-80 transition-opacity"
+          >
+            <Card>
+              <CardHeader>
+                <h3 className="text-lg font-semibold">{procedure.name}</h3>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">
+                  {`${procedure.events.length} events, ${procedure.messages.length} messages`}
+                </p>
+              </CardContent>
+            </Card>
+          </Link>
+        ))}
+      </div>
+    </div>
   );
-};
-
-export default Home;
+}
