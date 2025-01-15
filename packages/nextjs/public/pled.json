@@ -1,137 +1,156 @@
 {
-    "procedures": [
-      {
-        "id": "procedure_1",
-        "name": "Procedure 1",
-        "events": [
-          {
-            "eventId": "event_1",
-            "timestamp": "2025-01-15T12:00:00Z",
-            "content": "Event 1 content description",
-            "description": "Event 1 description",
-            "link": "https://example.com/event_1"
+  "procedureTemplates": [
+    {
+      "templateId": "hiring_process",
+      "name": "Software Engineer Hiring Process",
+      "description": "Standard hiring workflow for software engineering positions",
+      "variables": {
+        "candidate": {
+          "email": { "type": "string", "required": true },
+          "name": { "type": "string", "required": true }
+        },
+        "company": {
+          "email": { "type": "string", "required": true },
+          "department": { "type": "string", "required": true }
+        }
+      },
+      "eventTypes": [
+        {
+          "type": "EMAIL_RECEIVED",
+          "schema": {
+            "from": "string",
+            "to": "string",
+            "subject": "string",
+            "body": "string"
+          }
+        },
+        {
+          "type": "DOCUMENT_UPLOADED",
+          "schema": {
+            "filename": "string",
+            "type": "string",
+            "url": "string"
+          }
+        }
+      ],
+      "messageRules": [
+        {
+          "id": "interview_request",
+          "matches": {
+            "type": "EMAIL_RECEIVED",
+            "conditions": {
+              "from": "{{candidate.email}}",
+              "to": "{{company.email}}",
+              "subject": "(contains) interview"
+            }
           },
-          {
-            "eventId": "event_2",
-            "timestamp": "2025-01-16T14:30:00Z",
-            "content": "Event 2 content description",
-            "description": "Event 2 description",
-            "link": "https://example.com/event_2"
+          "generates": {
+            "type": "INTERVIEW_REQUESTED",
+            "template": {
+              "title": "Interview requested by {{candidate.name}}",
+              "content": "Candidate has requested an interview for {{company.department}} position"
+            }
           }
-        ],
-        "messages": [
+        }
+      ],
+      "stateMachine": {
+        "states": ["idle", "interview_requested", "interview_scheduled"],
+        "transitions": [
           {
-            "messageId": "message_1",
-            "title": "Message Transition 1",
-            "timestamp": "2025-01-15T12:05:00Z",
-            "events": ["event_1", "event_2"],
-            "messageContent": "Generated message content for transition 1",
-            "eventIds": ["event_1", "event_2"]
+            "from": "idle",
+            "to": "interview_requested",
+            "on": "INTERVIEW_REQUESTED"
           }
-        ],
-        "messageRules": [
+        ]
+      },
+      "actions": {
+        "interview_requested": [
           {
-            "ruleId": "rule_1",
-            "description": "Message rule for event 1",
-            "priority": 1,
-            "matchingEvents": ["event_1"],
-            "generatedMessage": "Message 1 for event 1",
-            "eventIds": ["event_1"]
-          }
-        ],
-        "stateMachineDefinition": "start->event_1->event_2->end",
-        "docusignEnvelopes": [
-          {
-            "envelopeId": "envelope_1",
-            "status": "sent",
-            "recipient": "recipient_1"
-          },
-          {
-            "envelopeId": "envelope_2",
-            "status": "completed",
-            "recipient": "recipient_2"
-          }
-        ],
-        "actions": [
-          {
-            "actionId": "action_1",
-            "type": "DOCUSIGN",
-            "status": "PENDING",
-            "description": "Send document for signature",
-            "timestamp": "2025-01-15T12:00:00Z",
-            "metadata": {
-              "envelopeId": "envelope_1",
-              "recipient": "recipient_1"
+            "type": "SEND_EMAIL",
+            "template": {
+              "from": "{{company.email}}",
+              "to": "{{candidate.email}}",
+              "subject": "Interview Request Received for {{company.department}}",
+              "body": "Dear {{candidate.name}},\n\nWe received your interview request for the position in {{company.department}}.\n\nBest regards,\nHR Team"
             }
           },
           {
-            "actionId": "action_2",
-            "type": "NOTIFICATION",
-            "status": "COMPLETED",
-            "description": "Send notification to user",
-            "timestamp": "2025-01-15T12:05:00Z",
-            "metadata": {
-              "notificationType": "EMAIL",
-              "recipient": "user@example.com"
+            "type": "CREATE_CALENDAR_EVENT",
+            "template": {
+              "title": "Interview with {{candidate.name}}",
+              "description": "Interview for {{company.department}} position",
+              "attendees": ["{{candidate.email}}", "{{company.email}}"]
+            }
+          }
+        ],
+        "interview_scheduled": [
+          {
+            "type": "SEND_REMINDER",
+            "template": {
+              "to": "{{candidate.email}}",
+              "subject": "Interview Reminder",
+              "body": "Dear {{candidate.name}},\n\nThis is a reminder about your upcoming interview..."
             }
           }
         ]
       }
-    ],
-    "events": [
-      {
-        "eventId": "event_1",
-        "timestamp": "2025-01-15T12:00:00Z",
-        "content": "Event 1 content",
-        "description": "A description for event 1",
-        "link": "https://example.com/event_1"
+    }
+  ],
+  "procedureInstances": [
+    {
+      "instanceId": "proc_123",
+      "templateId": "hiring_process",
+      "variables": {
+        "candidate": {
+          "email": "john@example.com",
+          "name": "John Doe"
+        },
+        "company": {
+          "email": "hr@company.com",
+          "department": "Engineering"
+        }
       },
-      {
-        "eventId": "event_2",
-        "timestamp": "2025-01-16T14:30:00Z",
-        "content": "Event 2 content",
-        "description": "A description for event 2",
-        "link": "https://example.com/event_2"
-      }
-    ],
-    "messageRules": [
-      {
-        "ruleId": "rule_1",
-        "description": "Rule for event 1 matching criteria",
-        "priority": 1,
-        "matchingEvents": ["event_1"],
-        "generatedMessage": "Generated message for event 1",
-        "eventIds": ["event_1"]
-      }
-    ],
-    "messages": [
-      {
-        "messageId": "message_1",
-        "title": "Transition Message 1",
-        "timestamp": "2025-01-15T12:05:00Z",
-        "events": ["event_1", "event_2"],
-        "messageContent": "Message content for transition 1",
-        "eventIds": ["event_1", "event_2"]
-      }
-    ],
-    "stateMachines": [
-      {
-        "procedureId": "procedure_1",
-        "stateMachineDefinition": "start->event_1->event_2->end",
-        "state": "start"
-      }
-    ],
-    "docusignEnvelopes": [
-      {
-        "envelopeId": "envelope_1",
-        "status": "sent",
-        "recipient": "recipient_1"
-      },
-      {
-        "envelopeId": "envelope_2",
-        "status": "completed",
-        "recipient": "recipient_2"
-      }
-    ]
-  }
+      "currentState": "interview_requested",
+      "events": [
+        {
+          "id": "evt_1",
+          "type": "EMAIL_RECEIVED",
+          "timestamp": "2024-03-20T10:00:00Z",
+          "data": {
+            "from": "john@example.com",
+            "to": "hr@company.com",
+            "subject": "Interview request",
+            "body": "I'd like to schedule an interview"
+          }
+        }
+      ],
+      "messages": [
+        {
+          "id": "msg_1",
+          "type": "INTERVIEW_REQUESTED",
+          "timestamp": "2024-03-20T10:00:01Z",
+          "title": "Interview requested by John Doe",
+          "content": "Candidate has requested an interview for Engineering position",
+          "fromEvent": "evt_1"
+        }
+      ],
+      "completedActions": [
+        {
+          "id": "act_1",
+          "type": "SEND_EMAIL",
+          "timestamp": "2024-03-20T10:00:02Z",
+          "result": {
+            "success": true,
+            "data": {
+              "from": "hr@company.com",
+              "to": "john@example.com",
+              "subject": "Interview Request Received for Engineering",
+              "messageId": "msg_123"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
   

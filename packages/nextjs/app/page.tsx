@@ -1,63 +1,81 @@
+"use client";
+
 import Link from "next/link";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { PlusCircle } from "lucide-react";
+import { Card } from "@/components/ui/card";
 import pledData from "@/public/pled.json";
 
-interface Procedure {
-  id: string;
-  name: string;
+interface ProcedureInstance {
+  instanceId: string;
+  templateId: string;
+  startDate?: string;
+  variables: {
+    candidate: {
+      email: string;
+      name: string;
+    };
+    company: {
+      email: string;
+      department: string;
+    };
+  };
+  currentState: string;
   events: Array<{
-    eventId: string;
+    id: string;
+    type: string;
     timestamp: string;
-    content: string;
-    description: string;
-    link: string;
+    data: Record<string, any>;
   }>;
   messages: Array<{
-    messageId: string;
-    title: string;
+    id: string;
+    type: string;
     timestamp: string;
-    events: string[];
-    messageContent: string;
-    eventIds: string[];
+    title: string;
+    content: string;
+    fromEvent: string;
   }>;
-  messageRules: any[];
-  stateMachineDefinition: string;
+  completedActions: Array<{
+    id: string;
+    type: string;
+    timestamp: string;
+    result: Record<string, any>;
+  }>;
 }
 
 export default function Home() {
-  const procedures = pledData.procedures;
-
   return (
-    <div className="p-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Available Procedures</h1>
-        <Button>
-          <PlusCircle className="mr-2 h-4 w-4" /> Add Procedure
-        </Button>
-      </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {procedures.map((procedure: Procedure) => (
-          <Link 
-            href={`/procedures/${procedure.id}`} 
-            key={procedure.id}
-            className="block hover:opacity-80 transition-opacity"
-          >
-            <Card>
-              <CardHeader>
-                <h3 className="text-lg font-semibold">{procedure.name}</h3>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  {`${procedure.events.length} events, ${procedure.messages.length} messages`}
-                </p>
-              </CardContent>
-            </Card>
-          </Link>
-        ))}
-      </div>
+    <div className="container mx-auto p-6">
+      {pledData.procedureTemplates.map((template) => (
+        <div key={template.templateId} className="mb-8">
+          <h2 className="text-2xl font-bold mb-4">{template.name}</h2>
+          <p className="text-muted-foreground mb-4">{template.description}</p>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {pledData.procedureInstances
+              .filter(instance => instance.templateId === template.templateId)
+              .map((instance: ProcedureInstance) => (
+                <Link 
+                  key={instance.instanceId} 
+                  href={`/procedures/${instance.instanceId}`}
+                >
+                  <Card className="p-4 hover:shadow-lg transition-shadow">
+                    <h3 className="font-semibold mb-2">
+                      {instance.variables?.candidate?.name || 'Unnamed'}
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      {instance.variables?.company?.department || 'No department specified'}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Started: {instance.startDate ? instance?.startDate : 'Not started'}
+                    </p>
+                    <div className="mt-2 inline-block px-2 py-1 text-xs bg-secondary rounded-full">
+                      {instance.currentState}
+                    </div>
+                  </Card>
+                </Link>
+              ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

@@ -1,88 +1,124 @@
 "use client"
 
-import { useState } from "react"
+import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import pledData from "@/public/pled.json"
+import { replaceTemplateVariables } from "@/lib/utils"
+import { TemplateVariable } from "@/components/ui/template-variable"
 
-const mockAutomaticActions = [
-  { id: 1, name: "Send Welcome Email", trigger: "Application Received" },
-  { id: 2, name: "Schedule Document Review", trigger: "Documents Submitted" },
-  { id: 3, name: "Send Interview Invitation", trigger: "Documents Approved" },
-]
+interface ActionListProps {
+  procedureId: string
+}
 
-const mockManualActions = [
-  { id: 1, name: "Approve Documents", available: true },
-  { id: 2, name: "Reject Application", available: true },
-  { id: 3, name: "Schedule Interview", available: false },
-  { id: 4, name: "Extend Offer", available: false },
-]
+interface ActionTemplate {
+  type: string;
+  template: {
+    [key: string]: string | string[] | undefined;
+    from?: string;
+    to?: string;
+    subject?: string;
+    body?: string;
+    title?: string;
+    description?: string;
+    attendees?: string[];
+  };
+}
 
-const mockActionLog = [
-  { id: 1, action: "Application Received", timestamp: "2023-05-01 10:00:00" },
-  { id: 2, action: "Send Welcome Email", timestamp: "2023-05-01 10:01:00" },
-  { id: 3, action: "Documents Submitted", timestamp: "2023-05-02 14:30:00" },
-  { id: 4, action: "Schedule Document Review", timestamp: "2023-05-02 14:31:00" },
-]
+interface Actions {
+  [state: string]: ActionTemplate[];
+}
 
-export default function ActionList({ procedureId }: { procedureId: string }) {
-  const [automaticActions] = useState(mockAutomaticActions)
-  const [manualActions, setManualActions] = useState(mockManualActions)
-  const [actionLog, setActionLog] = useState(mockActionLog)
+function formatTemplateContent(template: any, variables: any) {
+  const regex = /\{\{([^}]+)\}\}/g
+  let formattedContent: (string | JSX.Element)[] = []
+  let lastIndex = 0
+  let match
 
-  const executeAction = (actionId: number) => {
-    const action = manualActions.find(a => a.id === actionId)
-    if (action) {
-      const newLog = {
-        id: actionLog.length + 1,
-        action: action.name,
-        timestamp: new Date().toISOString()
-      }
-      setActionLog([newLog, ...actionLog])
-      
-      // Update available actions (this is a simplified example)
-      setManualActions(manualActions.map(a => 
-        a.id === actionId ? { ...a, available: false } : a
-      ))
+  const content = JSON.stringify(template, null, 2)
+
+  while ((match = regex.exec(content)) !== null) {
+    // Add text before the match
+    if (match.index > lastIndex) {
+      formattedContent.push(content.slice(lastIndex, match.index))
     }
+
+    // Add the template variable component
+    const path = match[1].trim()
+    const value = path.split('.').reduce((obj: any, key: string) => obj?.[key], variables) || path
+    
+    formattedContent.push(
+      <TemplateVariable 
+        key={match.index} 
+        path={path} 
+        value={value} 
+      />
+    )
+
+    lastIndex = regex.lastIndex
   }
 
+  // Add remaining text
+  if (lastIndex < content.length) {
+    formattedContent.push(content.slice(lastIndex))
+  }
+
+  return formattedContent
+}
+
+export default function ActionList({ procedureId }: ActionListProps) {
+  const instance = pledData.procedureInstances.find(
+    p => p.instanceId === procedureId
+  )
+  
+  if (!instance) return null
+
+  const template = pledData.procedureTemplates.find(
+    t => t.templateId === instance.templateId
+  )
+
+  if (!template) return null
+
+  // Get available actions for current state
+  const availableActions = (template.actions as Actions)[instance.currentState] || []
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+      {/* Available Actions */}
       <div>
-        <h3 className="text-lg font-semibold mb-4">Automatic Actions</h3>
-        <ul className="space-y-2">
-          {automaticActions.map((action) => (
-            <li key={action.id} className="bg-card p-2 rounded-lg">
-              <span>{action.name}</span>
-              <span className="text-sm text-muted-foreground ml-2">Trigger: {action.trigger}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
-      <div>
-        <h3 className="text-lg font-semibold mb-4">Manual Actions</h3>
+        <h3 className="font-semibold mb-4">Available Actions</h3>
         <div className="space-y-2">
-          {manualActions.map((action) => (
-            <Button
-              key={action.id}
-              onClick={() => executeAction(action.id)}
-              disabled={!action.available}
-              className="w-full"
-            >
-              {action.name}
-            </Button>
+          {availableActions.map((action) => (
+            <Card key={action.type} className="p-4">
+              <div className="flex justify-between items-start mb-2">
+                <h4 className="font-medium">{action.type}</h4>
+                <Button size="sm">Execute</Button>
+              </div>
+              <pre className="text-sm bg-muted p-2 rounded-md overflow-auto">
+                {formatTemplateContent(action.template, instance.variables)}
+              </pre>
+            </Card>
           ))}
         </div>
       </div>
+
+      {/* Completed Actions */}
       <div>
-        <h3 className="text-lg font-semibold mb-4">Action Log</h3>
-        <ul className="space-y-2">
-          {actionLog.map((log) => (
-            <li key={log.id} className="bg-card p-2 rounded-lg">
-              <span>{log.action}</span>
-              <span className="text-sm text-muted-foreground ml-2">{log.timestamp}</span>
-            </li>
+        <h3 className="font-semibold mb-4">Completed Actions</h3>
+        <div className="space-y-2">
+          {instance.completedActions.map((action) => (
+            <Card key={action.id} className="p-4">
+              <div className="flex justify-between items-start mb-2">
+                <h4 className="font-medium">{action.type}</h4>
+                <span className="text-xs text-muted-foreground">
+                  {new Date(action.timestamp).toLocaleString()}
+                </span>
+              </div>
+              <pre className="text-sm bg-muted p-2 rounded-md overflow-auto">
+                {JSON.stringify(action.result, null, 2)}
+              </pre>
+            </Card>
           ))}
-        </ul>
+        </div>
       </div>
     </div>
   )

@@ -20,24 +20,59 @@ export default function ProcedureLayout({
   params: { id: string };
 }) {
   const [activeTab, setActiveTab] = useState('events');
-  const procedure = pledData.procedures.find(p => p.id === params.id);
-  if (!procedure) return null;
+  const instance = pledData.procedureInstances.find(p => p.instanceId === params.id);
+  if (!instance) return null;
+
+  const template = pledData.procedureTemplates.find(t => t.templateId === instance.templateId);
+  if (!template) return null;
 
   const navItems = [
+    { id: 'variables', label: 'Variables' },
     { id: 'events', label: 'Events' },
     { id: 'messages', label: 'Messages' },
-    // { id: 'rules', label: 'Rules' },
     { id: 'state', label: 'State Machine' },
     { id: 'actions', label: 'Actions' },
   ];
 
   const renderContent = () => {
     switch (activeTab) {
+      case 'variables':
+        return (
+          <Card className="p-4">
+            <ScrollArea className="h-[calc(100vh-12rem)]">
+              <div className="space-y-6">
+                {Object.entries(template.variables).map(([section, fields]) => (
+                  <div key={section} className="space-y-2">
+                    <h3 className="font-medium capitalize">{section}</h3>
+                    <div className="grid gap-2">
+                      {Object.entries(fields).map(([field, config]: [string, any]) => (
+                        <div key={field} className="flex items-center justify-between p-2 rounded-lg bg-muted">
+                          <div>
+                            <p className="text-sm font-medium">{field}</p>
+                            <p className="text-xs text-muted-foreground">{config.description}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {config.required && (
+                              <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">Required</span>
+                            )}
+                            <span className="text-sm text-primary">
+                              {instance.variables[section as keyof typeof instance.variables]?.[field] || '-'}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </Card>
+        );
       case 'events':
         return (
           <Card className="p-4">
             <ScrollArea className="h-[calc(100vh-12rem)]">
-                <EventsList procedureId={params.id} />
+              <EventsList procedureId={params.id} />
             </ScrollArea>
           </Card>
         );
@@ -63,7 +98,7 @@ export default function ProcedureLayout({
         return (
           <Card className="p-4">
             <ScrollArea className="h-[calc(100vh-12rem)]">
-                <ActionList procedureId={params.id} />
+              <ActionList procedureId={params.id} />
             </ScrollArea>
           </Card>
         );
@@ -82,7 +117,7 @@ export default function ProcedureLayout({
           </Button>
         </Link>
         <ChevronRight className="h-4 w-4 text-muted-foreground" />
-        <span>{procedure.name}</span>
+        <span>{template.name} - {instance.variables?.candidate?.name}</span>
       </div>
 
       <div className="flex h-[calc(100vh-4rem)]">

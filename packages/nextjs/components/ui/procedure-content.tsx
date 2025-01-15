@@ -42,11 +42,7 @@ export default function ProcedureContent({ procedureId, activeSubsection, select
         {activeSubsection === "Events" && <EventList procedureId={procedureId.toString()} />}
         {activeSubsection === "Messages" && <MessageRules procedureId={procedureId.toString()} />}
         {activeSubsection === "State" && (
-          <>
-            <ProcedureState procedureId={procedureId.toString()} state={{
-              messages: []
-            }} />
-          </>
+          <ProcedureState procedureId={procedureId.toString()} />
         )}
         {activeSubsection === "Actions" && <ActionList procedureId={procedureId.toString()} />}
       </CardContent>
