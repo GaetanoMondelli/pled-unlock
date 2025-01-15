@@ -1,32 +1,28 @@
 import React, { useEffect, useState } from 'react';
-import { dot_to_svg } from 'jssm-viz';
+import { machine_to_svg_string } from 'jssm-viz';
+import { sm } from 'jssm';
 
 interface StateGraphProps {
-  stateMachine: any; // Adjust the type based on your state machine definition
+  definition: string;
+  currentState: string;
 }
 
-const StateGraph: React.FC<StateGraphProps> = ({ stateMachine }) => {
+const StateGraph: React.FC<StateGraphProps> = ({ definition, currentState }: StateGraphProps) => {
   const [svg, setSvg] = useState<string | null>(null);
 
   useEffect(() => {
     const generateSvg = async () => {
-      const svgData = await dot_to_svg(
-        `digraph StateMachine {
-          idle -> processing [label="start"];
-          processing -> success [label="complete"];
-          processing -> failure [label="fail"];
-          success -> idle [label="reset"];
-          failure -> idle [label="retry"];
-        }`
-      );
+      const newStyle = `state ${currentState} : { background-color: green;  corners: rounded; };`;
+      const svgData = await machine_to_svg_string(sm`${definition.trim()} \n ${newStyle}`);
       setSvg(svgData);
     };
 
     generateSvg();
-  }, [stateMachine]);
+  }, [definition, currentState]);
 
   return (
     <div>
+
       {svg ? (
         <div dangerouslySetInnerHTML={{ __html: svg }} />
       ) : (
