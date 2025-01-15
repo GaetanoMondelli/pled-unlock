@@ -11,7 +11,9 @@
     "serve": "next start",
     "start": "next dev",
     "vercel": "vercel --build-env YARN_ENABLE_IMMUTABLE_INSTALLS=false --build-env ENABLE_EXPERIMENTAL_COREPACK=1 --build-env VERCEL_TELEMETRY_DISABLED=1",
-    "vercel:yolo": "vercel --build-env YARN_ENABLE_IMMUTABLE_INSTALLS=false --build-env ENABLE_EXPERIMENTAL_COREPACK=1 --build-env NEXT_PUBLIC_IGNORE_BUILD_ERROR=true --build-env VERCEL_TELEMETRY_DISABLED=1"
+    "vercel:yolo": "vercel --build-env YARN_ENABLE_IMMUTABLE_INSTALLS=false --build-env ENABLE_EXPERIMENTAL_COREPACK=1 --build-env NEXT_PUBLIC_IGNORE_BUILD_ERROR=true --build-env VERCEL_TELEMETRY_DISABLED=1",
+    "pled:download": "ts-node --compilerOptions '{\"module\":\"commonjs\"}' scripts/pled-sync.ts download",
+    "pled:upload": "ts-node --compilerOptions '{\"module\":\"commonjs\"}' scripts/pled-sync.ts upload"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^17.0.0",
@@ -54,6 +56,7 @@
     "shadcn-ui": "^0.9.4",
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
+    "ts-node": "^10.x.x",
     "usehooks-ts": "~3.1.0",
     "viem": "2.21.54",
     "wagmi": "2.13.4",
