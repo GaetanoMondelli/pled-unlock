@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { D3Graph } from './d3-graph'
 import { calculateCurrentState, createStateMachine } from "@/lib/fsm"
+import { NodeDetailsDialog } from './node-details-dialog'
 
 interface Message {
   id: string;
@@ -18,9 +19,32 @@ interface Message {
 interface ProcedureStateProps {
   definitionProp: string;
   messagesProp: Message[];
+  params: { id: string };
+  template?: {
+    documents?: {
+      contracts?: Array<{
+        id: string;
+        name: string;
+        type: string;
+        content: string;
+        linkedStates?: string[];
+      }>;
+    };
+    states?: {
+      [key: string]: {
+        description?: string;
+        actions?: string[];
+      };
+    };
+  };
 }
 
-export const ProcedureState: React.FC<ProcedureStateProps> = ({ definitionProp, messagesProp}) => {
+export const ProcedureState: React.FC<ProcedureStateProps> = ({ 
+  definitionProp, 
+  messagesProp,
+  params,
+  template = { documents: { contracts: [] }, states: {} }
+}) => {
   const [definition, setDefinition] = useState<string>(
     definitionProp?.replace(/;\s*/g, ';\n') || `
       idle 'start' -> processing;
@@ -36,6 +60,8 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({ definitionProp, 
     calculateCurrentState(definition, messagesProp)
   );
   const [messages, setMessages] = useState<Message[]>(messagesProp || [])
+  const [selectedNode, setSelectedNode] = useState(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   // Extract nodes and transitions from the state machine
   const nodes = useMemo(() => {
@@ -71,10 +97,16 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({ definitionProp, 
     return Array.from(stateSet).map(state => ({
       id: state,
       isActive: state === currentState,
-      isInitial: state === 'idle', // Or however you identify your initial state
-      isFinal: finalStates.has(state)
+      isInitial: state === 'idle',
+      isFinal: finalStates.has(state),
+      metadata: {
+        ...template?.states?.[state],
+        // Add actions if they exist in the template
+        actions: template?.states?.[state]?.actions || [],
+        // We don't need to add documents here as they're inferred from the documents section
+      }
     }));
-  }, [definition, currentState]);
+  }, [definition, currentState, template]);
 
   const links = useMemo(() => {
     const transitionLinks: { source: string; target: string; label: string }[] = [];
@@ -142,28 +174,45 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({ definitionProp, 
     }
   };
 
+  const handleNodeClick = (node: any) => {
+    console.log('Clicked node:', node);
+    setSelectedNode(node);
+    setIsDialogOpen(true);
+  };
+
   return (
-    <div className="w-full h-[600px] bg-white rounded-lg shadow-lg p-4">
-      <div className="flex flex-col h-full">
-        <div className="flex-grow">
-          <D3Graph
-            nodes={nodes}
-            links={links}
-            width={800}
-            height={500}
-            direction="LR"
-          />
-        </div>
-        <div className="mt-4">
-          <Textarea
-            value={definition}
-            onChange={handleDefinitionChange}
-            className="w-full h-24"
-            placeholder="Enter state machine definition..."
-          />
+    <>
+      <div className="w-full h-[600px] bg-white rounded-lg shadow-lg p-4">
+        <div className="flex flex-col h-full">
+          <div className="flex-grow">
+            <D3Graph
+              nodes={nodes}
+              links={links}
+              width={800}
+              height={500}
+              direction="LR"
+              onNodeClick={handleNodeClick}
+              documents={template?.documents}
+            />
+          </div>
+          <div className="mt-4">
+            <Textarea
+              value={definition}
+              onChange={handleDefinitionChange}
+              className="w-full h-24"
+              placeholder="Enter state machine definition..."
+            />
+          </div>
         </div>
       </div>
-    </div>
+      <NodeDetailsDialog
+        node={selectedNode}
+        isOpen={isDialogOpen}
+        onClose={() => setIsDialogOpen(false)}
+        documents={template?.documents}
+        procedureId={params.id}
+      />
+    </>
   )
 }
 

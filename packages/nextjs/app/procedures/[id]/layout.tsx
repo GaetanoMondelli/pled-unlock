@@ -9,16 +9,18 @@ import {
   CalendarDays, 
   MessageSquare, 
   GitBranch, 
-  PlayCircle 
+  PlayCircle,
+  Folder
 } from "lucide-react";
 import pledData from "@/public/pled.json";
-import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import EventsList from "@/components/ui/event-list";
 import MessageRules from "@/components/ui/message-rules";
 import ProcedureState from "@/components/ui/procedure-state";
 import ActionList from "@/components/ui/action-list";
+import EnvelopeView from "~~/components/ui/envelope-view";
+import { useSearchParams, useRouter } from 'next/navigation';
 
 type Variables = {
   candidate: { email: string; name: string };
@@ -32,7 +34,14 @@ export default function ProcedureLayout({
   children: React.ReactNode;
   params: { id: string };
 }) {
-  const [activeTab, setActiveTab] = useState('events');
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const activeTab = searchParams.get('tab') || 'events';
+
+  const handleTabChange = (tab: string) => {
+    router.push(`/procedures/${params.id}?tab=${tab}`);
+  };
+
   const instance = pledData.procedureInstances.find(p => p.instanceId === params.id);
   if (!instance) return null;
 
@@ -45,6 +54,7 @@ export default function ProcedureLayout({
     { id: 'messages', label: 'Messages', icon: <MessageSquare className="h-4 w-4" /> },
     { id: 'state', label: 'State Machine', icon: <GitBranch className="h-4 w-4" /> },
     { id: 'actions', label: 'Actions', icon: <PlayCircle className="h-4 w-4" /> },
+    { id: 'envelope', label: 'Envelope', icon: <Folder className="h-4 w-4" /> },
   ];
 
   const renderContent = () => {
@@ -101,9 +111,12 @@ export default function ProcedureLayout({
         return (
           <Card className="p-4">
             <ScrollArea className="h-[calc(100vh-12rem)]">
-              <ProcedureState definitionProp={template.stateMachine.fsl} messagesProp={
-                instance.messages
-              } />
+              <ProcedureState 
+                definitionProp={template.stateMachine.fsl} 
+                messagesProp={instance.messages}
+                template={template}
+                params={params}
+              />
             </ScrollArea>
           </Card>
         );
@@ -112,6 +125,14 @@ export default function ProcedureLayout({
           <Card className="p-4">
             <ScrollArea className="h-[calc(100vh-12rem)]">
               <ActionList procedureId={params.id} />
+            </ScrollArea>
+          </Card>
+        );
+      case 'envelope':
+        return (
+          <Card className="p-4">
+            <ScrollArea className="h-[calc(100vh-12rem)]">
+              <EnvelopeView procedureId={params.id} template={template} />
             </ScrollArea>
           </Card>
         );
@@ -142,7 +163,7 @@ export default function ProcedureLayout({
                 key={item.id}
                 variant={activeTab === item.id ? "secondary" : "ghost"}
                 className="w-full justify-start gap-2"
-                onClick={() => setActiveTab(item.id)}
+                onClick={() => handleTabChange(item.id)}
               >
                 {item.icon}
                 {item.label}

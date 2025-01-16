@@ -12,7 +12,7 @@ import {
   GitBranch,
   Timer
 } from "lucide-react";
-import { formatDistanceToNow, format } from "date-fns";
+import { format } from "date-fns";
 import pledData from "@/public/pled.json";
 import { calculateCurrentState } from "@/lib/fsm"
 
@@ -164,3 +164,7 @@ function getStateBadgeVariant(state: string): "default" | "secondary" | "destruc
       return 'outline';
   }
 }
+function formatDistanceToNow(arg0: Date) {
+  throw new Error("Function not implemented.");
+}
+

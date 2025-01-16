@@ -143,3 +143,13 @@ p {
   stroke: #333;
   stroke-width: 1.5px;
 }
+
+.action-icon, .document-icon {
+  stroke: currentColor;
+  opacity: 0.5;
+  cursor: pointer;
+}
+
+.action-icon:hover, .document-icon:hover {
+  opacity: 1;
+}

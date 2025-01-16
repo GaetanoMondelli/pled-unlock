@@ -19,6 +19,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "~~/components/ui/tooltip"
+import DocumentSidebar from './document-sidebar';
 
 const SIDEBAR_COOKIE_NAME = "sidebar:state"
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
@@ -158,6 +159,9 @@ const SidebarProvider = React.forwardRef<
             {children}
             <button onClick={() => handleProcedureClick('Procedure 1')}>Procedure 1</button>
             <button onClick={() => handleProcedureClick('Procedure 2')}>Procedure 2</button>
+            <div className="tab" onClick={() => handleTabClick('envelope')}>
+              Envelope
+            </div>
           </div>
         </TooltipProvider>
       </SidebarContext.Provider>
@@ -744,6 +748,13 @@ const SidebarMenuSubButton = React.forwardRef<
   )
 })
 SidebarMenuSubButton.displayName = "SidebarMenuSubButton"
+
+const handleTabClick = (tab: string) => {
+  // Logic to switch between tabs
+  if (tab === 'envelope') {
+    // Show the DocumentSidebar or relevant content
+  }
+};
 
 export {
   Sidebar,

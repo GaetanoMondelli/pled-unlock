@@ -81,7 +81,51 @@
       "stateMachine": {
         "fsl": "idle 'contact_candidate' -> contacting_candidate; contacting_candidate 'discuss_role' -> role_discussed; role_discussed 'schedule_interview' -> interview_scheduled; interview_scheduled 'conduct_interview' -> interview_conducted; interview_conducted 'positive_feedback' -> offer_preparation; interview_conducted 'negative_feedback' -> failure; offer_preparation 'set_tabs_for_contract' -> contract_prepared; contract_prepared 'send_contract' -> contract_sent; contract_sent 'wait_for_signature' -> contract_signed; contract_sent 'rejection' -> failure; contract_signed 'check_lifecycle' -> onboarding_started; onboarding_started 'complete_training' -> training_completed; training_completed 'probation_period' -> probation_review; probation_review 'positive_feedback' -> salary_review; probation_review 'negative_feedback' -> termination_initiated; salary_review 'positive_feedback' -> performance_review; salary_review 'negative_feedback' -> termination_initiated; performance_review 'positive_feedback' -> active_employee; performance_review 'negative_feedback' -> termination_initiated; active_employee 'request_to_leave' -> voluntary_exit; active_employee 'termination_decision' -> termination_initiated; termination_initiated 'finalize' -> terminated; voluntary_exit 'finalize' -> exited; failure 'retry' -> idle;"
       },
+      "states": {
+        "contract_prepared": {
+          "description": "Employment contract has been prepared and is ready to be sent",
+          "actions": ["docusign_send"]
+        },
+        "contract_sent": {
+          "description": "Employment contract has been sent to the candidate",
+          "actions": ["send_reminder"]
+        },
+        "contract_signed": {
+          "description": "Employment contract has been signed by the candidate",
+          "actions": ["create_calendar_event", "send_email"]
+        }
+      },
+      "documents": {
+        "contracts": [
+          {
+            "id": "employment_contract",
+            "name": "Employment Contract",
+            "type": "contract",
+            "content": "Standard employment contract template...",
+            "linkedStates": ["contract_sent", "contract_signed"]
+          },
+          {
+            "id": "signed_employment_contract",
+            "name": "Signed Employment Contract",
+            "type": "contract",
+            "content": "Signed version of the employment contract",
+            "linkedStates": ["contract_signed"]
+          }
+        ]
+      },
       "actions": {
+        "docusign_send": {
+          "id": "docusign_send",
+          "name": "Send via DocuSign",
+          "type": "DOCUSIGN_SEND",
+          "description": "Send contract through DocuSign for signature",
+          "template": {
+            "documentId": "employment_contract",
+            "recipient": "{{candidate.email}}",
+            "message": "Please review and sign your employment contract",
+            "expiryDays": 7
+          }
+        },
         "interview_requested": [
           {
             "type": "SEND_EMAIL",

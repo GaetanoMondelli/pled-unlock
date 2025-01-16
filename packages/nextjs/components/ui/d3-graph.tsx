@@ -2,13 +2,17 @@ import React, { useEffect, useRef, useCallback, useState } from 'react';
 import * as d3 from 'd3';
 import * as dagreD3 from 'dagre-d3';
 import { Button } from "./button";
-import { MoveIcon, ZoomInIcon, ZoomOutIcon, RotateCcwIcon, CrosshairIcon } from "lucide-react";
+import { MoveIcon, ZoomInIcon, ZoomOutIcon, RotateCcwIcon, CrosshairIcon, FileText, Play } from "lucide-react";
 
 interface Node {
   id: string;
   isActive?: boolean;
   isInitial?: boolean;
   isFinal?: boolean;
+  metadata?: {
+    description?: string;
+    actions?: string[];
+  };
 }
 
 interface Link {
@@ -23,6 +27,13 @@ interface D3GraphProps {
   width?: number;
   height?: number;
   direction?: 'LR' | 'TB';
+  onNodeClick?: (node: any) => void;
+  documents?: {
+    contracts?: Array<{
+      id: string;
+      linkedStates?: string[];
+    }>;
+  };
 }
 
 export const D3Graph: React.FC<D3GraphProps> = ({
@@ -31,6 +42,8 @@ export const D3Graph: React.FC<D3GraphProps> = ({
   width = 800,
   height = 400,
   direction = 'LR',
+  onNodeClick,
+  documents
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const graphRef = useRef<any>(null);
@@ -87,6 +100,22 @@ export const D3Graph: React.FC<D3GraphProps> = ({
     }
   }, []);
 
+  const getStatesWithMetadata = (nodes: Node[], documents?: D3GraphProps['documents']) => {
+    const statesWithActions = nodes.filter(n => n.metadata?.actions?.length > 0)
+      .map(n => ({ id: n.id, actions: n.metadata?.actions }));
+
+    const statesWithDocs = nodes.filter(n => 
+      documents?.contracts?.some(doc => doc.linkedStates?.includes(n.id))
+    ).map(n => ({
+      id: n.id,
+      docs: documents?.contracts
+        ?.filter(doc => doc.linkedStates?.includes(n.id))
+        .map(doc => doc.id)
+    }));
+
+    return { statesWithActions, statesWithDocs };
+  };
+
   useEffect(() => {
     if (!svgRef.current) return;
     if (nodes.length === 0) return;
@@ -96,6 +125,13 @@ export const D3Graph: React.FC<D3GraphProps> = ({
       .attr("height", height);
     
     svg.selectAll("*").remove();
+
+    // Function to check if a state has linked documents
+    const hasLinkedDocuments = (stateId: string) => {
+      return documents?.contracts?.some(doc => 
+        doc.linkedStates?.includes(stateId)
+      ) || false;
+    };
 
     const g = new dagreD3.graphlib.Graph()
       .setGraph({
@@ -111,12 +147,13 @@ export const D3Graph: React.FC<D3GraphProps> = ({
     // Create svgGroup early
     const svgGroup = svg.append('g');
 
-    // Calculate final states (nodes with no outgoing edges)
+    // Calculate final states
     const finalStates = new Set(nodes.map(n => n.id));
     links.forEach(link => {
       finalStates.delete(link.source);
     });
 
+    // Set up nodes with proper metadata
     nodes.forEach(node => {
       const isInitial = node.id === 'idle';
       const isFinal = finalStates.has(node.id);
@@ -140,10 +177,13 @@ export const D3Graph: React.FC<D3GraphProps> = ({
         ry: 4,
         width: NODE_WIDTH,
         height: NODE_HEIGHT,
-        style: nodeStyle
+        style: nodeStyle,
+        metadata: node.metadata, // Add metadata here
+        hasDocuments: hasLinkedDocuments(node.id) // Add document info
       });
     });
 
+    // Set up edges
     links.forEach(link => {
       g.setEdge(link.source, link.target, {
         label: link.label,
@@ -155,6 +195,80 @@ export const D3Graph: React.FC<D3GraphProps> = ({
     });
 
     const render = new dagreD3.render();
+
+    // Override the default node shape
+    render.shapes().rect = function(parent, bbox, node) {
+      const shapeSvg = parent.insert("rect", ":first-child")
+        .attr("rx", 5)
+        .attr("ry", 5)
+        .attr("x", -bbox.width/2)
+        .attr("y", -bbox.height/2)
+        .attr("width", bbox.width)
+        .attr("height", bbox.height);
+
+      // Add icons if needed
+      const hasActions = (node as any).metadata?.actions?.length > 0;
+      const hasDocuments = (node as any).hasDocuments;
+
+      const iconSize = 14;
+      const iconPadding = 5;
+      const iconY = -bbox.height/2 + iconPadding;
+
+      if (hasActions) {
+        parent.append("path")
+          .attr("d", "M8 5v14l11-7z")
+          .attr("transform", `translate(${bbox.width/2 - iconSize - iconPadding}, ${iconY})`)
+          .attr("class", "action-icon")
+          .attr("width", iconSize)
+          .attr("height", iconSize)
+          .attr("fill", "none")
+          .attr("stroke", "currentColor")
+          .attr("stroke-width", "1.5");
+      }
+
+      if (hasDocuments) {
+        parent.append("path")
+          .attr("d", "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z")
+          .attr("transform", `translate(${bbox.width/2 - (hasActions ? 2 * (iconSize + iconPadding) : iconSize + iconPadding)}, ${iconY})`)
+          .attr("class", "document-icon")
+          .attr("width", iconSize)
+          .attr("height", iconSize)
+          .attr("fill", "none")
+          .attr("stroke", "currentColor")
+          .attr("stroke-width", "1.5");
+      }
+
+      return shapeSvg;
+    };
+
+    // Add intersection function to the node data
+    g.nodes().forEach(v => {
+      const node = g.node(v);
+      node.intersect = function(point: { x: number; y: number }) {
+        const bbox = this.elem.getBBox();
+        const w = bbox.width / 2;
+        const h = bbox.height / 2;
+        
+        const dx = point.x - node.x;
+        const dy = point.y - node.y;
+        
+        let sx, sy;
+        if (Math.abs(dy) * w > Math.abs(dx) * h) {
+          // Intersection is at top or bottom
+          sx = dy < 0 ? -h * dx / dy : h * dx / dy;
+          sy = dy < 0 ? -h : h;
+        } else {
+          // Intersection is at left or right
+          sx = dx < 0 ? -w : w;
+          sy = dx < 0 ? -w * dy / dx : w * dy / dx;
+        }
+        
+        return {
+          x: node.x + sx,
+          y: node.y + sy
+        };
+      };
+    });
 
     const zoom = d3.zoom()
       .scaleExtent([0.1, 2])
@@ -285,9 +399,9 @@ export const D3Graph: React.FC<D3GraphProps> = ({
         const edgePath = svgGroup.select(`path[data-source="${e.v}"][data-target="${e.w}"]`);
         edgePath
           .attr('d', d3.line()
-            .x(d => d.x)
-            .y(d => d.y)
-            .curve(d3.curveBasis)(points))
+            .x(d => d[0])
+            .y(d => d[1])
+            .curve(d3.curveBasis)(points.map(p => [p.x, p.y])))
           .attr('stroke', '#333')
           .attr('stroke-width', 1.5)
           .attr('fill', 'none')
@@ -295,14 +409,14 @@ export const D3Graph: React.FC<D3GraphProps> = ({
       });
     }
 
-    function dragMove(event: any, d: any) {
+    function dragMove(this: any, event: any, d: any) {
       if (isPanning || !draggedNode) return;
 
       const node = g.node(draggedNode);
       node.x += event.dx;
       node.y += event.dy;
 
-      d3.select(this).attr('transform', `translate(${node.x},${node.y})`);
+      d3.select(this as SVGGElement).attr('transform', `translate(${node.x},${node.y})`);
 
       // Update all edges and labels
       updateAllEdgePaths();
@@ -318,30 +432,7 @@ export const D3Graph: React.FC<D3GraphProps> = ({
       draggedNode = null;
     }
 
-    // After initial render, update the labels
-    render(svgGroup, g);
-
-    // Add data attributes to paths
-    svgGroup.selectAll('.edgePath path')
-      .attr('data-source', (d: any) => d.v)
-      .attr('data-target', (d: any) => d.w)
-      .attr('marker-end', 'url(#arrowhead)');
-
-    // Update all edge labels after initial render
-    updateAllEdgeLabels();
-
-    // Apply drag behavior
-    svgGroup.selectAll('g.node')
-      .call(dragBehavior as any);
-
-    // Move these to after all function definitions
-    graphRef.current = g;
-    zoomRef.current = zoom;
-
-    // Update cursor style based on dragging state
-    svgGroup.selectAll('g.node')
-      .style('cursor', isDraggingEnabled ? 'move' : 'pointer');
-
+    // Add styles for the icons
     const style = document.createElement('style');
     style.textContent = `
       .node rect {
@@ -390,13 +481,59 @@ export const D3Graph: React.FC<D3GraphProps> = ({
         fill: #333;
         stroke: none;
       }
+      .action-icon {
+        fill: currentColor;
+        opacity: 0.5;
+        cursor: pointer;
+        font-size: 14px;
+      }
+      .document-icon {
+        fill: currentColor;
+        opacity: 0.5;
+        cursor: pointer;
+        font-size: 14px;
+      }
+      .action-icon:hover, .document-icon:hover {
+        opacity: 1;
+      }
     `;
     document.head.appendChild(style);
+    // Create the renderer with proper typing
+    (render as any)(svgGroup, g);
+
+    // Move these to after all function definitions
+    graphRef.current = g;
+    zoomRef.current = zoom;
+
+    // Update cursor style based on dragging state
+    svgGroup.selectAll('g.node')
+      .style('cursor', isDraggingEnabled ? 'move' : 'pointer');
+
+    // Add click handler to nodes
+    svgGroup.selectAll('g.node')
+      .on('click', (event, d: any) => {
+        if (onNodeClick) {
+          const nodeData = g.node(d);
+          onNodeClick({
+            id: d,
+            metadata: nodeData.metadata
+          });
+        }
+      });
+
+    // In the debug section, add console logs
+    const metadata = getStatesWithMetadata(nodes, documents);
+    console.log('States with metadata:', {
+      nodes,
+      documents,
+      statesWithActions: metadata.statesWithActions,
+      statesWithDocs: metadata.statesWithDocs
+    });
 
     return () => {
       document.head.removeChild(style);
     };
-  }, [nodes, links, width, height, direction, isDraggingEnabled]);
+  }, [nodes, links, width, height, direction, isDraggingEnabled, onNodeClick, documents]);
 
   return (
     <div className="flex flex-col gap-2">
@@ -457,6 +594,31 @@ export const D3Graph: React.FC<D3GraphProps> = ({
       </div>
       <div className="relative w-full h-[400px] border rounded-lg overflow-hidden bg-white">
         <svg ref={svgRef} className="w-full h-full" />
+      </div>
+      
+      <div className="p-4 border rounded-lg bg-gray-50 text-sm">
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <h3 className="font-medium mb-2">States with Actions:</h3>
+            <ul className="space-y-1">
+              {getStatesWithMetadata(nodes, documents).statesWithActions.map(state => (
+                <li key={state.id} className="text-gray-600">
+                  {state.id}: [{state.actions?.join(', ')}]
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <h3 className="font-medium mb-2">States with Documents:</h3>
+            <ul className="space-y-1">
+              {getStatesWithMetadata(nodes, documents).statesWithDocs.map(state => (
+                <li key={state.id} className="text-gray-600">
+                  {state.id}: [{state.docs?.join(', ')}]
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
       </div>
     </div>
   );
