@@ -93,7 +93,9 @@ export default function ProcedureLayout({
         return (
           <Card className="p-4">
             <ScrollArea className="h-[calc(100vh-12rem)]">
-              <ProcedureState procedureId={params.id} />
+              <ProcedureState definitionProp={template.stateMachine.fsl} messagesProp={
+                instance.messages
+              } />
             </ScrollArea>
           </Card>
         );

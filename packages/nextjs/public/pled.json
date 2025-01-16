@@ -54,14 +54,7 @@
         }
       ],
       "stateMachine": {
-        "states": ["idle", "interview_requested", "interview_scheduled"],
-        "transitions": [
-          {
-            "from": "idle",
-            "to": "interview_requested",
-            "on": "INTERVIEW_REQUESTED"
-          }
-        ]
+        "fsl": "idle 'contact_candidate' -> contacting_candidate; contacting_candidate 'discuss_role' -> role_discussed; role_discussed 'schedule_interview' -> interview_scheduled; interview_scheduled 'conduct_interview' -> interview_conducted; interview_conducted 'positive_feedback' -> offer_preparation; interview_conducted 'negative_feedback' -> failure; offer_preparation 'set_tabs_for_contract' -> contract_prepared; contract_prepared 'send_contract' -> contract_sent; contract_sent 'wait_for_signature' -> contract_signed; contract_sent 'rejection' -> failure; contract_signed 'check_lifecycle' -> onboarding_started; onboarding_started 'complete_training' -> training_completed; training_completed 'probation_period' -> probation_review; probation_review 'positive_feedback' -> salary_review; probation_review 'negative_feedback' -> termination_initiated; salary_review 'positive_feedback' -> performance_review; salary_review 'negative_feedback' -> termination_initiated; performance_review 'positive_feedback' -> active_employee; performance_review 'negative_feedback' -> termination_initiated; active_employee 'request_to_leave' -> voluntary_exit; active_employee 'termination_decision' -> termination_initiated; termination_initiated 'finalize' -> terminated; voluntary_exit 'finalize' -> exited; failure 'retry' -> idle;"
       },
       "actions": {
         "interview_requested": [
@@ -127,7 +120,15 @@
       "messages": [
         {
           "id": "msg_1",
-          "type": "INTERVIEW_REQUESTED",
+          "type": "contact_candidate",
+          "timestamp": "2024-03-20T10:00:01Z",
+          "title": "Interview requested by John Doe",
+          "content": "Candidate has requested an interview for Engineering position",
+          "fromEvent": "evt_1"
+        },
+        {
+          "id": "msg_2",
+          "type": "discuss_role",
           "timestamp": "2024-03-20T10:00:01Z",
           "title": "Interview requested by John Doe",
           "content": "Candidate has requested an interview for Engineering position",

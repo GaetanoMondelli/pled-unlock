@@ -1,52 +1,123 @@
 "use client"
 
-import { Card } from "@/components/ui/card";
-import pledData from "@/public/pled.json";
+import { useState } from "react"
+import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
+import StateGraph from "@/components/ui/state-graph"
+import { sm } from 'jssm'
+
+interface Message {
+  id: string;
+  type: string;
+  timestamp: string;
+  title: string;
+  content: string;
+  fromEvent?: string;
+}
 
 interface ProcedureStateProps {
-  procedureId: string;
+  definitionProp: string;
+  messagesProp: Message[];
 }
 
-export default function ProcedureState({ procedureId }: ProcedureStateProps) {
-  const instance = pledData.procedureInstances.find(
-    p => p.instanceId === procedureId
+export const ProcedureState: React.FC<ProcedureStateProps> = ({ definitionProp, messagesProp}) => {
+  const [definition, setDefinition] = useState<string>(
+    definitionProp?.replace(/;\s*/g, ';\n') || `
+      idle 'start' -> processing;
+      success 'reset' -> failure;
+      processing 'complete' -> success;
+      processing 'fail' -> failure;
+      failure 'retry' -> idle;
+    `
+  )
+
+  const calculateCurrentState = (messages: Message[], machine: any) => {
+    let currentState = machine.state(); // Start from initial state
+    
+    // Sort messages by timestamp and apply transitions
+    const sortedMessages = [...messages].sort((a, b) => 
+      new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    );
+
+    for (const message of sortedMessages) {
+      try {
+        machine.go(currentState);
+        const actionResult = machine.action(message.type);
+        if (actionResult) {
+          currentState = machine.state();
+        }
+      } catch (error) {
+        console.error(`Error applying message ${message.type}:`, error);
+      }
+    }
+    
+    return currentState;
+  };
+
+  const [stateMachine, setStateMachine] = useState(() => sm`${(definition).trim()}`)
+  const [currentState, setCurrentState] = useState(() => 
+    calculateCurrentState(messagesProp, stateMachine)
   );
+  const [messages, setMessages] = useState<Message[]>(messagesProp || [])
+
+  const handleDefinitionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newDefinition = e.target.value
+    setDefinition(newDefinition)
+    try {
+      const newStateMachine = sm`${newDefinition.trim().replace(/\n/g, ' ')}`
+      setStateMachine(newStateMachine)
+      setCurrentState(calculateCurrentState(messages, newStateMachine))
+    } catch (error) {
+      console.error("Invalid state machine definition", error)
+    }
+  }
+
+  const handleSendMessage = (messageType: string) => {
+    try {
+      stateMachine.go(currentState)
+      const actionResult = stateMachine.action(messageType);
+      if (!actionResult) {
+        console.warn(`Action "${messageType}" is invalid for current state ${currentState}`);
+        return;
+      }
+
+      const newState = stateMachine.state();
+      const newMessage: Message = {
+        id: `msg_${Date.now()}`,
+        type: messageType,
+        timestamp: new Date().toISOString(),
+        title: `State changed to ${newState}`,
+        content: `Transition: ${currentState} -> ${newState}`
+      };
+
+      setMessages(prev => [...prev, newMessage]);
+      setCurrentState(newState);
+    } catch (error) {
+      console.error("Error during state transition:", error);
+    }
+  };
   
-  if (!instance) return null;
 
-  const template = pledData.procedureTemplates.find(
-    t => t.templateId === instance.templateId
-  );
-
-  if (!template) return null;
 
   return (
-    <div className="space-y-4">
-      <Card className="p-4">
-        <h3 className="font-semibold mb-2">Current State</h3>
-        <div className="text-lg font-medium text-primary">
-          {instance.currentState}
-        </div>
-      </Card>
+    <>
+      <h4 className="text-md font-semibold mb-2">Executed Messages for Procedure</h4>
+      <ul className="space-y-2">
+        {/* <Button onClick={() => handleSendMessage('start')}>Send 'start' Message</Button>
+        <Button onClick={() => handleSendMessage('complete')}>Send 'complete' Message</Button>
+        <Button onClick={() => handleSendMessage('fail')}>Send 'fail' Message</Button>
+        <Button onClick={() => handleSendMessage('reset')}>Send 'reset' Message</Button>
+        <Button onClick={() => handleSendMessage('retry')}>Send 'retry' Message</Button> */}
+        <p>Current State: {currentState}</p>
+        <p>Messages: {messages.map(m => m.type).join(', ')}</p>
 
-      <Card className="p-4">
-        <h3 className="font-semibold mb-2">Available States</h3>
-        <div className="flex gap-2 flex-wrap">
-          {template.stateMachine.states.map((state) => (
-            <span 
-              key={state}
-              className={`px-2 py-1 rounded-full text-sm ${
-                state === instance.currentState 
-                  ? 'bg-primary text-primary-foreground' 
-                  : 'bg-secondary'
-              }`}
-            >
-              {state}
-            </span>
-          ))}
-        </div>
-      </Card>
-    </div>
-  );
+      </ul>
+      <div className="flex gap-4 mt-4"> 
+        { <StateGraph definition={definition} currentState={currentState} />}
+        <Textarea value={definition} onChange={handleDefinitionChange} className="mb-4 w-1/2" />
+      </div>
+    </>
+  )
 }
 
+export default ProcedureState

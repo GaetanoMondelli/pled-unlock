@@ -10,7 +10,7 @@ import { sm } from 'jssm';
 import StateGraph from "@/components/ui/state-graph";
 
 interface ProcedureContentProps {
-  procedureId: number;
+  procedureId: string;
   activeSubsection: string;
   selectedProcedure: string | null;
 }
@@ -21,9 +21,6 @@ export default function ProcedureContent({ procedureId, activeSubsection, select
     name: "Procedure Name", // You might want to fetch the actual name based on the ID
     description: "Procedure Description" // Fetch the actual description
   };
-
-  // Define the state machine using jssm
-  const [stateMachine, setStateMachine] = useState(() => sm`state1 -> state2; state2 -> state3;`);
 
   useEffect(() => {
     if (selectedProcedure) {
@@ -41,9 +38,9 @@ export default function ProcedureContent({ procedureId, activeSubsection, select
       <CardContent>
         {activeSubsection === "Events" && <EventList procedureId={procedureId.toString()} />}
         {activeSubsection === "Messages" && <MessageRules procedureId={procedureId.toString()} />}
-        {activeSubsection === "State" && (
-          <ProcedureState procedureId={procedureId.toString()} />
-        )}
+        {/* {activeSubsection === "State" && (
+        //   <ProcedureState procedureId={procedureId.toString()} />
+        )} */}
         {activeSubsection === "Actions" && <ActionList procedureId={procedureId.toString()} />}
       </CardContent>
     </Card>
