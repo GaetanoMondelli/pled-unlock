@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback, useState } from 'react';
 import * as d3 from 'd3';
 import * as dagreD3 from 'dagre-d3';
 import { Button } from "./button";
@@ -35,6 +35,7 @@ export const D3Graph: React.FC<D3GraphProps> = ({
   const svgRef = useRef<SVGSVGElement>(null);
   const graphRef = useRef<any>(null);
   const zoomRef = useRef<any>(null);
+  const [isDraggingEnabled, setIsDraggingEnabled] = useState(false);
   const NODE_WIDTH = 150;
   const NODE_HEIGHT = 50;
 
@@ -90,11 +91,6 @@ export const D3Graph: React.FC<D3GraphProps> = ({
     if (!svgRef.current) return;
     if (nodes.length === 0) return;
 
-    const finalStates = new Set(nodes.map(n => n.id));
-    links.forEach(link => {
-      finalStates.delete(link.source);
-    });
-
     const svg = d3.select(svgRef.current)
       .attr("width", width)
       .attr("height", height);
@@ -111,6 +107,15 @@ export const D3Graph: React.FC<D3GraphProps> = ({
         edgesep: 15,
         ranker: "tight-tree"
       });
+
+    // Create svgGroup early
+    const svgGroup = svg.append('g');
+
+    // Calculate final states (nodes with no outgoing edges)
+    const finalStates = new Set(nodes.map(n => n.id));
+    links.forEach(link => {
+      finalStates.delete(link.source);
+    });
 
     nodes.forEach(node => {
       const isInitial = node.id === 'idle';
@@ -150,7 +155,6 @@ export const D3Graph: React.FC<D3GraphProps> = ({
     });
 
     const render = new dagreD3.render();
-    const svgGroup = svg.append('g');
 
     const zoom = d3.zoom()
       .scaleExtent([0.1, 2])
@@ -159,24 +163,6 @@ export const D3Graph: React.FC<D3GraphProps> = ({
       });
     
     svg.call(zoom as any);
-
-    const defs = svg.append("defs");
-    defs.append("marker")
-      .attr("id", "arrowhead")
-      .attr("viewBox", "-10 -5 10 5")
-      .attr("refX", 0)
-      .attr("refY", 0)
-      .attr("markerWidth", 6)
-      .attr("markerHeight", 6)
-      .attr("orient", "auto")
-      .append("path")
-      .attr("d", "M -10,-5 L 0,0 L -10,5 Z")
-      .attr("fill", "#333");
-
-    const dragBehavior = d3.drag()
-      .on('start', dragStart)
-      .on('drag', dragMove)
-      .on('end', dragEnd);
 
     let draggedNode: any = null;
 
@@ -199,10 +185,114 @@ export const D3Graph: React.FC<D3GraphProps> = ({
       }
     });
 
+    // Define drag behavior before using it
+    const dragBehavior = d3.drag()
+      .on('start', dragStart)
+      .on('drag', dragMove)
+      .on('end', dragEnd);
+
     function dragStart(event: any, d: any) {
-      if (isPanning) return;
+      if (isPanning || !isDraggingEnabled) return;
       event.sourceEvent.stopPropagation();
       draggedNode = d;
+    }
+
+    function updateAllEdgeLabels() {
+      // Remove all existing edge labels first
+      svgGroup.selectAll('.edgeLabel').remove();
+
+      // Re-create all edge labels
+      g.edges().forEach(e => {
+        const sourceNode = g.node(e.v);
+        const targetNode = g.node(e.w);
+        const edge = g.edge(e);
+
+        const dx = targetNode.x - sourceNode.x;
+        const dy = targetNode.y - sourceNode.y;
+        
+        const midX = (sourceNode.x + targetNode.x) / 2;
+        const midY = (sourceNode.y + targetNode.y) / 2;
+        
+        const curvature = 0.3;
+        const offset = Math.min(Math.abs(dx), Math.abs(dy)) * curvature;
+        
+        // Position label above or below the edge based on the edge direction
+        const labelOffset = 15; // Increased offset from edge
+        const labelY = midY + (dy > 0 ? -labelOffset : labelOffset);
+
+        const labelGroup = svgGroup.append('g')
+          .attr('class', 'edgeLabel')
+          .attr('data-source', e.v)
+          .attr('data-target', e.w)
+          .attr('transform', `translate(${midX},${labelY})`);
+
+        labelGroup.append('rect')
+          .attr('x', -20)
+          .attr('y', -10)
+          .attr('width', 40)
+          .attr('height', 20)
+          .attr('fill', 'white');
+
+        labelGroup.append('text')
+          .attr('text-anchor', 'middle')
+          .attr('dominant-baseline', 'middle')
+          .attr('font-size', '11px')
+          .text(edge.label || '');
+      });
+    }
+
+    function updateAllEdgePaths() {
+      // First, calculate the center of all nodes
+      const centerX = nodes.reduce((sum, n) => sum + g.node(n.id).x, 0) / nodes.length;
+      const centerY = nodes.reduce((sum, n) => sum + g.node(n.id).y, 0) / nodes.length;
+
+      g.edges().forEach(e => {
+        const sourceNode = g.node(e.v);
+        const targetNode = g.node(e.w);
+
+        const dx = targetNode.x - sourceNode.x;
+        const dy = targetNode.y - sourceNode.y;
+        
+        const midX = (sourceNode.x + targetNode.x) / 2;
+        const midY = (sourceNode.y + targetNode.y) / 2;
+        
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        const curvature = distance > NODE_WIDTH * 2 ? 0.5 : 0.3;
+
+        // Determine if the edge midpoint is above or below the canvas center
+        const isMidpointAboveCenter = midY < centerY;
+        // Determine if the edge midpoint is left or right of the canvas center
+        const isMidpointLeftOfCenter = midX < centerX;
+
+        // Calculate offset direction based on position relative to center
+        const offsetDirection = Math.abs(dx) > Math.abs(dy)
+          ? (isMidpointAboveCenter ? 1 : -1) // For horizontal edges
+          : (isMidpointLeftOfCenter ? 1 : -1); // For vertical edges
+
+        const offset = Math.min(Math.abs(dx), Math.abs(dy)) * curvature * offsetDirection;
+
+        const controlPoint = {
+          x: midX,
+          y: midY + offset // Note: positive offset curves downward, negative curves upward
+        };
+
+        const points = [
+          { x: sourceNode.x, y: sourceNode.y },
+          controlPoint,
+          { x: targetNode.x, y: targetNode.y }
+        ];
+
+        const edgePath = svgGroup.select(`path[data-source="${e.v}"][data-target="${e.w}"]`);
+        edgePath
+          .attr('d', d3.line()
+            .x(d => d.x)
+            .y(d => d.y)
+            .curve(d3.curveBasis)(points))
+          .attr('stroke', '#333')
+          .attr('stroke-width', 1.5)
+          .attr('fill', 'none')
+          .attr('marker-end', 'url(#arrowhead)');
+      });
     }
 
     function dragMove(event: any, d: any) {
@@ -214,67 +304,43 @@ export const D3Graph: React.FC<D3GraphProps> = ({
 
       d3.select(this).attr('transform', `translate(${node.x},${node.y})`);
 
-      g.edges().forEach(e => {
-        if (e.v === draggedNode || e.w === draggedNode) {
-          const sourceNode = g.node(e.v);
-          const targetNode = g.node(e.w);
-
-          const dx = targetNode.x - sourceNode.x;
-          const dy = targetNode.y - sourceNode.y;
-          
-          const midX = (sourceNode.x + targetNode.x) / 2;
-          const midY = (sourceNode.y + targetNode.y) / 2;
-          
-          const curvature = 0.3;
-          const offset = Math.min(Math.abs(dx), Math.abs(dy)) * curvature;
-          
-          const controlPoint = {
-            x: midX,
-            y: midY - offset
-          };
-
-          const points = [
-            { x: sourceNode.x, y: sourceNode.y },
-            controlPoint,
-            { x: targetNode.x, y: targetNode.y }
-          ];
-
-          const edgePath = svgGroup.select(`path[data-source="${e.v}"][data-target="${e.w}"]`);
-          
-          edgePath
-            .attr('d', d3.line()
-              .x(d => d.x)
-              .y(d => d.y)
-              .curve(d3.curveBasis)(points))
-            .attr('stroke', '#333')
-            .attr('stroke-width', 1.5)
-            .attr('fill', 'none')
-            .attr('marker-end', 'url(#arrowhead)');
-
-          const labelGroup = svgGroup.select(`g[data-source="${e.v}"][data-target="${e.w}"].edgeLabel`);
-          if (labelGroup.node()) {
-            labelGroup.attr('transform', `translate(${midX},${midY})`);
-          }
-        }
-      });
+      // Update all edges and labels
+      updateAllEdgePaths();
+      updateAllEdgeLabels();
     }
 
     function dragEnd(event: any, d: any) {
+      if (!draggedNode) return;
+      
+      // Final update of all edges and labels
+      updateAllEdgePaths();
+      updateAllEdgeLabels();
       draggedNode = null;
     }
 
+    // After initial render, update the labels
     render(svgGroup, g);
 
+    // Add data attributes to paths
     svgGroup.selectAll('.edgePath path')
       .attr('data-source', (d: any) => d.v)
       .attr('data-target', (d: any) => d.w)
       .attr('marker-end', 'url(#arrowhead)');
 
+    // Update all edge labels after initial render
+    updateAllEdgeLabels();
+
+    // Apply drag behavior
     svgGroup.selectAll('g.node')
       .call(dragBehavior as any);
 
+    // Move these to after all function definitions
     graphRef.current = g;
     zoomRef.current = zoom;
+
+    // Update cursor style based on dragging state
+    svgGroup.selectAll('g.node')
+      .style('cursor', isDraggingEnabled ? 'move' : 'pointer');
 
     const style = document.createElement('style');
     style.textContent = `
@@ -330,7 +396,7 @@ export const D3Graph: React.FC<D3GraphProps> = ({
     return () => {
       document.head.removeChild(style);
     };
-  }, [nodes, links, width, height, direction]);
+  }, [nodes, links, width, height, direction, isDraggingEnabled]);
 
   return (
     <div className="flex flex-col gap-2">
@@ -368,10 +434,25 @@ export const D3Graph: React.FC<D3GraphProps> = ({
           >
             <CrosshairIcon className="h-4 w-4" />
           </Button>
+          <Button
+            variant={isDraggingEnabled ? "default" : "outline"}
+            size="sm"
+            onClick={() => setIsDraggingEnabled(!isDraggingEnabled)}
+            className="flex items-center gap-2"
+          >
+            <MoveIcon className="h-4 w-4" />
+            <span>{isDraggingEnabled ? "Disable Dragging" : "Enable Dragging"}</span>
+          </Button>
         </div>
         <div className="flex items-center gap-2 text-sm text-gray-500">
-          <MoveIcon className="h-4 w-4" />
-          <span>Hold Space + Drag to Pan</span>
+          {isDraggingEnabled ? (
+            <span className="font-medium text-blue-600">Node dragging enabled</span>
+          ) : (
+            <>
+              <MoveIcon className="h-4 w-4" />
+              <span>Hold Space + Drag to Pan</span>
+            </>
+          )}
         </div>
       </div>
       <div className="relative w-full h-[400px] border rounded-lg overflow-hidden bg-white">
