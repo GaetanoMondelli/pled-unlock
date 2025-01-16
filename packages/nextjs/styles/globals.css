@@ -120,3 +120,26 @@ p {
     @apply bg-background;
   }
 }
+
+/* Add these styles for the graph */
+.node rect {
+  stroke: #333;
+  fill: #fff;
+  stroke-width: 1.5px;
+}
+
+.edgePath path {
+  stroke: #333;
+  fill: none;
+  stroke-width: 1.5px;
+}
+
+.edge .label {
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.edge path {
+  stroke: #333;
+  stroke-width: 1.5px;
+}
