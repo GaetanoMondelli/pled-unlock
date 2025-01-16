@@ -2,7 +2,15 @@
 
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Home, ChevronRight } from "lucide-react";
+import { 
+  Home, 
+  ChevronRight, 
+  VariableIcon,
+  CalendarDays, 
+  MessageSquare, 
+  GitBranch, 
+  PlayCircle 
+} from "lucide-react";
 import pledData from "@/public/pled.json";
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
@@ -32,11 +40,11 @@ export default function ProcedureLayout({
   if (!template) return null;
 
   const navItems = [
-    { id: 'variables', label: 'Variables' },
-    { id: 'events', label: 'Events' },
-    { id: 'messages', label: 'Messages' },
-    { id: 'state', label: 'State Machine' },
-    { id: 'actions', label: 'Actions' },
+    { id: 'variables', label: 'Variables', icon: <VariableIcon className="h-4 w-4" /> },
+    { id: 'events', label: 'Events', icon: <CalendarDays className="h-4 w-4" /> },
+    { id: 'messages', label: 'Messages', icon: <MessageSquare className="h-4 w-4" /> },
+    { id: 'state', label: 'State Machine', icon: <GitBranch className="h-4 w-4" /> },
+    { id: 'actions', label: 'Actions', icon: <PlayCircle className="h-4 w-4" /> },
   ];
 
   const renderContent = () => {
@@ -133,9 +141,10 @@ export default function ProcedureLayout({
               <Button
                 key={item.id}
                 variant={activeTab === item.id ? "secondary" : "ghost"}
-                className="w-full justify-start"
+                className="w-full justify-start gap-2"
                 onClick={() => setActiveTab(item.id)}
               >
+                {item.icon}
                 {item.label}
               </Button>
             ))}

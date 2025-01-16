@@ -4,7 +4,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import StateGraph from "@/components/ui/state-graph"
-import { sm } from 'jssm'
+import { calculateCurrentState, createStateMachine } from "@/lib/fsm"
 
 interface Message {
   id: string;
@@ -31,32 +31,9 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({ definitionProp, 
     `
   )
 
-  const calculateCurrentState = (messages: Message[], machine: any) => {
-    let currentState = machine.state(); // Start from initial state
-    
-    // Sort messages by timestamp and apply transitions
-    const sortedMessages = [...messages].sort((a, b) => 
-      new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-    );
-
-    for (const message of sortedMessages) {
-      try {
-        machine.go(currentState);
-        const actionResult = machine.action(message.type);
-        if (actionResult) {
-          currentState = machine.state();
-        }
-      } catch (error) {
-        console.error(`Error applying message ${message.type}:`, error);
-      }
-    }
-    
-    return currentState;
-  };
-
-  const [stateMachine, setStateMachine] = useState(() => sm`${(definition).trim()}`)
+  const [stateMachine, setStateMachine] = useState(() => createStateMachine(definition))
   const [currentState, setCurrentState] = useState(() => 
-    calculateCurrentState(messagesProp, stateMachine)
+    calculateCurrentState(definition, messagesProp)
   );
   const [messages, setMessages] = useState<Message[]>(messagesProp || [])
 
@@ -64,9 +41,9 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({ definitionProp, 
     const newDefinition = e.target.value
     setDefinition(newDefinition)
     try {
-      const newStateMachine = sm`${newDefinition.trim().replace(/\n/g, ' ')}`
+      const newStateMachine = createStateMachine(newDefinition)
       setStateMachine(newStateMachine)
-      setCurrentState(calculateCurrentState(messages, newStateMachine))
+      setCurrentState(calculateCurrentState(newDefinition, messagesProp))
     } catch (error) {
       console.error("Invalid state machine definition", error)
     }

@@ -2,10 +2,20 @@
 
 import { Card } from "@/components/ui/card";
 import pledData from "@/public/pled.json";
+import { format } from "date-fns";
 
 interface EventListProps {
   procedureId: string;
 }
+
+const formatDate = (dateString: string) => {
+  try {
+    return format(new Date(dateString), "PPpp");
+  } catch (error) {
+    console.error('Error formatting date:', error);
+    return dateString;
+  }
+};
 
 export default function EventList({ procedureId }: EventListProps) {
   const instance = pledData.procedureInstances.find(
@@ -17,6 +27,15 @@ export default function EventList({ procedureId }: EventListProps) {
   const template = pledData.procedureTemplates.find(
     t => t.templateId === instance.templateId
   );
+
+  const getEventTime = (event: any) => {
+    // For email events, use the time when email was sent
+    if (event.type === 'EMAIL_RECEIVED' && event.data.time) {
+      return formatDate(event.data.time);
+    }
+    // For other events, use the system timestamp
+    return formatDate(event.timestamp);
+  };
 
   return (
     <div className="space-y-4">
@@ -30,7 +49,7 @@ export default function EventList({ procedureId }: EventListProps) {
             <div className="flex justify-between items-start mb-2">
               <h3 className="font-semibold">{event.type}</h3>
               <span className="text-xs text-muted-foreground">
-                {new Date(event.timestamp).toLocaleString()}
+                {formatDate(event.timestamp)}
               </span>
             </div>
             <pre className="text-sm bg-muted p-2 rounded-md overflow-auto">
