@@ -62,7 +62,10 @@ export default function ProcedureList() {
                   <MessageRules procedureId={selectedProcedure.id} />
                 </TabsContent>
                 <TabsContent value="state">
-                  <ProcedureState procedureId={selectedProcedure.id} />
+                  <ProcedureState 
+                    definitionProp={selectedProcedure.stateMachine.fsl} 
+                    messagesProp={selectedProcedure.messages} 
+                  />
                 </TabsContent>
                 <TabsContent value="actions">
                   <ActionList procedureId={selectedProcedure.id} />

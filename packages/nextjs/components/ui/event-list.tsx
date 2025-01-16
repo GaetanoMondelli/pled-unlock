@@ -49,7 +49,7 @@ export default function EventList({ procedureId }: EventListProps) {
             <div className="flex justify-between items-start mb-2">
               <h3 className="font-semibold">{event.type}</h3>
               <span className="text-xs text-muted-foreground">
-                {formatDate(event.timestamp)}
+                {event.timestamp}
               </span>
             </div>
             <pre className="text-sm bg-muted p-2 rounded-md overflow-auto">

@@ -36,17 +36,40 @@
       ],
       "messageRules": [
         {
-          "id": "interview_request",
+          "id": "interview_request_pattern",
+          "priority": 1,
           "matches": {
             "type": "EMAIL_RECEIVED",
             "conditions": {
               "from": "{{candidate.email}}",
               "to": "{{company.email}}",
-              "subject": "(contains) interview"
+              "subject": "(contains) interview",
+              "time": "{{event.data.time}}"
             }
           },
           "generates": {
             "type": "contact_candidate",
+            "template": {
+              "title": "Interview requested by {{candidate.name}}",
+              "content": "Candidate has requested an interview for {{company.department}} position",
+              "timestamp": "{{event.data.time}}"
+            }
+          }
+        },
+        {
+          "id": "interview_request_llm",
+          "priority": 2,
+          "matches": {
+            "type": "EMAIL_RECEIVED",
+            "conditions": {
+              "from": "{{candidate.email}}",
+              "to": "{{company.email}}",
+              "body": "(llm-prompt) {{candidate.name}} asks for an interview",
+              "time": "{{event.data.time}}"
+            }
+          },
+          "generates": {
+            "type": "discuss_role",
             "template": {
               "title": "Interview requested by {{candidate.name}}",
               "content": "Candidate has requested an interview for {{company.department}} position",

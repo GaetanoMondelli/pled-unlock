@@ -1,35 +1,36 @@
 "use client"
 
-import { TemplateVariable } from "@/components/ui/template-variable"
+import { User, Calendar } from "lucide-react";
 
-export function formatTemplateContent(content: string, variables: any) {
-  const regex = /\{\{([^}]+)\}\}/g
-  let formattedContent: (string | JSX.Element)[] = []
-  let lastIndex = 0
-  let match
-
-  while ((match = regex.exec(content)) !== null) {
-    if (match.index > lastIndex) {
-      formattedContent.push(content.slice(lastIndex, match.index))
+export const formatTemplateContent = (content: string, variables: any) => {
+  return content.split(/(\{\{[^}]+\}\})/).map((part, index) => {
+    if (part.startsWith('{{')) {
+      const variable = part.slice(2, -2).trim();
+      
+      // Check if it's an event variable
+      if (variable.startsWith('event.')) {
+        return (
+          <span key={index} className="text-blue-500 group relative inline-flex items-center">
+            <Calendar className="h-3 w-3 inline mr-1" />
+            {part}
+            <span className="hidden group-hover:block absolute -top-8 left-0 bg-black text-white text-xs p-1 rounded z-50">
+              Event Variable
+            </span>
+          </span>
+        );
+      }
+      
+      // Instance variable
+      return (
+        <span key={index} className="text-green-500 group relative inline-flex items-center">
+          <User className="h-3 w-3 inline mr-1" />
+          {part}
+          <span className="hidden group-hover:block absolute -top-8 left-0 bg-black text-white text-xs p-1 rounded z-50">
+            Instance Variable
+          </span>
+        </span>
+      );
     }
-
-    const path = match[1].trim()
-    const value = path.split('.').reduce((obj: any, key: string) => obj?.[key], variables) || path
-    
-    formattedContent.push(
-      <TemplateVariable 
-        key={match.index} 
-        path={path} 
-        value={value} 
-      />
-    )
-
-    lastIndex = regex.lastIndex
-  }
-
-  if (lastIndex < content.length) {
-    formattedContent.push(content.slice(lastIndex))
-  }
-
-  return formattedContent
-} 
+    return part;
+  });
+}; 

@@ -7,11 +7,14 @@
 
 :root,
 [data-theme] {
-  background: oklch(var(--b2));
+  background: white;
 }
 
 body {
   min-height: 100vh;
+  background-color: white;
+  margin: 0;
+  padding: 0;
 }
 
 h1,
@@ -37,7 +40,7 @@ p {
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
+    --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;
     --card-foreground: 0 0% 3.9%;
     --popover: 0 0% 100%;
@@ -111,6 +114,9 @@ p {
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground min-h-screen;
+  }
+  html {
+    @apply bg-background;
   }
 }

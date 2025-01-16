@@ -21,7 +21,7 @@ const ScaffoldEthApp = ({ children }: { children: React.ReactNode }) => {
           <ScaffoldEthAppWithProviders>{children}</ScaffoldEthAppWithProviders>
         </ThemeProvider>
       </body> */}
-      <body className={inter.className}>
+      <body className={`${inter.className} min-h-screen bg-background`}>
         <CustomEthAppWithProviders>{children}</CustomEthAppWithProviders>
       </body>
     </html>
