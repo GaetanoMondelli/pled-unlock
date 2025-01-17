@@ -1,11 +1,13 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { D3Graph } from './d3-graph'
 import { calculateCurrentState, createStateMachine } from "@/lib/fsm"
 import { NodeDetailsDialog } from './node-details-dialog'
+import { FSMDefinitionModal } from './fsm-definition-modal'
+import { StateHistory } from './state-history'
 
 interface Message {
   id: string;
@@ -39,6 +41,14 @@ interface ProcedureStateProps {
   };
 }
 
+interface StateTransition {
+  id: string;
+  timestamp: string;
+  message: string;
+  fromState: string;
+  toState: string;
+}
+
 export const ProcedureState: React.FC<ProcedureStateProps> = ({ 
   definitionProp, 
   messagesProp,
@@ -62,6 +72,34 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
   const [messages, setMessages] = useState<Message[]>(messagesProp || [])
   const [selectedNode, setSelectedNode] = useState(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [focusedState, setFocusedState] = useState<string | null>(null);
+  const graphRef = useRef<any>(null);
+  const [stateHistory, setStateHistory] = useState<StateTransition[]>([]);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Calculate initial state history by replaying all messages
+  useEffect(() => {
+    const history: StateTransition[] = [];
+    const fsm = createStateMachine(definition);
+    let currentState = 'idle'; // Start from initial state
+    
+    messagesProp.forEach(msg => {
+      fsm.go(currentState);
+      const prevState = currentState;
+      fsm.action(msg.type);
+      currentState = fsm.state();
+      
+      history.push({
+        id: msg.id,
+        timestamp: msg.timestamp,
+        message: msg.type,
+        fromState: prevState,
+        toState: currentState
+      });
+    });
+    
+    setStateHistory(history);
+  }, [messagesProp, definition]);
 
   // Extract nodes and transitions from the state machine
   const nodes = useMemo(() => {
@@ -152,6 +190,7 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
   const handleSendMessage = (messageType: string) => {
     try {
       stateMachine.go(currentState)
+      const previousState = currentState;
       const actionResult = stateMachine.action(messageType);
       if (!actionResult) {
         console.warn(`Action "${messageType}" is invalid for current state ${currentState}`);
@@ -163,11 +202,18 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
         id: `msg_${Date.now()}`,
         type: messageType,
         timestamp: new Date().toISOString(),
-        title: `State changed to ${newState}`,
-        content: `Transition: ${currentState} -> ${newState}`
+        title: `${messageType}`,
+        content: `Transition: ${previousState} -> ${newState}`
       };
 
       setMessages(prev => [...prev, newMessage]);
+      setStateHistory(prev => [...prev, {
+        id: newMessage.id,
+        timestamp: newMessage.timestamp,
+        message: messageType,
+        fromState: previousState,
+        toState: newState
+      }]);
       setCurrentState(newState);
     } catch (error) {
       console.error("Error during state transition:", error);
@@ -178,33 +224,66 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
     console.log('Clicked node:', node);
     setSelectedNode(node);
     setIsDialogOpen(true);
+    setFocusedState(node.id);
+    if (graphRef.current?.focusOnState) {
+      graphRef.current.focusOnState(node.id);
+    }
+  };
+
+  const handleFocusState = (state: string) => {
+    setFocusedState(prev => prev === state ? null : state);
+    if (graphRef.current?.focusOnState && state !== focusedState) {
+      graphRef.current.focusOnState(state);
+    }
+  };
+
+  const handleContainerClick = (e: React.MouseEvent) => {
+    if (e.target === containerRef.current) {
+      setFocusedState(null);
+    }
   };
 
   return (
     <>
-      <div className="w-full h-[600px] bg-white rounded-lg shadow-lg p-4">
-        <div className="flex flex-col h-full">
-          <div className="flex-grow">
-            <D3Graph
-              nodes={nodes}
-              links={links}
-              width={800}
-              height={500}
-              direction="LR"
-              onNodeClick={handleNodeClick}
-              documents={template?.documents}
-            />
-          </div>
-          <div className="mt-4">
-            <Textarea
-              value={definition}
-              onChange={handleDefinitionChange}
-              className="w-full h-24"
-              placeholder="Enter state machine definition..."
-            />
-          </div>
+      <div 
+        className="flex flex-col gap-6" 
+        onClick={handleContainerClick}
+        ref={containerRef}
+      >
+        <div className="flex justify-between items-center">
+          <h3 className="text-lg font-medium">State Machine Visualization</h3>
+          <FSMDefinitionModal 
+            definition={definition}
+            onChange={(value: string) => handleDefinitionChange({ target: { value } } as React.ChangeEvent<HTMLTextAreaElement>)}
+          />
+        </div>
+
+        <div className="w-full bg-white rounded-lg shadow-lg p-4">
+          <D3Graph
+            ref={graphRef}
+            nodes={nodes.map(node => ({
+              ...node,
+              highlight: node.id === focusedState
+            }))}
+            links={links}
+            width={800}
+            height={500}
+            direction="LR"
+            onNodeClick={handleNodeClick}
+            documents={template?.documents}
+          />
+        </div>
+
+        <div className="space-y-4">
+          <h3 className="text-lg font-medium">State Transition History</h3>
+          <StateHistory 
+            transitions={stateHistory}
+            onFocusState={handleFocusState}
+            focusedState={focusedState}
+          />
         </div>
       </div>
+
       <NodeDetailsDialog
         node={selectedNode}
         isOpen={isDialogOpen}

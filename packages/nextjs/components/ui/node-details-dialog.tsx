@@ -64,14 +64,14 @@ export const NodeDetailsDialog: React.FC<NodeDetailsDialogProps> = ({
             </div>
           )}
 
-          {node.metadata?.actions?.length > 0 && (
+          {node.metadata?.actions && node.metadata.actions.length > 0 && (
             <div>
               <h3 className="text-base font-medium mb-2 flex items-center gap-2">
                 <Play className="h-4 w-4 stroke-current fill-none" />
                 Actions
               </h3>
               <ul className="space-y-2">
-                {node.metadata.actions.map((action, i) => {
+                {node.metadata?.actions?.map((action, i) => {
                   const ActionIcon = getActionIcon(action);
                   return (
                     <li key={i} className="text-sm text-muted-foreground flex items-center gap-2">

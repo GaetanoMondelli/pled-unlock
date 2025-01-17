@@ -9,6 +9,7 @@ interface Node {
   isActive?: boolean;
   isInitial?: boolean;
   isFinal?: boolean;
+  highlight?: boolean;
   metadata?: {
     description?: string;
     actions?: string[];
@@ -36,7 +37,7 @@ interface D3GraphProps {
   };
 }
 
-export const D3Graph: React.FC<D3GraphProps> = ({
+export const D3Graph = React.forwardRef<any, D3GraphProps>(({
   nodes,
   links,
   width = 800,
@@ -44,13 +45,39 @@ export const D3Graph: React.FC<D3GraphProps> = ({
   direction = 'LR',
   onNodeClick,
   documents
-}) => {
+}, ref) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const graphRef = useRef<any>(null);
   const zoomRef = useRef<any>(null);
   const [isDraggingEnabled, setIsDraggingEnabled] = useState(false);
   const NODE_WIDTH = 150;
   const NODE_HEIGHT = 50;
+
+  // Define focusOnState function at component level
+  const focusOnState = useCallback((stateId: string) => {
+    if (!svgRef.current || !graphRef.current) return;
+    
+    const g = graphRef.current;
+    const nodeData = g.node(stateId);
+    if (!nodeData) return;
+
+    const svg = d3.select(svgRef.current);
+    const scale = 1;
+    const x = width / 2 - nodeData.x * scale;
+    const y = height / 2 - nodeData.y * scale;
+
+    svg.transition()
+      .duration(750)
+      .call(zoomRef.current.transform, d3.zoomIdentity
+        .translate(x, y)
+        .scale(scale)
+      );
+  }, [width]);
+
+  // Expose the focusOnState method through ref
+  React.useImperativeHandle(ref, () => ({
+    focusOnState
+  }), [focusOnState]);
 
   const resetLayout = useCallback(() => {
     if (!svgRef.current || !graphRef.current || !zoomRef.current) return;
@@ -101,7 +128,7 @@ export const D3Graph: React.FC<D3GraphProps> = ({
   }, []);
 
   const getStatesWithMetadata = (nodes: Node[], documents?: D3GraphProps['documents']) => {
-    const statesWithActions = nodes.filter(n => n.metadata?.actions?.length > 0)
+    const statesWithActions = nodes.filter(n => n.metadata?.actions && n.metadata.actions.length > 0)
       .map(n => ({ id: n.id, actions: n.metadata?.actions }));
 
     const statesWithDocs = nodes.filter(n => 
@@ -159,7 +186,9 @@ export const D3Graph: React.FC<D3GraphProps> = ({
       const isFinal = finalStates.has(node.id);
       
       let nodeStyle = '';
-      if (node.isActive) {
+      if (node.highlight) {
+        nodeStyle = 'fill: #fef08a; stroke: #facc15;'; // Yellow highlight
+      } else if (node.isActive) {
         nodeStyle = 'fill: #22c55e; stroke: #16a34a;';
       } else if (isInitial) {
         nodeStyle = 'fill: #3b82f6; stroke: #2563eb;';
@@ -512,6 +541,7 @@ export const D3Graph: React.FC<D3GraphProps> = ({
     // Add click handler to nodes
     svgGroup.selectAll('g.node')
       .on('click', (event, d: any) => {
+        event.stopPropagation(); // Prevent any parent handlers from firing
         if (onNodeClick) {
           const nodeData = g.node(d);
           onNodeClick({
@@ -592,7 +622,16 @@ export const D3Graph: React.FC<D3GraphProps> = ({
           )}
         </div>
       </div>
-      <div className="relative w-full h-[400px] border rounded-lg overflow-hidden bg-white">
+      <div 
+        className="w-full border rounded-lg overflow-hidden bg-white" 
+        style={{ height: height }}
+        onClick={(e) => {
+          // Only clear if clicking the background, not a node
+          if (e.target === e.currentTarget || (e.target as HTMLElement).tagName === 'svg') {
+            onNodeClick?.(null);
+          }
+        }}
+      >
         <svg ref={svgRef} className="w-full h-full" />
       </div>
       
@@ -622,4 +661,6 @@ export const D3Graph: React.FC<D3GraphProps> = ({
       </div>
     </div>
   );
-}; 
+});
+
+D3Graph.displayName = 'D3Graph'; 

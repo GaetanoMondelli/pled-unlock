@@ -17,13 +17,13 @@ export const EnvelopeView = ({ procedureId, template }: { procedureId: string; t
         {selectedDoc ? (
           // Show single document view
           <DocumentDetail 
-            document={documents.find(d => d.id === selectedDoc)} 
+            document={documents.find((d: { id: string; }) => d.id === selectedDoc)} 
             procedureId={procedureId}
           />
         ) : (
           // Show document list
           <div className="space-y-4">
-            {documents.map((doc) => (
+            {documents.map((doc: { id: string; name: string; linkedStates?: string[] }) => (
               <Link 
                 key={doc.id}
                 href={`/procedures/${procedureId}/envelope?doc=${doc.id}`}
