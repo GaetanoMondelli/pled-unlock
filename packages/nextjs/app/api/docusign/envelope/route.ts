@@ -18,6 +18,8 @@ export async function POST(request: Request) {
     const signerEmail = formData.get('signerEmail') as string;
     const signerName = formData.get('signerName') as string;
     const documentFile = formData.get('document') as File;
+    const tabsData = formData.get('tabs') as string;
+    const templateData = formData.get('templateData') as string;
 
     if (!documentFile) {
       return NextResponse.json(
@@ -26,14 +28,32 @@ export async function POST(request: Request) {
       );
     }
 
-    const documentContent = await documentFile.text();
+    console.log('Creating envelope with:', {
+      signerEmail,
+      signerName,
+      fileName: documentFile.name,
+      tabsData,
+      templateData
+    });
+
+    // Convert document to base64
+    const documentBuffer = Buffer.from(await documentFile.arrayBuffer());
+    const documentBase64 = documentBuffer.toString('base64');
+
+    // Parse tabs and template data
+    const tabs = tabsData ? JSON.parse(tabsData) : {};
+    const templateVariables = templateData ? JSON.parse(templateData) : {};
+
+    // Create envelope definition
     const envelope = {
       emailSubject: 'Please sign this document',
+      emailBlurb: 'Please review and sign this document at your earliest convenience.',
       documents: [{
-        documentBase64: Buffer.from(documentContent).toString('base64'),
+        documentBase64,
         name: documentFile.name,
         fileExtension: documentFile.name.split('.').pop(),
-        documentId: '1'
+        documentId: '1',
+        transformPdfFields: true
       }],
       recipients: {
         signers: [{
@@ -42,16 +62,32 @@ export async function POST(request: Request) {
           recipientId: '1',
           routingOrder: '1',
           tabs: {
-            signHereTabs: [{
-              anchorString: '/sig1/',
-              anchorXOffset: '20',
-              anchorUnits: 'pixels'
-            }]
+            signHereTabs: [
+              {
+                documentId: '1',
+                pageNumber: '1',
+                xPosition: '100',
+                yPosition: '100',
+                optional: false,
+                recipientId: '1',
+                name: 'SignHere_1',
+                tabLabel: 'SignHere_1'
+              }
+            ],
+            ...tabs
           }
         }]
       },
-      status: 'sent'
+      status: 'created'
     };
+
+    console.log('Envelope request:', {
+      ...envelope,
+      documents: [{
+        ...envelope.documents[0],
+        documentBase64: '[REDACTED]'
+      }]
+    });
 
     const response = await fetch(`${BASE_URL}/accounts/${accountId}/envelopes`, {
       method: 'POST',
@@ -63,11 +99,28 @@ export async function POST(request: Request) {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to create envelope');
+      const errorText = await response.text();
+      console.error('Create envelope error:', {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorText
+      });
+      try {
+        const error = JSON.parse(errorText);
+        throw new Error(error.message || 'Failed to create envelope');
+      } catch (e) {
+        throw new Error(`Failed to create envelope: ${response.status} ${response.statusText}\n${errorText}`);
+      }
     }
 
-    return NextResponse.json(await response.json());
+    const result = await response.json();
+    console.log('Envelope created:', result);
+
+    return NextResponse.json({
+      envelopeId: result.envelopeId,
+      status: result.status,
+      message: 'Envelope created successfully'
+    });
   } catch (error: any) {
     console.error('Create envelope error:', error);
     return NextResponse.json(

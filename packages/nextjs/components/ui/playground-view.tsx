@@ -19,6 +19,7 @@ import {
   Eye,
   EyeOff
 } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./dialog"
 
 interface DocuSignConfig {
   integrationKey: string;
@@ -26,6 +27,14 @@ interface DocuSignConfig {
   userId: string;
   privateKey: string;
   oAuthServer: string;
+}
+
+interface TabPosition {
+  pageNumber: string;
+  xPosition: string;
+  yPosition: string;
+  name: string;
+  tabLabel: string;
 }
 
 export const PlaygroundView = () => {
@@ -47,6 +56,10 @@ export const PlaygroundView = () => {
   const [authenticated, setAuthenticated] = useState(false);
   const [envelopeId, setEnvelopeId] = useState<string>("");
   const [auth, setAuth] = useState<{ accessToken: string; accountId: string } | null>(null);
+  const [signingUrl, setSigningUrl] = useState<string | null>(null);
+  const [showSigningDialog, setShowSigningDialog] = useState(false);
+  const [tabPositions, setTabPositions] = useState<TabPosition[]>([]);
+  const [templateVariables, setTemplateVariables] = useState<Record<string, string>>({});
 
   useEffect(() => {
     // Fetch initial configuration
@@ -130,6 +143,19 @@ export const PlaygroundView = () => {
         formData.append('signerName', 'Test Signer');
         formData.append('document', selectedFile);
 
+        // Add tab positions
+        const tabs = {
+          signHereTabs: tabPositions.map(pos => ({
+            ...pos,
+            documentId: '1',
+            recipientId: '1'
+          }))
+        };
+        formData.append('tabs', JSON.stringify(tabs));
+
+        // Add template variables
+        formData.append('templateData', JSON.stringify(templateVariables));
+
         const response = await fetch('/api/docusign/envelope', {
           method: 'POST',
           headers: {
@@ -212,175 +238,429 @@ export const PlaygroundView = () => {
       } catch (error: any) {
         setStatus(`Failed to get envelope status: ${error.message}`);
       }
+    },
+
+    openSigningView: async () => {
+      if (!auth || !authenticated) {
+        setStatus("Error: Please authenticate first");
+        return;
+      }
+      if (!envelopeId) {
+        setStatus("Error: No envelope ID. Create an envelope first.");
+        return;
+      }
+
+      try {
+        setStatus("Getting signing URL...");
+        const response = await fetch(`/api/docusign/envelopes/${envelopeId}/view`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${auth.accessToken}`,
+            'Account-Id': auth.accountId,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            email: recipients.split('\n')[0].trim(),
+            name: "Test Signer"
+          })
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to get signing URL');
+        }
+
+        const { url } = await response.json();
+        setSigningUrl(url);
+        setShowSigningDialog(true);
+        setStatus('Signing view ready');
+      } catch (error: any) {
+        setStatus(`Failed to get signing URL: ${error.message}`);
+      }
+    },
+
+    sendEnvelope: async () => {
+      if (!auth || !authenticated) {
+        setStatus("Error: Please authenticate first");
+        return;
+      }
+      if (!envelopeId) {
+        setStatus("Error: No envelope ID. Create an envelope first.");
+        return;
+      }
+      if (!recipients) {
+        setStatus("Error: Please add at least one recipient");
+        return;
+      }
+
+      try {
+        // Log the recipients to make sure we're getting them
+        const recipientsList = recipients.split('\n')
+          .filter(email => email.trim())
+          .map((email, index) => ({
+            email: email.trim(),
+            name: `Recipient ${index + 1}`,
+            recipientId: (index + 1).toString(),
+            routingOrder: (index + 1).toString()
+          }));
+
+        console.log('Sending to recipients:', recipientsList);
+
+        setStatus("Sending envelope...");
+        const response = await fetch(`/api/docusign/envelopes/${envelopeId}`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${auth.accessToken}`,
+            'Account-Id': auth.accountId,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            status: 'sent',
+            recipients: recipientsList
+          })
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to send envelope');
+        }
+
+        const result = await response.json();
+        
+        // Log the result to see what we're getting back
+        console.log('Send envelope result:', result);
+
+        setStatus(
+          `Envelope sent successfully!\n` +
+          `Status: ${result.status}\n` +
+          `Message: ${result.message}\n\n` +
+          `Details:\n` +
+          `Created: ${result.details.created}\n` +
+          `Sent: ${result.details.sentDateTime}\n` +
+          `Email Subject: ${result.details.emailSubject}\n\n` +
+          `Recipients:\n${JSON.stringify(result.details.recipients, null, 2)}\n\n` +
+          `Emails sent to:\n${recipientsList.map(r => r.email).join('\n')}`
+        );
+      } catch (error: any) {
+        console.error('Send envelope error:', error);
+        setStatus(`Failed to send envelope: ${error.message}`);
+      }
     }
   };
 
   return (
-    <Card className="p-4">
-      <ScrollArea className="h-[calc(100vh-12rem)]">
-        <Tabs defaultValue="config">
-          <TabsList>
-            <TabsTrigger value="config">
-              <Key className="h-4 w-4 mr-2" />
-              Configuration
-            </TabsTrigger>
-            <TabsTrigger value="operations">
-              <FileSignature className="h-4 w-4 mr-2" />
-              Operations
-            </TabsTrigger>
-          </TabsList>
+    <>
+      <Card className="p-4">
+        <ScrollArea className="h-[calc(100vh-12rem)]">
+          <Tabs defaultValue="config">
+            <TabsList>
+              <TabsTrigger value="config">
+                <Key className="h-4 w-4 mr-2" />
+                Configuration
+              </TabsTrigger>
+              <TabsTrigger value="operations">
+                <FileSignature className="h-4 w-4 mr-2" />
+                Operations
+              </TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="config" className="space-y-4">
-            <div className="flex justify-end">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={toggleEdit}
-              >
-                {isEditing ? 'Cancel Editing' : 'Edit Configuration'}
-              </Button>
-            </div>
+            <TabsContent value="config" className="space-y-4">
+              <div className="flex justify-end">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={toggleEdit}
+                >
+                  {isEditing ? 'Cancel Editing' : 'Edit Configuration'}
+                </Button>
+              </div>
 
-            <div className="grid gap-4">
-              <div>
-                <h3 className="text-sm font-medium mb-2">Integration Key</h3>
-                <Input
-                  placeholder="DocuSign Integration Key"
-                  value={config.integrationKey}
-                  onChange={handleConfigChange("integrationKey")}
-                  readOnly={!isEditing}
-                />
+              <div className="grid gap-4">
+                <div>
+                  <h3 className="text-sm font-medium mb-2">Integration Key</h3>
+                  <Input
+                    placeholder="DocuSign Integration Key"
+                    value={config.integrationKey}
+                    onChange={handleConfigChange("integrationKey")}
+                    readOnly={!isEditing}
+                  />
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium mb-2">Account ID</h3>
+                  <Input
+                    placeholder="DocuSign Account ID"
+                    value={config.accountId}
+                    onChange={handleConfigChange("accountId")}
+                    readOnly={!isEditing}
+                  />
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium mb-2">User ID</h3>
+                  <Input
+                    placeholder="DocuSign User ID"
+                    value={config.userId}
+                    onChange={handleConfigChange("userId")}
+                    readOnly={!isEditing}
+                  />
+                </div>
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <h3 className="text-sm font-medium">Private Key (RSA)</h3>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowPrivateKey(!showPrivateKey)}
+                    >
+                      {showPrivateKey ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                  <Textarea
+                    placeholder="Paste your RSA private key here"
+                    value={showPrivateKey ? privateKeyContent : '••••••••••••••••••••••••••••••••'}
+                    onChange={(e) => {
+                      setPrivateKeyContent(e.target.value);
+                      handleConfigChange("privateKey")(e);
+                    }}
+                    className="font-mono text-sm"
+                    rows={8}
+                    readOnly={!isEditing}
+                  />
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium mb-2">OAuth Server</h3>
+                  <Input
+                    value={config.oAuthServer}
+                    onChange={handleConfigChange("oAuthServer")}
+                    readOnly={!isEditing}
+                  />
+                </div>
               </div>
-              <div>
-                <h3 className="text-sm font-medium mb-2">Account ID</h3>
-                <Input
-                  placeholder="DocuSign Account ID"
-                  value={config.accountId}
-                  onChange={handleConfigChange("accountId")}
-                  readOnly={!isEditing}
-                />
-              </div>
-              <div>
-                <h3 className="text-sm font-medium mb-2">User ID</h3>
-                <Input
-                  placeholder="DocuSign User ID"
-                  value={config.userId}
-                  onChange={handleConfigChange("userId")}
-                  readOnly={!isEditing}
-                />
-              </div>
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <h3 className="text-sm font-medium">Private Key (RSA)</h3>
+            </TabsContent>
+
+            <TabsContent value="operations" className="space-y-6">
+              <div className="grid gap-4">
+                <Button
+                  variant="default"
+                  className="w-full"
+                  onClick={operations.authenticate}
+                  disabled={authenticated}
+                >
+                  {authenticated ? "Authenticated ✓" : "Authenticate"}
+                </Button>
+
+                <div className="p-4 border rounded-lg space-y-4">
+                  <h3 className="font-medium">Document Upload</h3>
+                  <Input
+                    type="file"
+                    onChange={handleFileChange}
+                    accept=".pdf,.doc,.docx"
+                  />
+                </div>
+
+                <div className="p-4 border rounded-lg space-y-4">
+                  <h3 className="font-medium">Recipients</h3>
+                  <Textarea
+                    placeholder="Enter email addresses (one per line)"
+                    value={recipients}
+                    onChange={(e) => {
+                      console.log('Recipients changed:', e.target.value);
+                      setRecipients(e.target.value);
+                    }}
+                    rows={3}
+                  />
+                </div>
+
+                <div className="p-4 border rounded-lg space-y-4">
+                  <h3 className="font-medium">Signature Positions</h3>
+                  <div className="space-y-2">
+                    {tabPositions.map((pos, index) => (
+                      <div key={index} className="flex gap-2">
+                        <Input
+                          placeholder="Page"
+                          value={pos.pageNumber}
+                          onChange={(e) => {
+                            const newPositions = [...tabPositions];
+                            newPositions[index].pageNumber = e.target.value;
+                            setTabPositions(newPositions);
+                          }}
+                          className="w-20"
+                        />
+                        <Input
+                          placeholder="X"
+                          value={pos.xPosition}
+                          onChange={(e) => {
+                            const newPositions = [...tabPositions];
+                            newPositions[index].xPosition = e.target.value;
+                            setTabPositions(newPositions);
+                          }}
+                          className="w-20"
+                        />
+                        <Input
+                          placeholder="Y"
+                          value={pos.yPosition}
+                          onChange={(e) => {
+                            const newPositions = [...tabPositions];
+                            newPositions[index].yPosition = e.target.value;
+                            setTabPositions(newPositions);
+                          }}
+                          className="w-20"
+                        />
+                        <Button
+                          variant="destructive"
+                          onClick={() => {
+                            setTabPositions(positions => 
+                              positions.filter((_, i) => i !== index)
+                            );
+                          }}
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    ))}
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setTabPositions(positions => [
+                          ...positions,
+                          {
+                            pageNumber: '1',
+                            xPosition: '100',
+                            yPosition: '100',
+                            name: `SignHere_${positions.length + 1}`,
+                            tabLabel: `SignHere_${positions.length + 1}`
+                          }
+                        ]);
+                      }}
+                    >
+                      Add Signature Position
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="p-4 border rounded-lg space-y-4">
+                  <h3 className="font-medium">Template Variables</h3>
+                  <div className="space-y-2">
+                    {Object.entries(templateVariables).map(([key, value], index) => (
+                      <div key={index} className="flex gap-2">
+                        <Input
+                          placeholder="Variable Name"
+                          value={key}
+                          onChange={(e) => {
+                            const newVars = { ...templateVariables };
+                            delete newVars[key];
+                            newVars[e.target.value] = value;
+                            setTemplateVariables(newVars);
+                          }}
+                        />
+                        <Input
+                          placeholder="Value"
+                          value={value}
+                          onChange={(e) => {
+                            setTemplateVariables(vars => ({
+                              ...vars,
+                              [key]: e.target.value
+                            }));
+                          }}
+                        />
+                        <Button
+                          variant="destructive"
+                          onClick={() => {
+                            const newVars = { ...templateVariables };
+                            delete newVars[key];
+                            setTemplateVariables(newVars);
+                          }}
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    ))}
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setTemplateVariables(vars => ({
+                          ...vars,
+                          [`variable_${Object.keys(vars).length + 1}`]: ''
+                        }));
+                      }}
+                    >
+                      Add Variable
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
                   <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowPrivateKey(!showPrivateKey)}
+                    variant="outline"
+                    className="w-full"
+                    onClick={operations.createEnvelope}
                   >
-                    {showPrivateKey ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
+                    <Upload className="h-4 w-4 mr-2" />
+                    Create Envelope
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={operations.sendEnvelope}
+                  >
+                    <Send className="h-4 w-4 mr-2" />
+                    Send Envelope
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={operations.getEnvelopes}
+                  >
+                    <List className="h-4 w-4 mr-2" />
+                    List Envelopes
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={operations.getEnvelopeStatus}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Check Status
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={operations.openSigningView}
+                    disabled={!envelopeId}
+                  >
+                    <FileSignature className="h-4 w-4 mr-2" />
+                    Sign Document
                   </Button>
                 </div>
-                <Textarea
-                  placeholder="Paste your RSA private key here"
-                  value={showPrivateKey ? privateKeyContent : '••••••••••••••••••••••••••••••••'}
-                  onChange={(e) => {
-                    setPrivateKeyContent(e.target.value);
-                    handleConfigChange("privateKey")(e);
-                  }}
-                  className="font-mono text-sm"
-                  rows={8}
-                  readOnly={!isEditing}
-                />
-              </div>
-              <div>
-                <h3 className="text-sm font-medium mb-2">OAuth Server</h3>
-                <Input
-                  value={config.oAuthServer}
-                  onChange={handleConfigChange("oAuthServer")}
-                  readOnly={!isEditing}
-                />
-              </div>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="operations" className="space-y-6">
-            <div className="grid gap-4">
-              <Button
-                variant="default"
-                className="w-full"
-                onClick={operations.authenticate}
-                disabled={authenticated}
-              >
-                {authenticated ? "Authenticated ✓" : "Authenticate"}
-              </Button>
-
-              <div className="p-4 border rounded-lg space-y-4">
-                <h3 className="font-medium">Document Upload</h3>
-                <Input
-                  type="file"
-                  onChange={handleFileChange}
-                  accept=".pdf,.doc,.docx"
-                />
               </div>
 
-              <div className="p-4 border rounded-lg space-y-4">
-                <h3 className="font-medium">Recipients</h3>
-                <Textarea
-                  placeholder="Enter email addresses (one per line)"
-                  value={recipients}
-                  onChange={(e) => setRecipients(e.target.value)}
-                  rows={3}
-                />
-              </div>
+              {status && (
+                <div className="p-4 bg-muted rounded-lg">
+                  <pre className="text-sm whitespace-pre-wrap">{status}</pre>
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+        </ScrollArea>
+      </Card>
 
-              <div className="grid grid-cols-2 gap-4">
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={operations.createEnvelope}
-                >
-                  <Upload className="h-4 w-4 mr-2" />
-                  Create Envelope
-                </Button>
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={operations.sendEnvelope}
-                >
-                  <Send className="h-4 w-4 mr-2" />
-                  Send Envelope
-                </Button>
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={operations.getEnvelopes}
-                >
-                  <List className="h-4 w-4 mr-2" />
-                  List Envelopes
-                </Button>
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={operations.getEnvelopeStatus}
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Check Status
-                </Button>
-              </div>
-            </div>
-
-            {status && (
-              <div className="p-4 bg-muted rounded-lg">
-                <pre className="text-sm whitespace-pre-wrap">{status}</pre>
-              </div>
-            )}
-          </TabsContent>
-        </Tabs>
-      </ScrollArea>
-    </Card>
+      <Dialog open={showSigningDialog} onOpenChange={setShowSigningDialog}>
+        <DialogContent className="max-w-[90vw] w-[800px] h-[90vh]">
+          <DialogHeader>
+            <DialogTitle>DocuSign Signing</DialogTitle>
+          </DialogHeader>
+          {signingUrl && (
+            <iframe 
+              src={signingUrl}
+              className="w-full h-full border-0"
+              title="DocuSign Signing"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }; 
