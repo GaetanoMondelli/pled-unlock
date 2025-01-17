@@ -8,8 +8,8 @@ import "~~/styles/globals.css";
 import { getMetadata } from "~~/utils/scaffold-eth/getMetadata";
 
 export const metadata = getMetadata({
-  title: "Smart Miner Dashboard",
-  description: "Monitor and manage your smart miners",
+  title: "Pled - Practical ledger platform",
+  description: "Monitor and manage your procedures",
 });
 const inter = Inter({ subsets: ["latin"] })
 
