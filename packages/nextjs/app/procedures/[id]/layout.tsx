@@ -10,7 +10,8 @@ import {
   MessageSquare, 
   GitBranch, 
   PlayCircle,
-  Folder
+  Folder,
+  Beaker
 } from "lucide-react";
 import pledData from "@/public/pled.json";
 import { Card } from "@/components/ui/card";
@@ -21,6 +22,7 @@ import ProcedureState from "@/components/ui/procedure-state";
 import ActionList from "@/components/ui/action-list";
 import EnvelopeView from "~~/components/ui/envelope-view";
 import { useSearchParams, useRouter } from 'next/navigation';
+import { PlaygroundView } from "@/components/ui/playground-view";
 
 type Variables = {
   candidate: { email: string; name: string };
@@ -55,6 +57,7 @@ export default function ProcedureLayout({
     { id: 'state', label: 'State Machine', icon: <GitBranch className="h-4 w-4" /> },
     { id: 'actions', label: 'Actions', icon: <PlayCircle className="h-4 w-4" /> },
     { id: 'envelope', label: 'Envelope', icon: <Folder className="h-4 w-4" /> },
+    { id: 'playground', label: 'Playground', icon: <Beaker className="h-4 w-4" /> },
   ];
 
   const renderContent = () => {
@@ -133,6 +136,14 @@ export default function ProcedureLayout({
           <Card className="p-4">
             <ScrollArea className="h-[calc(100vh-12rem)]">
               <EnvelopeView procedureId={params.id} template={template} />
+            </ScrollArea>
+          </Card>
+        );
+      case 'playground':
+        return (
+          <Card className="p-4">
+            <ScrollArea className="h-[calc(100vh-12rem)]">
+              <PlaygroundView />
             </ScrollArea>
           </Card>
         );
