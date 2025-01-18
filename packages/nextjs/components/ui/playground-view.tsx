@@ -20,6 +20,7 @@ import {
   EyeOff
 } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./dialog"
+import { EventsPlayground } from "../events/EventsPlayground"
 
 interface DocuSignConfig {
   integrationKey: string;
@@ -36,6 +37,152 @@ interface TabPosition {
   name: string;
   tabLabel: string;
 }
+
+interface EnvelopeStatus {
+  [key: string]: {
+    emoji: string;
+    title: string;
+    description: string;
+  };
+}
+
+const ENVELOPE_STATUSES: EnvelopeStatus = {
+  created: {
+    emoji: "📝",
+    title: "Created",
+    description: "The envelope has been created and saved as a draft. Recipients have not been notified yet."
+  },
+  sent: {
+    emoji: "📤",
+    title: "Sent",
+    description: "The envelope has been sent to recipients. They will receive email notifications to sign."
+  },
+  delivered: {
+    emoji: "📨",
+    title: "Delivered",
+    description: "Recipients have received the envelope and can now view and sign the documents."
+  },
+  completed: {
+    emoji: "✅",
+    title: "Completed",
+    description: "All recipients have signed the document and the process is complete."
+  },
+  declined: {
+    emoji: "❌",
+    title: "Declined",
+    description: "One or more recipients have declined to sign the document."
+  },
+  voided: {
+    emoji: "🚫",
+    title: "Voided",
+    description: "The envelope has been voided and can no longer be acted upon."
+  },
+  signed: {
+    emoji: "✍️",
+    title: "Signed",
+    description: "The document has been signed but may be waiting for additional signatures."
+  },
+  corrected: {
+    emoji: "📝",
+    title: "Corrected",
+    description: "The envelope has been corrected and resent to the recipients."
+  },
+  processing: {
+    emoji: "⚙️",
+    title: "Processing",
+    description: "DocuSign is processing the envelope (temporary state)."
+  },
+  template: {
+    emoji: "📋",
+    title: "Template",
+    description: "The envelope is saved as a template for future use."
+  },
+  failed: {
+    emoji: "💔",
+    title: "Failed",
+    description: "The envelope processing has failed. Please check for errors and try again."
+  },
+  contract_prepared: {
+    emoji: "📋",
+    title: "Contract Prepared",
+    description: "Employment contract has been prepared and is ready to be sent"
+  },
+  contract_sent: {
+    emoji: "📤",
+    title: "Contract Sent",
+    description: "Employment contract has been sent to the candidate"
+  },
+  contract_signed: {
+    emoji: "✍️",
+    title: "Contract Signed",
+    description: "Employment contract has been signed by the candidate"
+  },
+  draft: {
+    emoji: "📝",
+    title: "Draft",
+    description: "The envelope is saved as a draft and can be modified before sending"
+  },
+  sent_api: {
+    emoji: "🔄",
+    title: "Sent via API",
+    description: "The envelope has been sent through the DocuSign API"
+  },
+  delivered_api: {
+    emoji: "📨",
+    title: "Delivered via API",
+    description: "The envelope has been delivered through the DocuSign API"
+  },
+  authentication_failed: {
+    emoji: "🔒",
+    title: "Authentication Failed",
+    description: "Recipient authentication has failed. They may need to verify their identity"
+  },
+  auto_responded: {
+    emoji: "🤖",
+    title: "Auto Responded",
+    description: "An automatic response has been received for this envelope"
+  },
+  expired: {
+    emoji: "⏰",
+    title: "Expired",
+    description: "The envelope has expired without being completed"
+  },
+  waiting_for_review: {
+    emoji: "👀",
+    title: "Waiting for Review",
+    description: "The envelope is waiting for review before proceeding"
+  },
+  waiting_for_others: {
+    emoji: "⏳",
+    title: "Waiting for Others",
+    description: "Waiting for other recipients to complete their actions"
+  },
+  out_for_signature: {
+    emoji: "✒️",
+    title: "Out for Signature",
+    description: "The envelope has been sent and is awaiting signatures"
+  },
+  viewed: {
+    emoji: "👁️",
+    title: "Viewed",
+    description: "The envelope has been viewed by the recipient but not yet signed"
+  },
+  partially_signed: {
+    emoji: "📑",
+    title: "Partially Signed",
+    description: "Some but not all recipients have signed the document"
+  },
+  in_progress: {
+    emoji: "🔄",
+    title: "In Progress",
+    description: "The envelope is being processed by one or more recipients"
+  },
+  completed_api: {
+    emoji: "✅",
+    title: "Completed via API",
+    description: "The envelope has been completed through the DocuSign API"
+  }
+};
 
 export const PlaygroundView = () => {
   const [config, setConfig] = useState<DocuSignConfig>({
@@ -107,7 +254,10 @@ export const PlaygroundView = () => {
   const operations = {
     authenticate: async () => {
       try {
-        setStatus("Authenticating...");
+        setStatus(
+          "🔄 Authenticating...\n" +
+          "Connecting to DocuSign and requesting JWT token..."
+        );
         const response = await fetch('/api/docusign/authenticate', {
           method: 'POST'
         });
@@ -120,24 +270,45 @@ export const PlaygroundView = () => {
         const authData = await response.json();
         setAuth(authData);
         setAuthenticated(true);
-        setStatus(`Authenticated successfully! Account ID: ${authData.accountId}`);
+        setStatus(
+          "✅ Authentication Successful!\n\n" +
+          "Connected to DocuSign with:\n" +
+          `Account ID: ${authData.accountId}\n` +
+          "Access Token: [Secured]\n\n" +
+          "You can now create and send envelopes."
+        );
       } catch (error: any) {
-        setStatus(`Authentication failed: ${error.message}`);
+        setStatus(
+          "❌ Authentication Failed\n\n" +
+          `Error: ${error.message}\n\n` +
+          "Please check your configuration and try again."
+        );
       }
     },
 
     createEnvelope: async () => {
       if (!auth || !authenticated) {
-        setStatus("Error: Please authenticate first");
+        setStatus(
+          "❌ Not Authenticated\n\n" +
+          "Please authenticate with DocuSign first before creating an envelope."
+        );
         return;
       }
       if (!selectedFile) {
-        setStatus("Error: Please select a file");
+        setStatus(
+          "❌ No File Selected\n\n" +
+          "Please select a document to create an envelope."
+        );
         return;
       }
       
       try {
-        setStatus("Creating envelope...");
+        setStatus(
+          "🔄 Creating Envelope...\n\n" +
+          "1. Uploading document\n" +
+          "2. Setting up recipients\n" +
+          "3. Configuring signature fields"
+        );
         const formData = new FormData();
         formData.append('signerEmail', recipients.split('\n')[0].trim());
         formData.append('signerName', 'Test Signer');
@@ -172,9 +343,21 @@ export const PlaygroundView = () => {
 
         const result = await response.json();
         setEnvelopeId(result.envelopeId);
-        setStatus(`Envelope created successfully! ID: ${result.envelopeId}`);
+        setStatus(
+          "✅ Envelope Created Successfully!\n\n" +
+          `Envelope ID: ${result.envelopeId}\n` +
+          "Status: Draft\n\n" +
+          "You can now:\n" +
+          "• Send the envelope to recipients\n" +
+          "• Add more signature positions\n" +
+          "• Check envelope status"
+        );
       } catch (error: any) {
-        setStatus(`Failed to create envelope: ${error.message}`);
+        setStatus(
+          "❌ Envelope Creation Failed\n\n" +
+          `Error: ${error.message}\n\n` +
+          "Please check your document and try again."
+        );
       }
     },
 
@@ -211,16 +394,25 @@ export const PlaygroundView = () => {
 
     getEnvelopeStatus: async () => {
       if (!auth || !authenticated) {
-        setStatus("Error: Please authenticate first");
+        setStatus(
+          "❌ Not Authenticated\n\n" +
+          "Please authenticate with DocuSign first before checking status."
+        );
         return;
       }
       if (!envelopeId) {
-        setStatus("Error: No envelope ID. Create an envelope first.");
+        setStatus(
+          "❌ No Envelope Selected\n\n" +
+          "Please create an envelope first before checking status."
+        );
         return;
       }
       
       try {
-        setStatus("Checking status...");
+        setStatus(
+          "🔄 Checking Envelope Status...\n" +
+          "Fetching latest information from DocuSign..."
+        );
         const response = await fetch(`/api/docusign/envelopes/${envelopeId}`, {
           headers: {
             'Authorization': `Bearer ${auth.accessToken}`,
@@ -234,9 +426,30 @@ export const PlaygroundView = () => {
         }
 
         const result = await response.json();
-        setStatus(`Envelope status: ${result.status}\nCreated: ${result.createdDateTime}`);
+        const status = result.status.toLowerCase();
+        const statusInfo = ENVELOPE_STATUSES[status] || {
+          emoji: "❓",
+          title: status,
+          description: "Unknown status"
+        };
+
+        setStatus(
+          `${statusInfo.emoji} Envelope Status: ${statusInfo.title}\n\n` +
+          `Description: ${statusInfo.description}\n\n` +
+          `Created: ${result.createdDateTime}\n` +
+          (result.sentDateTime ? `Sent: ${result.sentDateTime}\n` : '') +
+          (result.completedDateTime ? `Completed: ${result.completedDateTime}\n` : '') +
+          "\nAll Possible Statuses:\n" +
+          Object.entries(ENVELOPE_STATUSES)
+            .map(([key, info]) => `${info.emoji} ${info.title}: ${info.description}`)
+            .join('\n\n')
+        );
       } catch (error: any) {
-        setStatus(`Failed to get envelope status: ${error.message}`);
+        setStatus(
+          "❌ Status Check Failed\n\n" +
+          `Error: ${error.message}\n\n` +
+          "Please try again later."
+        );
       }
     },
 
@@ -281,20 +494,28 @@ export const PlaygroundView = () => {
 
     sendEnvelope: async () => {
       if (!auth || !authenticated) {
-        setStatus("Error: Please authenticate first");
+        setStatus(
+          "❌ Not Authenticated\n\n" +
+          "Please authenticate with DocuSign first before sending an envelope."
+        );
         return;
       }
       if (!envelopeId) {
-        setStatus("Error: No envelope ID. Create an envelope first.");
+        setStatus(
+          "❌ No Envelope Selected\n\n" +
+          "Please create an envelope first before sending."
+        );
         return;
       }
       if (!recipients) {
-        setStatus("Error: Please add at least one recipient");
+        setStatus(
+          "❌ No Recipients\n\n" +
+          "Please add at least one recipient email address."
+        );
         return;
       }
 
       try {
-        // Log the recipients to make sure we're getting them
         const recipientsList = recipients.split('\n')
           .filter(email => email.trim())
           .map((email, index) => ({
@@ -304,9 +525,14 @@ export const PlaygroundView = () => {
             routingOrder: (index + 1).toString()
           }));
 
-        console.log('Sending to recipients:', recipientsList);
+        setStatus(
+          "🔄 Sending Envelope...\n\n" +
+          "1. Updating recipients\n" +
+          "2. Configuring email notifications\n" +
+          "3. Sending to DocuSign\n\n" +
+          `Recipients:\n${recipientsList.map(r => `• ${r.email}`).join('\n')}`
+        );
 
-        setStatus("Sending envelope...");
         const response = await fetch(`/api/docusign/envelopes/${envelopeId}`, {
           method: 'POST',
           headers: {
@@ -331,37 +557,70 @@ export const PlaygroundView = () => {
         console.log('Send envelope result:', result);
 
         setStatus(
-          `Envelope sent successfully!\n` +
+          "✅ Envelope Sent Successfully!\n\n" +
           `Status: ${result.status}\n` +
-          `Message: ${result.message}\n\n` +
-          `Details:\n` +
           `Created: ${result.details.created}\n` +
           `Sent: ${result.details.sentDateTime}\n` +
-          `Email Subject: ${result.details.emailSubject}\n\n` +
-          `Recipients:\n${JSON.stringify(result.details.recipients, null, 2)}\n\n` +
-          `Emails sent to:\n${recipientsList.map(r => r.email).join('\n')}`
+          `Subject: ${result.details.emailSubject}\n\n` +
+          "Recipients will receive email notifications to:\n" +
+          recipientsList.map(r => `• ${r.email}`).join('\n') + "\n\n" +
+          "They can click the link in their email to sign the document."
         );
       } catch (error: any) {
-        console.error('Send envelope error:', error);
-        setStatus(`Failed to send envelope: ${error.message}`);
+        setStatus(
+          "❌ Send Failed\n\n" +
+          `Error: ${error.message}\n\n` +
+          "Please check recipient emails and try again."
+        );
       }
     }
   };
 
+  // Add this function to get captured variables
+  const getCapturedVariables = (procedureId: string) => {
+    const instance = pledData.procedureInstances.find(
+      p => p.instanceId === procedureId
+    );
+    
+    const outputs: Record<string, Record<string, any>> = {};
+    
+    const template = pledData.procedureTemplates.find(
+      t => t.templateId === "hiring_process"
+    );
+    
+    instance?.messages?.forEach(message => {
+      const rule = template?.messageRules.find(r => r.id === message.rule);
+      if (rule?.captures) {
+        if (!outputs[message.type]) {
+          outputs[message.type] = {};
+        }
+        Object.entries(rule.captures).forEach(([key, pathTemplate]) => {
+          const event = instance.events.find(e => e.id === message.fromEvent);
+          if (event) {
+            const pathMatch = pathTemplate.toString().match(/{{event\.data\.(.+)}}/);
+            if (pathMatch && pathMatch[1]) {
+              const path = pathMatch[1];
+              const value = getValueByPath(event.data, path);
+              if (value !== undefined) {
+                outputs[message.type][key] = value;
+              }
+            }
+          }
+        });
+      }
+    });
+    
+    return outputs;
+  };
+
   return (
     <>
-      <Card className="p-4">
-        <ScrollArea className="h-[calc(100vh-12rem)]">
+      <Card className="w-full">
+        <ScrollArea className="h-[85vh]">
           <Tabs defaultValue="config">
             <TabsList>
-              <TabsTrigger value="config">
-                <Key className="h-4 w-4 mr-2" />
-                Configuration
-              </TabsTrigger>
-              <TabsTrigger value="operations">
-                <FileSignature className="h-4 w-4 mr-2" />
-                Operations
-              </TabsTrigger>
+              <TabsTrigger value="config">Configuration</TabsTrigger>
+              <TabsTrigger value="docusign">DocuSign</TabsTrigger>
             </TabsList>
 
             <TabsContent value="config" className="space-y-4">
@@ -441,7 +700,7 @@ export const PlaygroundView = () => {
               </div>
             </TabsContent>
 
-            <TabsContent value="operations" className="space-y-6">
+            <TabsContent value="docusign" className="space-y-6">
               <div className="grid gap-4">
                 <Button
                   variant="default"
