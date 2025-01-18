@@ -151,6 +151,27 @@ export async function POST(request: Request) {
   }
 }
 
+export async function DELETE(request: Request) {
+  try {
+    const { eventId } = await request.json();
+    const pledPath = path.join(process.cwd(), "public", "pled.json");
+    const pledData = JSON.parse(await fs.readFile(pledPath, "utf-8"));
+
+    // Remove event from events object
+    if (pledData.events[eventId]) {
+      delete pledData.events[eventId];
+    }
+
+    // Write updated data back to file
+    await fs.writeFile(pledPath, JSON.stringify(pledData, null, 2));
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Error deleting event:", error);
+    return NextResponse.json({ error: "Failed to delete event" }, { status: 500 });
+  }
+}
+
 // Helper function to interpolate variables in templates
 function interpolateTemplate(template: string, variables: any): string {
   return template.replace(/\{\{([^}]+)\}\}/g, (match, path) => {

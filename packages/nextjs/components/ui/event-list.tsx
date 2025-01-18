@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Card } from "./card";
 import { Button } from "./button";
-import { ArrowRight, ArrowLeft, ChevronDown, ChevronUp, Plus } from "lucide-react";
+import { ArrowRight, ArrowLeft, ChevronDown, ChevronUp, Plus, Trash2 } from "lucide-react";
 import { Event } from "../../types/events";
 import { CreateEventModal } from "../events/CreateEventModal";
 import { matchEventToRule } from "../../utils/eventMatching";
@@ -210,6 +210,27 @@ export default function EventList({ procedureId }: EventListProps) {
     };
   };
 
+  const handleDeleteEvent = async (eventId: string) => {
+    try {
+      const response = await fetch('/api/events', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventId })
+      });
+
+      if (!response.ok) throw new Error('Failed to delete event');
+      
+      // Update local state
+      setAvailableEvents(prev => {
+        const updated = { ...prev };
+        delete updated[eventId];
+        return updated;
+      });
+    } catch (error) {
+      console.error('Error deleting event:', error);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex gap-4 items-start">
@@ -236,25 +257,31 @@ export default function EventList({ procedureId }: EventListProps) {
               .map(([key, event]: [string, any]) => (
                 <div key={key} className="border rounded">
                   <div 
-                    className={`p-2 cursor-pointer ${
+                    className={`p-2 ${
                       selectedAvailable.includes(key) ? 'bg-blue-50 border-blue-200' : 'hover:bg-gray-50'
                     }`}
-                    onClick={() => {
-                      setSelectedAvailable(prev =>
-                        prev.includes(key) 
-                          ? prev.filter(k => k !== key)
-                          : [...prev, key]
-                      );
-                    }}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-medium text-sm">{event.name}</span>
+                      <div className="flex-1 cursor-pointer" onClick={() => {
+                        setSelectedAvailable(prev =>
+                          prev.includes(key)
+                            ? prev.filter(id => id !== key)
+                            : [...prev, key]
+                        );
+                      }}>
+                        <span className="font-medium text-sm">{event.type}</span>
+                      </div>
                       <div className="flex gap-2 items-center">
-                        <span className={`text-xs px-2 py-1 rounded ${
-                          event.received ? 'bg-green-100' : 'bg-yellow-100'
-                        }`}>
-                          {event.type}
-                        </span>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteEvent(key);
+                          }}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
                         <Button
                           size="sm"
                           variant="ghost"
