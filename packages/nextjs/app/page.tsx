@@ -150,19 +150,28 @@ export default function Home() {
 }
 
 // Helper function to determine badge variant based on state
-function getStateBadgeVariant(state: string): "default" | "secondary" | "destructive" | "outline" {
-  switch (state) {
-    case 'terminated':
-    case 'failure':
-      return 'destructive';
-    case 'active_employee':
-    case 'contract_signed':
-      return 'default';
-    case 'idle':
-      return 'secondary';
-    default:
-      return 'outline';
+function getStateBadgeVariant(state: string): "default" | "secondary" | "destructive" | "outline" | "success" {
+  // Initial state
+  if (state === 'idle') {
+    return 'secondary';
   }
+  
+  // Failed/terminated states
+  if (['terminated', 'failure'].includes(state)) {
+    return 'destructive';
+  }
+  
+  // Completed/successful states
+  if (['contract_signed', 'active_employee'].includes(state)) {
+    return 'default';
+  }
+  
+  // Any other non-initial state should be green
+  if (state !== 'idle') {
+    return 'success';
+  }
+  
+  return 'outline';
 }
 function formatDistanceToNow(arg0: Date) {
   throw new Error("Function not implemented.");
