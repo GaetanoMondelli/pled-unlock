@@ -298,6 +298,21 @@ export default function EventList({ procedureId }: EventListProps) {
                         </Button>
                       </div>
                     </div>
+                    {getMatchingRules(event).length > 0 && (
+                      <div className="flex gap-1 mt-1">
+                        <p className="text-xs font-medium">Matches:</p>
+                        <div className="flex flex-wrap gap-1">
+                          {getMatchingRules(event).map((rule) => (
+                            <span 
+                              key={rule.id} 
+                              className="text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded"
+                            >
+                              {rule.id}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                   {expandedEvents.includes(key) && (
                     <div className="p-2 border-t bg-gray-50">
