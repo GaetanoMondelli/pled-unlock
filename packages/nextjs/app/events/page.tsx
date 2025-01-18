@@ -83,6 +83,30 @@ export default function EventsPage() {
     }
   };
 
+  const handleSave = async (template: any) => {
+    try {
+      const response = await fetch('/api/events', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          event: template,
+          action: 'add_template'
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save template');
+      }
+
+      // Refresh events list
+      await fetchEvents();
+    } catch (error) {
+      console.error('Error saving template:', error);
+    }
+  };
+
   return (
     <div className="container mx-auto py-8">
       <h1 className="text-2xl font-bold mb-6">Events</h1>

@@ -1,46 +1,50 @@
 export class DocuSignService {
   private accessToken: string | null = null;
   private accountId: string | null = null;
-  private basePath: string | null = null;
+  private config: any = null;
 
-  constructor() {
-    // No need for constructor parameters anymore since we're using API routes
+  async getConfig() {
+    try {
+      const response = await fetch('/api/docusign/config');
+      this.config = await response.json();
+      return this.config;
+    } catch (error) {
+      console.error('Failed to get DocuSign config:', error);
+      throw error;
+    }
   }
 
-  async authenticate() {
-    try {
-      console.log('Starting authentication...');
-      const response = await fetch('/api/docusign/authenticate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      console.log('Got response:', response.status);
-      const data = await response.json();
-      console.log('Response data:', data);
-
-      if (response.status === 401 && data.consentUrl) {
-        console.log('Consent required, opening URL:', data.consentUrl);
-        window.open(data.consentUrl, '_blank');
-        throw new Error('Please grant consent in the new window and try authenticating again');
-      }
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Authentication failed');
-      }
-
-      this.accessToken = data.accessToken;
-      this.accountId = data.accountId;
-      this.basePath = data.basePath;
-
-      console.log('Authentication successful');
-      return data;
-    } catch (error: any) {
-      console.error('Authentication error:', error);
-      throw new Error(error.message || 'Authentication failed');
+  getAuthUrl() {
+    if (!this.config) {
+      throw new Error('Config not loaded. Call getConfig() first.');
     }
+
+    const params = new URLSearchParams({
+      response_type: 'code',
+      scope: this.config.scopes.join(' '),
+      client_id: this.config.clientId,
+      redirect_uri: this.config.redirectUri
+    });
+
+    return `${this.config.authServer}/oauth/auth?${params.toString()}`;
+  }
+
+  async handleAuthCallback(code: string) {
+    // Handle the auth callback and set tokens
+    // This should match the playground implementation
+    const response = await fetch('/api/docusign/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code })
+    });
+
+    if (!response.ok) {
+      throw new Error('Auth failed');
+    }
+
+    const { access_token, account_id } = await response.json();
+    this.accessToken = access_token;
+    this.accountId = account_id;
   }
 
   async createAndSendEnvelope(params: {
@@ -94,7 +98,8 @@ export class DocuSignService {
     try {
       const response = await fetch('/api/docusign/envelopes', {
         headers: {
-          'Authorization': `Bearer ${this.accessToken}`
+          'Authorization': `Bearer ${this.accessToken}`,
+          'Account-Id': this.accountId
         }
       });
 
@@ -106,11 +111,11 @@ export class DocuSignService {
       return response.json();
     } catch (error: any) {
       console.error('List envelopes error:', error);
-      throw new Error(error.message || 'Failed to list envelopes');
+      throw error;
     }
   }
 
-  async getEnvelopeStatus(envelopeId: string) {
+  async getEnvelope(envelopeId: string) {
     if (!this.accessToken || !this.accountId) {
       throw new Error('Not authenticated. Call authenticate() first.');
     }
@@ -118,7 +123,8 @@ export class DocuSignService {
     try {
       const response = await fetch(`/api/docusign/envelopes/${envelopeId}`, {
         headers: {
-          'Authorization': `Bearer ${this.accessToken}`
+          'Authorization': `Bearer ${this.accessToken}`,
+          'Account-Id': this.accountId
         }
       });
 
@@ -130,7 +136,35 @@ export class DocuSignService {
       return response.json();
     } catch (error: any) {
       console.error('Get envelope status error:', error);
-      throw new Error(error.message || 'Failed to get envelope status');
+      throw error;
+    }
+  }
+
+  async authenticate() {
+    try {
+      console.log('Starting authentication...');
+      const response = await fetch('/api/docusign/authenticate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Authentication failed');
+      }
+
+      const data = await response.json();
+      // Store the tokens properly
+      this.accessToken = data.accessToken;
+      this.accountId = data.accountId;
+
+      console.log('Authentication successful');
+      return data;
+    } catch (error: any) {
+      console.error('Authentication error:', error);
+      throw error;
     }
   }
 } 

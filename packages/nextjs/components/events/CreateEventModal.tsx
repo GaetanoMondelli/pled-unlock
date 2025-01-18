@@ -12,6 +12,8 @@ import { Textarea } from "../ui/textarea";
 import pledData from "@/public/pled.json";
 import { matchEventToRule } from "../../utils/eventMatching";
 import { ChevronDown, ChevronUp } from "lucide-react";
+import { ScrollArea } from "../ui/scroll-area";
+import { DocuSignService } from "../../lib/docusign-service";
 
 interface CreateEventModalProps {
   open: boolean;
@@ -67,6 +69,18 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
 
   // Add state for expanded rules
   const [expandedRules, setExpandedRules] = useState<string[]>([]);
+
+  // Add state for DocuSign data
+  const [envelopes, setEnvelopes] = useState<Array<{id: string, status: string}>>([]);
+  const [isLoadingEnvelopes, setIsLoadingEnvelopes] = useState(false);
+  const [statusResult, setStatusResult] = useState<any>(null);
+  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
+
+  // Initialize DocuSign service
+  const [docusignService] = useState(() => new DocuSignService());
+
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
 
   // Update event type handler to set template
   const handleEventTypeChange = (type: string) => {
@@ -187,13 +201,36 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
   const handleRawEventSubmit = async () => {
     try {
       const parsedData = JSON.parse(eventData);
-      await onSave({
+      
+      // Create event template
+      const template = {
+        id: `${eventType.toLowerCase()}_${Date.now()}`,
+        name: `${eventType} Event`,
+        description: `${eventType} event created manually`,
         type: eventType,
         template: {
           source: "manual",
           data: parsedData
         }
+      };
+
+      // Make direct API call to add event
+      const response = await fetch('/api/events', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          event: template,
+          action: 'add_template'
+        }),
       });
+
+      if (!response.ok) {
+        throw new Error('Failed to add event');
+      }
+
+      onClose(); // Just close the modal
     } catch (error) {
       console.error("Invalid JSON data:", error);
     }
@@ -209,9 +246,97 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
     console.log("Importing from Gmail");
   };
 
+  // Update handleTabChange to use proper authentication
+  const handleTabChange = async (tab: string) => {
+    if (tab === 'docusign' && !isAuthenticated) {
+      setIsAuthenticating(true);
+      try {
+        // First get the config
+        await docusignService.getConfig();
+        // Then authenticate
+        await docusignService.authenticate();
+        setIsAuthenticated(true);
+        // After authentication, fetch envelopes
+        await fetchEnvelopes();
+      } catch (error) {
+        console.error('Authentication failed:', error);
+      } finally {
+        setIsAuthenticating(false);
+      }
+    }
+  };
+
+  // Update fetchEnvelopes to not handle authentication
+  const fetchEnvelopes = async () => {
+    if (!isAuthenticated) return;
+    
+    setIsLoadingEnvelopes(true);
+    try {
+      const data = await docusignService.listEnvelopes();
+      setEnvelopes(data.envelopes.map((env: any) => ({
+        id: env.envelopeId,
+        status: env.status,
+        created: env.createdDateTime
+      })));
+    } catch (error) {
+      console.error('Error fetching envelopes:', error);
+    } finally {
+      setIsLoadingEnvelopes(false);
+    }
+  };
+
+  // Update handleDocusignAction to use authenticated state
   const handleDocusignAction = async () => {
-    // TODO: Implement DocuSign action
-    console.log("Executing DocuSign action:", selectedAction, selectedEnvelope);
+    if (!selectedEnvelope || !isAuthenticated) return;
+
+    setIsCheckingStatus(true);
+    try {
+      const data = await docusignService.getEnvelope(selectedEnvelope);
+      setStatusResult(data);
+    } catch (error) {
+      console.error('Error checking status:', error);
+    } finally {
+      setIsCheckingStatus(false);
+    }
+  };
+
+  const addAsVerifiedEvent = async () => {
+    if (!statusResult) return;
+
+    // Create a DocuSign event template using the API response data
+    const template = {
+      id: `docusign-${statusResult.envelopeId}`,
+      name: "DocuSign Status Update",
+      description: `DocuSign envelope ${statusResult.status}`,
+      type: "DOCUSIGN_EVENT",
+      template: {
+        source: "docusign",
+        data: statusResult  // Keep the full API response
+      }
+    };
+
+    try {
+      console.log('Creating DocuSign event:', template);
+      const response = await fetch('/api/events', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          event: template,
+          action: 'add_template'
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to add DocuSign event');
+      }
+
+      setStatusResult(null);
+      onClose(); // Just close the modal
+    } catch (error) {
+      console.error('Error adding DocuSign event:', error);
+    }
   };
 
   return (
@@ -221,7 +346,7 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
           <DialogTitle>Create Event</DialogTitle>
         </DialogHeader>
 
-        <Tabs defaultValue="raw">
+        <Tabs defaultValue="raw" onValueChange={handleTabChange}>
           <TabsList>
             <TabsTrigger value="raw">Raw Event</TabsTrigger>
             <TabsTrigger value="api">API Execution</TabsTrigger>
@@ -390,33 +515,83 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
           <TabsContent value="docusign">
             <Card className="p-4">
               <h3 className="text-sm font-medium mb-2">DocuSign Actions</h3>
-              <div className="space-y-4">
-                <Select value={selectedAction} onValueChange={setSelectedAction}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select action" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="check_status">Check Envelope Status</SelectItem>
-                    <SelectItem value="get_recipients">Get Recipients</SelectItem>
-                    <SelectItem value="download_doc">Download Document</SelectItem>
-                  </SelectContent>
-                </Select>
+              {isAuthenticating ? (
+                <div className="text-center py-4">
+                  <p className="text-sm text-muted-foreground">Authenticating with DocuSign...</p>
+                </div>
+              ) : !isAuthenticated ? (
+                <div className="text-center py-4">
+                  <p className="text-sm text-muted-foreground mb-2">Not authenticated with DocuSign</p>
+                  <Button onClick={() => handleTabChange('docusign')}>
+                    Authenticate
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label>Select Envelope</Label>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={fetchEnvelopes}
+                        disabled={isLoadingEnvelopes}
+                      >
+                        Refresh
+                      </Button>
+                    </div>
+                    <Select 
+                      value={selectedEnvelope} 
+                      onValueChange={setSelectedEnvelope}
+                      disabled={isLoadingEnvelopes}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={isLoadingEnvelopes ? "Loading..." : "Select envelope"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {envelopes.map(env => (
+                          <SelectItem key={env.id} value={env.id}>
+                            <div className="flex flex-col">
+                              <span>{env.id}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {env.status} - {new Date(env.created).toLocaleDateString()}
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                <Select value={selectedEnvelope} onValueChange={setSelectedEnvelope}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select envelope" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {/* Fetch and display actual envelopes */}
-                    <SelectItem value="env1">Envelope 1</SelectItem>
-                    <SelectItem value="env2">Envelope 2</SelectItem>
-                  </SelectContent>
-                </Select>
+                  <Button 
+                    onClick={handleDocusignAction}
+                    disabled={!selectedEnvelope || isCheckingStatus}
+                  >
+                    {isCheckingStatus ? "Checking..." : "Check Status"}
+                  </Button>
 
-                <Button onClick={handleDocusignAction}>
-                  Execute Action
-                </Button>
-              </div>
+                  {statusResult && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-sm font-medium">API Result</h4>
+                        <Button 
+                          size="sm" 
+                          onClick={addAsVerifiedEvent}
+                        >
+                          Add as Event
+                        </Button>
+                      </div>
+                      <Card className="bg-muted">
+                        <ScrollArea className="h-[200px]">
+                          <pre className="p-4 text-xs mt-2 bg-gray-50 p-2 rounded overflow-x-auto whitespace-pre">
+                            {JSON.stringify(statusResult, null, 2)}
+                          </pre>
+                        </ScrollArea>
+                      </Card>
+                    </div>
+                  )}
+                </div>
+              )}
             </Card>
           </TabsContent>
         </Tabs>

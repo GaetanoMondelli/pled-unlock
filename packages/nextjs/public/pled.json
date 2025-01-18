@@ -522,26 +522,65 @@
       },
       "received": false
     },
-    "docusign_sent": {
-      "id": "docusign-sent",
-      "name": "DocuSign Sent",
-      "description": "Contract sent via DocuSign",
+    "docusign_docusign-741ea9b7-0a57-454a-aeaa-495350b6a0d5": {
+      "id": "docusign_docusign-741ea9b7-0a57-454a-aeaa-495350b6a0d5",
+      "name": "DocuSign Status Update",
+      "description": "DocuSign envelope sent",
       "type": "DOCUSIGN_EVENT",
       "template": {
         "source": "docusign",
         "data": {
-          "envelopeStatus": "sent",
-          "envelopeId": "ENV-789",
-          "recipientStatus": [
-            "sent"
-          ],
-          "recipients": [
-            {
-              "email": "john@example.com",
-              "status": "sent",
-              "sentAt": "2024-01-17T10:10:00Z"
-            }
-          ]
+          "status": "sent",
+          "documentsUri": "/envelopes/741ea9b7-0a57-454a-aeaa-495350b6a0d5/documents",
+          "recipientsUri": "/envelopes/741ea9b7-0a57-454a-aeaa-495350b6a0d5/recipients",
+          "attachmentsUri": "/envelopes/741ea9b7-0a57-454a-aeaa-495350b6a0d5/attachments",
+          "envelopeUri": "/envelopes/741ea9b7-0a57-454a-aeaa-495350b6a0d5",
+          "emailSubject": "Please sign this document",
+          "emailBlurb": "Please review and sign this document at your earliest convenience.",
+          "envelopeId": "741ea9b7-0a57-454a-aeaa-495350b6a0d5",
+          "signingLocation": "online",
+          "customFieldsUri": "/envelopes/741ea9b7-0a57-454a-aeaa-495350b6a0d5/custom_fields",
+          "notificationUri": "/envelopes/741ea9b7-0a57-454a-aeaa-495350b6a0d5/notification",
+          "enableWetSign": "true",
+          "allowMarkup": "false",
+          "allowReassign": "true",
+          "createdDateTime": "2025-01-17T15:41:24.6400000Z",
+          "lastModifiedDateTime": "2025-01-17T15:41:31.9900000Z",
+          "initialSentDateTime": "2025-01-17T15:41:32.7430000Z",
+          "sentDateTime": "2025-01-17T15:41:32.7430000Z",
+          "statusChangedDateTime": "2025-01-17T15:41:32.7430000Z",
+          "documentsCombinedUri": "/envelopes/741ea9b7-0a57-454a-aeaa-495350b6a0d5/documents/combined",
+          "certificateUri": "/envelopes/741ea9b7-0a57-454a-aeaa-495350b6a0d5/documents/certificate",
+          "templatesUri": "/envelopes/741ea9b7-0a57-454a-aeaa-495350b6a0d5/templates",
+          "expireEnabled": "true",
+          "expireDateTime": "2025-05-17T15:41:32.7430000Z",
+          "expireAfter": "119",
+          "sender": {
+            "userName": "Gaetano Mondelli",
+            "userId": "3d75ee95-c9b7-4531-80e7-31ad925c641c",
+            "accountId": "a8c0cf58-75d0-422a-a7cd-1f7a88f15dd6",
+            "email": "gaetano.mondelli@gmail.com",
+            "ipAddress": "81.133.15.69"
+          },
+          "purgeState": "unpurged",
+          "envelopeIdStamping": "true",
+          "is21CFRPart11": "false",
+          "signerCanSignOnMobile": "true",
+          "autoNavigation": "true",
+          "isSignatureProviderEnvelope": "false",
+          "hasFormDataChanged": "false",
+          "allowComments": "true",
+          "hasComments": "false",
+          "allowViewHistory": "true",
+          "envelopeMetadata": {
+            "allowAdvancedCorrect": "true",
+            "enableSignWithNotary": "true",
+            "allowCorrect": "true"
+          },
+          "anySigner": null,
+          "envelopeLocation": "current_site",
+          "isDynamicEnvelope": "false",
+          "burnDefaultTabData": "false"
         }
       },
       "received": false
