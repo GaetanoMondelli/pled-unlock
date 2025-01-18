@@ -23,6 +23,7 @@ import ActionList from "@/components/ui/action-list";
 import EnvelopeView from "~~/components/ui/envelope-view";
 import { useSearchParams, useRouter } from 'next/navigation';
 import { PlaygroundView } from "@/components/ui/playground-view";
+import { VariablesSection } from "@/components/variables/VariablesSection";
 
 type Variables = {
   candidate: { email: string; name: string };
@@ -64,35 +65,11 @@ export default function ProcedureLayout({
     switch (activeTab) {
       case 'variables':
         return (
-          <Card className="p-4">
-            <ScrollArea className="h-[calc(100vh-12rem)]">
-              <div className="space-y-6">
-                {Object.entries(template.variables).map(([section, fields]) => (
-                  <div key={section} className="space-y-2">
-                    <h3 className="font-medium capitalize">{section}</h3>
-                    <div className="grid gap-2">
-                      {Object.entries(fields).map(([field, config]: [string, any]) => (
-                        <div key={field} className="flex items-center justify-between p-2 rounded-lg bg-muted">
-                          <div>
-                            <p className="text-sm font-medium">{field}</p>
-                            <p className="text-xs text-muted-foreground">{config.description}</p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {config.required && (
-                              <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">Required</span>
-                            )}
-                            <span className="text-sm text-primary">
-                              {instance.variables[section as keyof Variables]?.[field as keyof Variables[keyof Variables]] || '-'}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
-          </Card>
+          <VariablesSection 
+            procedureId={params.id}
+            template={template}
+            instance={instance}
+          />
         );
       case 'events':
         return (
