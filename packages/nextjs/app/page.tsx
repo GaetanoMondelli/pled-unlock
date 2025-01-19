@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { 
   User, 
   Building2, 
@@ -11,10 +12,13 @@ import {
   MessageCircle, 
   Activity,
   GitBranch,
-  Timer
+  Timer,
+  PlusCircle
 } from "lucide-react";
 import { format } from "date-fns";
 import { calculateCurrentState } from "@/lib/fsm"
+import { CreateProcedureModal } from "@/components/procedures/CreateProcedureModal";
+import { fetchFromDb } from "../utils/api";
 
 
 // Add the date formatting helper
@@ -31,21 +35,34 @@ const formatDate = (dateString?: string) => {
 export default function Home() {
   const [templates, setTemplates] = useState<any[]>([]);
   const [instances, setInstances] = useState<any[]>([]);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   useEffect(() => {
-    async function fetchData() {
-      try {
-        const response = await fetch('/api/db');
-        if (!response.ok) throw new Error('Failed to fetch data');
-        const data = await response.json();
-        setTemplates(data.procedureTemplates || []);
-        setInstances(data.procedureInstances || []);
-      } catch (error) {
-        console.error('Error fetching data:', error);
-      }
-    }
-    fetchData();
+    const loadData = async () => {
+      const data = await fetchFromDb();
+      setTemplates(data.procedureTemplates || []);
+      setInstances(data.procedureInstances || []);
+    };
+    loadData();
   }, []);
+
+  const handleCreateProcedure = async (data: any) => {
+    try {
+      const response = await fetch('/api/procedures', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      if (!response.ok) throw new Error('Failed to create procedure');
+      
+      // Refresh the data
+      const newData = await fetchFromDb();
+      setTemplates(newData.procedureTemplates || []);
+      setInstances(newData.procedureInstances || []);
+    } catch (error) {
+      console.error('Error creating procedure:', error);
+    }
+  };
 
   const formatTimestamp = (timestamp: string) => {
     try {
@@ -58,6 +75,19 @@ export default function Home() {
 
   return (
     <div className="container mx-auto p-6">
+      {/* Header with Create Button */}
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold">Procedures</h1>
+        <Button 
+          onClick={() => setShowCreateModal(true)}
+          size="lg"
+          className="gap-2"
+        >
+          <PlusCircle className="h-5 w-5" />
+          New Procedure
+        </Button>
+      </div>
+
       {templates.map((template) => (
         <div key={template.templateId} className="mb-8">
           <h2 className="text-2xl font-bold mb-4">{template.name}</h2>
@@ -139,6 +169,13 @@ export default function Home() {
           </div>
         </div>
       ))}
+
+      {/* Create Procedure Modal */}
+      <CreateProcedureModal
+        open={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSave={handleCreateProcedure}
+      />
     </div>
   );
 }
