@@ -8,10 +8,7 @@ import { Button } from "./button"
 import { Input } from "./input"
 import { Textarea } from "./textarea"
 import {
-  FileText,
   Send,
-  Key,
-  Mail,
   FileSignature,
   Download,
   Upload,
@@ -20,7 +17,6 @@ import {
   EyeOff
 } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./dialog"
-import { EventsPlayground } from "../events/EventsPlayground"
 
 interface DocuSignConfig {
   integrationKey: string;
@@ -441,7 +437,7 @@ export const PlaygroundView = () => {
           (result.completedDateTime ? `Completed: ${result.completedDateTime}\n` : '') +
           "\nAll Possible Statuses:\n" +
           Object.entries(ENVELOPE_STATUSES)
-            .map(([key, info]) => `${info.emoji} ${info.title}: ${info.description}`)
+            .map(([_key, info] : [any, any]) => `${info.emoji} ${info.title}: ${info.description}`)
             .join('\n\n')
         );
       } catch (error: any) {
@@ -576,42 +572,6 @@ export const PlaygroundView = () => {
     }
   };
 
-  // Add this function to get captured variables
-  const getCapturedVariables = (procedureId: string) => {
-    const instance = pledData.procedureInstances.find(
-      p => p.instanceId === procedureId
-    );
-    
-    const outputs: Record<string, Record<string, any>> = {};
-    
-    const template = pledData.procedureTemplates.find(
-      t => t.templateId === "hiring_process"
-    );
-    
-    instance?.messages?.forEach(message => {
-      const rule = template?.messageRules.find(r => r.id === message.rule);
-      if (rule?.captures) {
-        if (!outputs[message.type]) {
-          outputs[message.type] = {};
-        }
-        Object.entries(rule.captures).forEach(([key, pathTemplate]) => {
-          const event = instance.events.find(e => e.id === message.fromEvent);
-          if (event) {
-            const pathMatch = pathTemplate.toString().match(/{{event\.data\.(.+)}}/);
-            if (pathMatch && pathMatch[1]) {
-              const path = pathMatch[1];
-              const value = getValueByPath(event.data, path);
-              if (value !== undefined) {
-                outputs[message.type][key] = value;
-              }
-            }
-          }
-        });
-      }
-    });
-    
-    return outputs;
-  };
 
   return (
     <>

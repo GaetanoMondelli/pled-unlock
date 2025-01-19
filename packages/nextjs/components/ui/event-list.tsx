@@ -44,7 +44,7 @@ export default function EventList({ procedureId }: EventListProps) {
 
   // Get the instance with null check
   const instance = pledData?.procedureInstances?.find(
-    p => p.instanceId === procedureId
+    (p: any) => p.instanceId === procedureId
   );
 
   useEffect(() => {
@@ -58,7 +58,7 @@ export default function EventList({ procedureId }: EventListProps) {
     
     try {
       const availableEvts = Object.entries(pledData.eventTemplates)
-        .reduce((acc, [key, event]) => {
+        .reduce((acc, [key, event] : [any, any]) => {
           if (!event.received) {
             acc[key] = event;
           }
@@ -88,7 +88,7 @@ export default function EventList({ procedureId }: EventListProps) {
       const updatedPledData = JSON.parse(JSON.stringify(pledData));
       
       const instanceIndex = updatedPledData.procedureInstances.findIndex(
-        p => p.instanceId === procedureId
+        (p: any) => p.instanceId === procedureId
       );
 
       if (instanceIndex === -1) {
@@ -135,7 +135,7 @@ export default function EventList({ procedureId }: EventListProps) {
         // Update messages - remove messages associated with the reverted events
         const existingMessages = updatedPledData.procedureInstances[instanceIndex].history.messages || [];
         const updatedMessages = existingMessages.filter(
-          message => !selectedProcessed.includes(message.fromEvent)
+          (message: any) => !selectedProcessed.includes(message.fromEvent)
         );
         
         updatedPledData.procedureInstances[instanceIndex].history.messages = updatedMessages;
@@ -173,7 +173,7 @@ export default function EventList({ procedureId }: EventListProps) {
       
       // Update available events
       const availableEvts = Object.entries(refreshedData.eventTemplates)
-        .reduce((acc, [key, event]) => {
+        .reduce((acc, [key, event] : [any, any]) => {
           if (!event.received) {
             acc[key] = event;
           }
@@ -201,14 +201,14 @@ export default function EventList({ procedureId }: EventListProps) {
 
   const getMatchingRules = (event: any) => {
     const template = pledData.procedureTemplates.find(
-      t => t.templateId === "hiring_process"
+      (t: any) => t.templateId === "hiring_process"
     );
 
     if (!template) return [];
 
     // Get the instance variables
     const instance = pledData.procedureInstances.find(
-      p => p.instanceId === procedureId
+      (p: any) => p.instanceId === procedureId
     );
 
     const variables = instance?.variables || {};
@@ -219,7 +219,7 @@ export default function EventList({ procedureId }: EventListProps) {
       data: event.template.data
     } : event;
 
-    return template.messageRules.filter(rule => 
+    return template.messageRules.filter((rule: any) => 
       matchEventToRule(
         eventToMatch,
         {
@@ -259,25 +259,25 @@ export default function EventList({ procedureId }: EventListProps) {
 
   const getCapturedOutputs = () => {
     const instance = pledData.procedureInstances.find(
-      p => p.instanceId === procedureId
+      (p: any) => p.instanceId === procedureId
     );
     
     const outputs: Record<string, Record<string, any>> = {};
     
     // Get all rules with captures
     const template = pledData.procedureTemplates.find(
-      t => t.templateId === "hiring_process"
+      (t: any) => t.templateId === "hiring_process"
     );
     
-    instance?.messages?.forEach(message => {
-      const rule = template?.messageRules.find(r => r.id === message.rule);
+    instance?.messages?.forEach((message: any) => {
+      const rule = template?.messageRules.find((r: any) => r.id === message.rule);
       if (rule?.captures) {
         // Group by message type
         if (!outputs[message.type]) {
           outputs[message.type] = {};
         }
 
-        Object.entries(rule.captures).forEach(([key, pathTemplate]) => {
+        Object.entries(rule.captures).forEach(([key, pathTemplate] : [any, any]) => {
           const event = processedEvents.find(e => e.id === message.fromEvent);
           if (event) {
             const pathMatch = pathTemplate.toString().match(/{{event\.data\.(.+)}}/);
@@ -438,7 +438,7 @@ export default function EventList({ procedureId }: EventListProps) {
                       <div className="flex gap-1 mt-1">
                         <p className="text-xs font-medium">Matches:</p>
                         <div className="flex flex-wrap gap-1">
-                          {getMatchingRules(event).map((rule) => (
+                          {getMatchingRules(event).map((rule: any) => (
                             <span 
                               key={rule.id} 
                               className="text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded"
@@ -491,7 +491,7 @@ export default function EventList({ procedureId }: EventListProps) {
             </span>
           </div>
           <div className="space-y-2 max-h-[400px] overflow-auto">
-            {processedEvents?.map((event) => (
+            {processedEvents?.map((event: any) => (
               <div key={event.id} className="border rounded">
                 <div 
                   className={`p-2 cursor-pointer ${
@@ -529,7 +529,7 @@ export default function EventList({ procedureId }: EventListProps) {
                   </div>
                   {event.triggeredTransitions?.length > 0 && (
                     <div className="flex gap-1 mt-1">
-                      {event.triggeredTransitions.map((transition, i) => (
+                      {event.triggeredTransitions.map((transition: any, i: any) => (
                         <div key={i} className="flex gap-1 mt-1">
                           {renderTransition(transition)}
                         </div>
@@ -543,7 +543,7 @@ export default function EventList({ procedureId }: EventListProps) {
                       <div className="mb-2">
                         <p className="text-xs font-medium mb-1">Matching Rules:</p>
                         <div className="flex flex-wrap gap-1">
-                          {getMatchingRules(event).map((rule) => (
+                          {getMatchingRules(event).map((rule: any) => (
                             <span 
                               key={rule.id} 
                               className="text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded"
@@ -568,11 +568,11 @@ export default function EventList({ procedureId }: EventListProps) {
       <Card className="p-4">
         <h3 className="font-semibold mb-4">Instance Variables</h3>
         <div className="space-y-4">
-          {Object.entries(getAllVariables()).map(([section, vars]) => (
+          {Object.entries(getAllVariables()).map(([section, vars] : [any, any]) => (
             <div key={section} className="space-y-1">
               <h4 className="text-sm font-medium capitalize">{section}</h4>
               <div className="pl-2 space-y-1">
-                {Object.entries(vars).map(([key, value]) => (
+                {Object.entries(vars).map(([key, value] : [any, any]) => (
                   <div key={key} className="flex items-center gap-2 text-sm">
                     <span className="text-gray-500">{key}:</span>
                     <span className="font-mono">{value}</span>

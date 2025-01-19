@@ -16,42 +16,6 @@ import { format } from "date-fns";
 import pledData from "@/public/pled.json";
 import { calculateCurrentState } from "@/lib/fsm"
 
-interface ProcedureInstance {
-  instanceId: string;
-  templateId: string;
-  startDate?: string;
-  variables: {
-    candidate: {
-      email: string;
-      name: string;
-    };
-    company: {
-      email: string;
-      department: string;
-    };
-  };
-  currentState: string;
-  events: Array<{
-    id: string;
-    type: string;
-    timestamp: string;
-    data: Record<string, any>;
-  }>;
-  messages: Array<{
-    id: string;
-    type: string;
-    timestamp: string;
-    title: string;
-    content: string;
-    fromEvent: string;
-  }>;
-  completedActions: Array<{
-    id: string;
-    type: string;
-    timestamp: string;
-    result: Record<string, any>;
-  }>;
-}
 
 // Add the date formatting helper
 const formatDate = (dateString?: string) => {
@@ -84,7 +48,7 @@ export default function Home() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {pledData.procedureInstances
               .filter(instance => instance.templateId === template.templateId)
-              .map((instance) => {
+              .map((instance: any) => {
                 const currentState = calculateCurrentState(template.stateMachine.fsl, instance.history.messages);
                 const lastActivity = instance.history.messages[instance.history.messages.length - 1]?.timestamp;
                 const firstEventDate = instance.history.events[0]?.timestamp;

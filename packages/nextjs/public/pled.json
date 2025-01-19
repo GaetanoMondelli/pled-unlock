@@ -345,7 +345,7 @@
           "time": "2024-01-17T10:00:00Z"
         }
       },
-      "received": true
+      "received": false
     },
     "role_discussion": {
       "id": "role-discuss",
@@ -585,20 +585,7 @@
             "fromEvent": "evt_6"
           }
         ],
-        "events": [
-          {
-            "id": "interview-request-1737256963800",
-            "type": "EMAIL_RECEIVED",
-            "timestamp": "2025-01-19T03:22:43.800Z",
-            "data": {
-              "from": "john@example.com",
-              "to": "hr@company.com",
-              "subject": "Interview request",
-              "body": "I would like to schedule an interview",
-              "time": "2024-01-17T10:00:00Z"
-            }
-          }
-        ],
+        "events": [],
         "completedActions": []
       },
       "startDate": "2024-03-20T10:00:00Z"

@@ -39,13 +39,13 @@ export default function ProcedureLayout({
 }) {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const activeTab = searchParams.get('tab') || 'events';
+  const activeTab = searchParams?.get('tab') || 'events';
 
   const handleTabChange = (tab: string) => {
     router.push(`/procedures/${params.id}?tab=${tab}`);
   };
 
-  const instance = pledData.procedureInstances.find(p => p.instanceId === params.id);
+  const instance : any = pledData.procedureInstances.find(p => p.instanceId === params.id);
   if (!instance) return null;
 
   const template = pledData.procedureTemplates.find(t => t.templateId === instance.templateId);
