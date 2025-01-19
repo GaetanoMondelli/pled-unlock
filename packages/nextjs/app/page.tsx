@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -13,7 +14,6 @@ import {
   Timer
 } from "lucide-react";
 import { format } from "date-fns";
-import pledData from "@/public/pled.json";
 import { calculateCurrentState } from "@/lib/fsm"
 
 
@@ -29,6 +29,24 @@ const formatDate = (dateString?: string) => {
 };
 
 export default function Home() {
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [instances, setInstances] = useState<any[]>([]);
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const response = await fetch('/api/db');
+        if (!response.ok) throw new Error('Failed to fetch data');
+        const data = await response.json();
+        setTemplates(data.procedureTemplates || []);
+        setInstances(data.procedureInstances || []);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      }
+    }
+    fetchData();
+  }, []);
+
   const formatTimestamp = (timestamp: string) => {
     try {
       return `Updated ${formatDistanceToNow(new Date(timestamp))} ago`;
@@ -40,13 +58,13 @@ export default function Home() {
 
   return (
     <div className="container mx-auto p-6">
-      {pledData.procedureTemplates.map((template) => (
+      {templates.map((template) => (
         <div key={template.templateId} className="mb-8">
           <h2 className="text-2xl font-bold mb-4">{template.name}</h2>
           <p className="text-muted-foreground mb-4">{template.description}</p>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {pledData.procedureInstances
+            {instances
               .filter(instance => instance.templateId === template.templateId)
               .map((instance: any) => {
                 const currentState = calculateCurrentState(template.stateMachine.fsl, instance.history.messages);
@@ -149,7 +167,8 @@ function getStateBadgeVariant(state: string): "default" | "secondary" | "destruc
   
   return 'outline';
 }
+
 function formatDistanceToNow(arg0: Date) {
-  throw new Error("Function not implemented.");
+  
 }
 

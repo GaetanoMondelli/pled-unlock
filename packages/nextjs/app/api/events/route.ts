@@ -1,19 +1,12 @@
 import { NextResponse } from 'next/server';
-import { promises as fs } from 'fs';
-import path from 'path';
-import { Event } from '../../../types/events';
-import { matchEventToRule } from '../../../utils/eventMatching';
-
-const PLED_PATH = path.join(process.cwd(), 'public', 'pled.json');
+import { fetchFromDb, updateDb } from '../../../utils/api';
 
 export async function GET() {
   try {
-    const pledContent = await fs.readFile(PLED_PATH, 'utf8');
-    const pled = JSON.parse(pledContent);
-    
+    const data = await fetchFromDb();
     return NextResponse.json({
-      events: pled.events,
-      receivedEvents: pled.receivedEvents
+      events: data.events,
+      receivedEvents: data.receivedEvents
     });
   } catch (error: any) {
     return NextResponse.json(
@@ -28,22 +21,18 @@ export async function POST(request: Request) {
     const { event, action } = await request.json();
     console.log('Received request:', { action, event });
 
-    const pledPath = path.join(process.cwd(), "public", "pled.json");
-    const pledData = JSON.parse(await fs.readFile(pledPath, "utf-8"));
+    const data = await fetchFromDb();
 
     if (action === 'add_template') {
-      // Initialize events if doesn't exist
-      if (!pledData.events) {
-        pledData.events = {};
+      if (!data.events) {
+        data.events = {};
       }
 
-      // Create event key
       const eventKey = event.type === 'DOCUSIGN_EVENT' 
         ? `docusign_${event.id}`
         : `${event.type.toLowerCase()}_${Date.now()}`;
 
-      // Add event to events object
-      pledData.events[eventKey] = {
+      data.events[eventKey] = {
         id: eventKey,
         name: event.name || `${event.type} Event`,
         description: event.description || `${event.type} event created at ${new Date().toISOString()}`,
@@ -52,13 +41,12 @@ export async function POST(request: Request) {
         received: false
       };
 
-      // Write updated data back to file
-      await fs.writeFile(pledPath, JSON.stringify(pledData, null, 2));
-      console.log('Added event:', pledData.events[eventKey]);
+      await updateDb(data);
+      console.log('Added event:', data.events[eventKey]);
 
       return NextResponse.json({ 
         success: true,
-        event: pledData.events[eventKey]
+        event: data.events[eventKey]
       });
     }
 
@@ -72,16 +60,13 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const { eventId } = await request.json();
-    const pledPath = path.join(process.cwd(), "public", "pled.json");
-    const pledData = JSON.parse(await fs.readFile(pledPath, "utf-8"));
+    const data = await fetchFromDb();
 
-    // Remove event from events object
-    if (pledData.events[eventId]) {
-      delete pledData.events[eventId];
+    if (data.events[eventId]) {
+      delete data.events[eventId];
     }
 
-    // Write updated data back to file
-    await fs.writeFile(pledPath, JSON.stringify(pledData, null, 2));
+    await updateDb(data);
 
     return NextResponse.json({ success: true });
   } catch (error) {

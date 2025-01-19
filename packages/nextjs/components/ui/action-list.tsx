@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   ChevronDown, 
   ChevronRight, 
@@ -10,8 +10,8 @@ import {
   FileSignature,
   LucideIcon
 } from "lucide-react";
-import pledData from "@/public/pled.json";
 import { TemplateVariable } from "./template-variable";
+import { fetchFromDb } from "../../utils/api";
 
 // Define action type icons mapping
 const actionIcons: Record<string, LucideIcon> = {
@@ -27,12 +27,30 @@ interface ActionListProps {
 
 export const ActionList = ({ procedureId }: ActionListProps) => {
   const [expandedActions, setExpandedActions] = useState<string[]>([]);
+  const [instance, setInstance] = useState<any>(null);
+  const [template, setTemplate] = useState<any>(null);
 
-  const instance = pledData.procedureInstances.find(p => p.instanceId === procedureId);
-  if (!instance) return null;
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const data = await fetchFromDb();
+        const instance = data.procedureInstances?.find((p: any) => p.instanceId === procedureId);
+        const template = data.procedureTemplates?.find((t: any) => t.templateId === instance?.templateId);
+        
+        if (!instance || !template) {
+          throw new Error('Procedure not found');
+        }
 
-  const template = pledData.procedureTemplates.find(t => t.templateId === instance.templateId);
-  if (!template) return null;
+        setInstance(instance);
+        setTemplate(template);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      }
+    }
+    fetchData();
+  }, [procedureId]);
+
+  if (!instance || !template) return null;
 
   const toggleActions = (state: string) => {
     setExpandedActions(prev =>

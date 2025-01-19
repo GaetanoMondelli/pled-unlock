@@ -9,16 +9,19 @@ import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { Textarea } from "../ui/textarea";
-import pledData from "@/public/pled.json";
 import { matchEventToRule } from "../../utils/eventMatching";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, ChevronRight } from "lucide-react";
 import { ScrollArea } from "../ui/scroll-area";
 import { DocuSignService } from "../../lib/docusign-service";
+import { getProcedureData, fetchFromDb } from "~~/utils/api";
+import { getNotMatchingReason } from "../../utils/message-rules";
+import { handleEventAndGenerateMessages } from "../../utils/stateAndMessageHandler";
 
 interface CreateEventModalProps {
   open: boolean;
   onClose: () => void;
   onSave: (template: any) => Promise<void>;
+  procedureId: string;
 }
 
 const EVENT_TEMPLATES = {
@@ -52,7 +55,7 @@ const EVENT_TEMPLATES = {
   }
 };
 
-export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProps) => {
+export const CreateEventModal = ({ open, onClose, onSave, procedureId }: CreateEventModalProps) => {
   const [selectedEndpoint, setSelectedEndpoint] = useState<string>("");
   const [selectedAction, setSelectedAction] = useState<string>("");
   const [selectedEnvelope, setSelectedEnvelope] = useState<string>("");
@@ -82,6 +85,15 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
 
+  const [templateRules, setTemplateRules] = useState<any[]>([]);
+  const [instanceVariables, setInstanceVariables] = useState<any>({});
+
+  // Add state for expanded rule debug
+  const [expandedRuleDebug, setExpandedRuleDebug] = useState<string[]>([]);
+
+  // Add this state for the debug section
+  const [showDebug, setShowDebug] = useState(false);
+
   // Update event type handler to set template
   const handleEventTypeChange = (type: string) => {
     setEventType(type);
@@ -94,42 +106,73 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
     );
   };
 
-  // Update the rule matching check to interpolate variables and show specific conditions
+  // Add useEffect to fetch rules when modal opens
+  useEffect(() => {
+    if (open) {
+      fetchRules();
+    }
+  }, [open, procedureId]); // Dependencies: open state and procedureId
+
+  // Update the fetchRules function
+  const fetchRules = async () => {
+    try {
+      console.log('Fetching rules for procedure:', procedureId);
+      const data = await fetchFromDb();
+      
+      // Find the instance and template
+      const instance = data.procedureInstances?.find(
+        (p: any) => p.instanceId === procedureId
+      );
+      const template = data.procedureTemplates?.find(
+        (t: any) => t.templateId === instance?.templateId
+      );
+
+      if (!instance || !template) {
+        console.error('Instance or template not found:', { instance, template });
+        return;
+      }
+
+      console.log('Fetched rules:', {
+        messageRules: template.messageRules,
+        variables: instance.variables
+      });
+
+      setTemplateRules(template.messageRules || []);
+      setInstanceVariables(instance.variables || {});
+    } catch (error) {
+      console.error('Error fetching rules:', error);
+    }
+  };
+
+  // Update the rule matching check
   const checkRuleMatching = (data: any) => {
     try {
-      const template = pledData.procedureTemplates.find(t => t.templateId === "hiring_process");
-      if (!template) return;
-
       const event = { type: eventType, data };
       const matching = [];
       const nonMatching = [];
 
-      // Get instance variables for interpolation
-      const instance = pledData.procedureInstances[0]; // or pass instance as prop
-      const variables = instance?.variables || {};
-
-      for (const rule of template.messageRules) {
+      for (const rule of templateRules) {
         if (rule.matches.type === eventType) {
           try {
             const matches = matchEventToRule(
               event,
               { type: rule.matches.type, conditions: rule.matches.conditions },
-              variables
+              instanceVariables
             );
 
             if (matches) {
               matching.push(rule);
             } else {
               // Add detailed condition comparison with interpolated values
-              const conditionDetails = Object.entries(rule.matches.conditions || {}).map(([field, condition]) => {
+              const conditionDetails = Object.entries(rule.matches.conditions || {}).map(([field, condition]: [string, any]) => {
                 // Get actual value from event data
                 const actualValue = field.split('.').reduce((obj, key) => obj?.[key], data);
                 
                 // Interpolate the expected value template
                 let expectedTemplate = condition.toString();
-                const interpolated = expectedTemplate.replace(/\{\{([^}]+)\}\}/g, (match, path) => {
+                const interpolated = expectedTemplate.replace(/\{\{([^}]+)\}\}/g, (match: string, path: string) => {
                   return path.split('.')
-                    .reduce((obj, key) => obj?.[key], variables) || match;
+                    .reduce((obj: any, key: string) => obj?.[key], instanceVariables) || match;
                 });
 
                 // Parse the condition
@@ -143,7 +186,7 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                   expected: expectedValue,
                   actual: actualValue || 'undefined',
                   template: condition.toString(),
-                  matches: false // You can implement actual condition matching here
+                  matches: false
                 };
               });
 
@@ -339,6 +382,48 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
     }
   };
 
+  // Add state handler for expanded rule debug
+  const toggleRuleDebug = (ruleId: string) => {
+    setExpandedRuleDebug(prev => 
+      prev.includes(ruleId) ? prev.filter(id => id !== ruleId) : [...prev, ruleId]
+    );
+  };
+
+  const handleSave = async () => {
+    try {
+      const eventObj = {
+        id: `evt_${Date.now()}`,
+        type: eventType,
+        timestamp: new Date().toISOString(),
+        data: JSON.parse(eventData)
+      };
+
+      // Get current state and FSM definition
+      const { currentState, fsmDefinition } = await fetchProcedureState(procedureId);
+      
+      // Generate messages and handle state transitions
+      const { messages, transitions, finalState } = handleEventAndGenerateMessages(
+        eventObj,
+        templateRules,
+        instanceVariables,
+        currentState,
+        fsmDefinition
+      );
+
+      // Save everything
+      await onSave({
+        event: eventObj,
+        messages,
+        stateTransitions: transitions,
+        newState: finalState
+      });
+
+      onClose();
+    } catch (error) {
+      console.error('Error saving event:', error);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl">
@@ -433,7 +518,7 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                                   </tr>
                                 </thead>
                                 <tbody>
-                                  {details.map((detail, i) => (
+                                  {details.map((detail: any, i: number) => (
                                     <tr key={i} className="border-t border-yellow-200/50">
                                       <td className="p-1 font-medium">{detail.field}</td>
                                       <td className="p-1 italic">{detail.operator}</td>
@@ -549,12 +634,12 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                         <SelectValue placeholder={isLoadingEnvelopes ? "Loading..." : "Select envelope"} />
                       </SelectTrigger>
                       <SelectContent>
-                        {envelopes.map(env => (
+                        {envelopes.map((env: any) => (
                           <SelectItem key={env.id} value={env.id}>
                             <div className="flex flex-col">
                               <span>{env.id}</span>
                               <span className="text-xs text-muted-foreground">
-                                {env.status} - {new Date(env.created).toLocaleDateString()}
+                                {env.status} - {new Date(env.created || Date.now()).toLocaleDateString()}
                               </span>
                             </div>
                           </SelectItem>
@@ -595,6 +680,130 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
             </Card>
           </TabsContent>
         </Tabs>
+
+        {/* Add this debug section right before the Rule Matching Analysis */}
+        <div className="mt-4 mb-4">
+          <Button
+            variant="ghost"
+            className="w-full flex justify-between items-center mb-2"
+            onClick={() => setShowDebug(!showDebug)}
+          >
+            <h3 className="text-sm font-medium">Rule Matching Debug</h3>
+            {showDebug ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+          </Button>
+
+          {showDebug && (
+            <ScrollArea className="h-[400px]">
+              <div className="space-y-2 pr-4">
+                {templateRules.map((rule: any) => {
+                  try {
+                    const eventObj = { 
+                      type: eventType, 
+                      data: JSON.parse(eventData) 
+                    };
+                    
+                    return (
+                      <Card key={rule.id} className="p-2">
+                        <Button
+                          variant="ghost"
+                          className="w-full flex justify-between items-center"
+                          onClick={() => toggleRuleDebug(rule.id)}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium">Rule: {rule.id}</span>
+                            <span className={`text-xs px-2 py-0.5 rounded-full ${
+                              matchEventToRule(eventObj, { type: rule.matches.type, conditions: rule.matches.conditions }, instanceVariables)
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-red-100 text-red-800'
+                            }`}>
+                              {matchEventToRule(eventObj, { type: rule.matches.type, conditions: rule.matches.conditions }, instanceVariables) ? 'Matches' : 'No Match'}
+                            </span>
+                          </div>
+                          {expandedRuleDebug.includes(rule.id) ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                        </Button>
+
+                        {expandedRuleDebug.includes(rule.id) && (
+                          <div className="mt-2">
+                            <table className="w-full text-xs">
+                              <thead>
+                                <tr className="border-b">
+                                  <th className="text-left p-2">Path</th>
+                                  <th className="text-left p-2">Operator</th>
+                                  <th className="text-left p-2">Expected</th>
+                                  <th className="text-left p-2">Actual</th>
+                                  <th className="text-left p-2">Status</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {Object.entries(rule.matches.conditions).map(([path, pattern]: [string, any]) => {
+                                  const eventValue = path.split('.')
+                                    .reduce((obj: any, key: string) => obj?.[key], JSON.parse(eventData));
+                                  const isContains = pattern.startsWith('(contains)');
+                                  const isLlmPrompt = pattern.startsWith('(llm-prompt)');
+                                  const isTemplate = pattern.includes('{{');
+                                  
+                                  const operator = isContains ? 'contains' : 
+                                                 isLlmPrompt ? 'llm-prompt' :
+                                                 isTemplate ? 'template' : 'equals';
+                                                     
+                                  // Get the interpolated value for templates
+                                  const expectedValue = isTemplate ? 
+                                    pattern.replace(/\{\{([^}]+)\}\}/g, (_, path) => {
+                                      return path.split('.')
+                                        .reduce((obj: any, key: string) => obj?.[key], instanceVariables) ?? '(undefined)';
+                                    }) :
+                                    isContains ? pattern.replace('(contains)', '').trim() :
+                                    isLlmPrompt ? pattern.replace('(llm-prompt)', '').trim() :
+                                    pattern;
+                                                      
+                                  const matches = isTemplate ? 
+                                    eventValue === expectedValue :
+                                    isContains ? 
+                                      String(eventValue).toLowerCase().includes(expectedValue.toLowerCase()) :
+                                    isLlmPrompt ? true :
+                                    eventValue === pattern;
+
+                                  return (
+                                    <tr key={path} className="border-b">
+                                      <td className="p-2">{path}</td>
+                                      <td className="p-2">
+                                        <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
+                                          {operator}
+                                        </span>
+                                      </td>
+                                      <td className="p-2 font-mono group relative">
+                                        {expectedValue}
+                                        {isTemplate && (
+                                          <span className="hidden group-hover:block absolute left-0 -top-8 bg-gray-900 text-white text-xs rounded px-2 py-1 whitespace-nowrap">
+                                            Template: {pattern}
+                                          </span>
+                                        )}
+                                      </td>
+                                      <td className="p-2 font-mono">{String(eventValue)}</td>
+                                      <td className="p-2">
+                                        <span className={`px-2 py-0.5 rounded-full ${
+                                          matches ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                        }`}>
+                                          {matches ? '✓' : '✗'}
+                                        </span>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </Card>
+                    );
+                  } catch (error) {
+                    return null;
+                  }
+                })}
+              </div>
+            </ScrollArea>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   );

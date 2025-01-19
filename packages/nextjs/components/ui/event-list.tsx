@@ -8,6 +8,7 @@ import { Event } from "../../types/events";
 import { CreateEventModal } from "../events/CreateEventModal";
 import { matchEventToRule } from "../../utils/eventMatching";
 import { getValueByPath } from "../../utils/eventMatching";
+import { fetchFromDb, updateDb } from "../../utils/api";
 
 interface EventListProps {
   procedureId: string;
@@ -23,18 +24,21 @@ export default function EventList({ procedureId }: EventListProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [expandedEvents, setExpandedEvents] = useState<string[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [history, setHistory] = useState<{
+    events: any[];
+    messages: any[];
+    stateTransitions: any[];
+  }>();
 
-  // Load JSON data through API
+  // Load data through DB API
   useEffect(() => {
     const loadPledData = async () => {
       try {
         setIsLoading(true);
-        const response = await fetch('/api/get-pled-json');
-        if (!response.ok) throw new Error('Failed to fetch data');
-        const data = await response.json();
+        const data = await fetchFromDb();
         setPledData(data);
       } catch (error) {
-        console.error('Failed to load pled data:', error);
+        console.error('Failed to load data:', error);
       } finally {
         setIsLoading(false);
       }
@@ -129,10 +133,8 @@ export default function EventList({ procedureId }: EventListProps) {
           event => !selectedProcessed.includes(event.id)
         );
         
-        // Update events
         updatedPledData.procedureInstances[instanceIndex].history.events = updatedProcessedEvents;
         
-        // Update messages - remove messages associated with the reverted events
         const existingMessages = updatedPledData.procedureInstances[instanceIndex].history.messages || [];
         const updatedMessages = existingMessages.filter(
           (message: any) => !selectedProcessed.includes(message.fromEvent)
@@ -142,7 +144,6 @@ export default function EventList({ procedureId }: EventListProps) {
 
         // Mark events as not received in eventTemplates
         selectedProcessed.forEach(eventId => {
-          // Find the event template key by matching the event ID pattern
           const templateKey = Object.keys(updatedPledData.eventTemplates).find(key => 
             eventId.startsWith(`${updatedPledData.eventTemplates[key].id}-`)
           );
@@ -152,23 +153,11 @@ export default function EventList({ procedureId }: EventListProps) {
         });
       }
 
-      // Save updated JSON to file
-      const saveResponse = await fetch('/api/save-pled-json', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedPledData)
-      });
-
-      if (!saveResponse.ok) {
-        throw new Error('Failed to save JSON');
-      }
-
-      // Refresh data from API
-      const refreshResponse = await fetch('/api/get-pled-json');
-      if (!refreshResponse.ok) throw new Error('Failed to refresh data');
-      const refreshedData = await refreshResponse.json();
+      // Update data through DB API
+      await updateDb(updatedPledData);
       
-      // Update all state
+      // Refresh data
+      const refreshedData = await fetchFromDb();
       setPledData(refreshedData);
       
       // Update available events
@@ -324,21 +313,11 @@ export default function EventList({ procedureId }: EventListProps) {
         delete updatedPledData.eventTemplates[eventId];
       }
 
-      const saveResponse = await fetch('/api/save-pled-json', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedPledData)
-      });
-
-      if (!saveResponse.ok) {
-        throw new Error('Failed to save JSON');
-      }
-
-      // Refresh data from API
-      const refreshResponse = await fetch('/api/get-pled-json');
-      if (!refreshResponse.ok) throw new Error('Failed to refresh data');
-      const refreshedData = await refreshResponse.json();
+      // Update data through DB API
+      await updateDb(updatedPledData);
       
+      // Refresh data
+      const refreshedData = await fetchFromDb();
       setPledData(refreshedData);
       setAvailableEvents(prev => {
         const updated = { ...prev };
@@ -592,20 +571,21 @@ export default function EventList({ procedureId }: EventListProps) {
             const response = await fetch('/api/events', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ 
+              body: JSON.stringify({
                 event: template,
                 action: 'create'
               })
             });
-            
+
             if (!response.ok) throw new Error('Failed to create event');
-            
+
             await fetchEvents();
             setShowCreateModal(false);
           } catch (error) {
             console.error('Error creating event:', error);
           }
         }}
+        procedureId={procedureId}
       />
     </div>
   );

@@ -65,7 +65,7 @@
           "generates": {
             "type": "contact_candidate",
             "template": {
-              "title": "Interview requested by {{candidate.name}}",
+              "title": "interview requested by {{candidate.name}}",
               "content": "Candidate has requested an interview for {{company.department}} position",
               "timestamp": "{{captures.requestTime}}"
             }
@@ -92,7 +92,7 @@
           "generates": {
             "type": "discuss_role",
             "template": {
-              "title": "Interview requested by {{candidate.name}}",
+              "title": "interview requested by {{candidate.name}}",
               "content": "Candidate has requested an interview for {{company.department}} position",
               "timestamp": "{{event.data.time}}"
             }
@@ -340,12 +340,12 @@
         "data": {
           "from": "john@example.com",
           "to": "hr@company.com",
-          "subject": "Interview request",
+          "subject": "interview request",
           "body": "I would like to schedule an interview",
           "time": "2024-01-17T10:00:00Z"
         }
       },
-      "received": false
+      "received": true
     },
     "role_discussion": {
       "id": "role-discuss",
@@ -522,7 +522,7 @@
       "templateId": "hiring_process",
       "variables": {
         "candidate": {
-          "email": "john.doe@example.com",
+          "email": "john@example.com",
           "name": "John Doe"
         },
         "company": {
@@ -535,57 +535,21 @@
         "enteredAt": "2024-03-20T14:30:00Z"
       },
       "history": {
-        "messages": [
+        "messages": [],
+        "events": [
           {
-            "id": "msg_1",
-            "type": "contact_candidate",
-            "timestamp": "2024-03-20T10:00:00Z",
-            "title": "Interview requested by John Doe",
-            "content": "Candidate has requested an interview for Engineering position",
-            "fromEvent": "evt_1"
-          },
-          {
-            "id": "msg_2",
-            "type": "discuss_role",
-            "timestamp": "2024-03-20T11:00:00Z",
-            "title": "Role discussion with John Doe",
-            "content": "Candidate wants to discuss role details",
-            "fromEvent": "evt_2"
-          },
-          {
-            "id": "msg_3",
-            "type": "schedule_interview",
-            "timestamp": "2024-03-20T12:00:00Z",
-            "title": "Interview scheduled with John Doe",
-            "content": "Interview scheduled for 2024-03-20T13:00:00Z",
-            "fromEvent": "evt_3"
-          },
-          {
-            "id": "msg_4",
-            "type": "conduct_interview",
-            "timestamp": "2024-03-20T13:55:00Z",
-            "title": "Interview completed with John Doe",
-            "content": "Interview lasted 55 minutes",
-            "fromEvent": "evt_4"
-          },
-          {
-            "id": "msg_5",
-            "type": "positive_feedback",
-            "timestamp": "2024-03-20T14:15:00Z",
-            "title": "Positive feedback for John Doe",
-            "content": "Interview feedback: Strong technical skills and good culture fit",
-            "fromEvent": "evt_5"
-          },
-          {
-            "id": "msg_6",
-            "type": "prepare_contract",
-            "timestamp": "2024-03-20T14:30:00Z",
-            "title": "Prepare employment contract",
-            "content": "Contract preparation initiated for candidate",
-            "fromEvent": "evt_6"
+            "id": "interview-request-1737296975126",
+            "type": "EMAIL_RECEIVED",
+            "timestamp": "2025-01-19T14:29:35.126Z",
+            "data": {
+              "from": "john@example.com",
+              "to": "hr@company.com",
+              "subject": "interview request",
+              "body": "I would like to schedule an interview",
+              "time": "2024-01-17T10:00:00Z"
+            }
           }
         ],
-        "events": [],
         "completedActions": []
       },
       "startDate": "2024-03-20T10:00:00Z"

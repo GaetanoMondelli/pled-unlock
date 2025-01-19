@@ -1,8 +1,8 @@
 "use client"
 
+import { useState, useEffect } from "react";
 import { Card } from "./card";
 import { ScrollArea } from "./scroll-area";
-import pledData from "@/public/pled.json";
 import { getValueByPath } from "../../utils/eventMatching";
 
 interface VariablesViewProps {
@@ -10,25 +10,36 @@ interface VariablesViewProps {
 }
 
 export const VariablesView = ({ procedureId }: VariablesViewProps) => {
-  const instance : any = pledData.procedureInstances.find(
-    (p: any) => p.instanceId === procedureId
-  );
+  const [instance, setInstance] = useState<any>(null);
+  const [template, setTemplate] = useState<any>(null);
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const response = await fetch(`/api/procedures/${procedureId}`);
+        if (!response.ok) throw new Error('Failed to fetch procedure data');
+        const data = await response.json();
+        setInstance(data.instance);
+        setTemplate(data.template);
+      } catch (error) {
+        console.error('Error fetching procedure data:', error);
+      }
+    }
+    fetchData();
+  }, [procedureId]);
 
   const getCapturedOutputs = () => {
+    if (!instance || !template) return {};
     const outputs: Record<string, Record<string, any>> = {};
     
-    const template = pledData.procedureTemplates.find(
-      t => t.templateId === "hiring_process"
-    );
-    
     instance?.messages?.forEach((message: any) => {
-      const rule = template?.messageRules.find(r => r.id === message.rule);
+      const rule = template?.messageRules.find((r: any) => r.id === message.rule);
       if (rule?.captures) {
         if (!outputs[message.type]) {
           outputs[message.type] = {};
         }
-        Object.entries(rule.captures).forEach(([key, pathTemplate]) => {
-          const event = instance.events.find( (e:any) => e.id === message.fromEvent);
+        Object.entries(rule.captures).forEach(([key, pathTemplate]: [string, any]) => {
+          const event = instance.events.find((e: any) => e.id === message.fromEvent);
           if (event) {
             const pathMatch = pathTemplate.toString().match(/{{event\.data\.(.+)}}/);
             if (pathMatch && pathMatch[1]) {

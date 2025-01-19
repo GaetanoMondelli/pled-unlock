@@ -553,12 +553,6 @@ export const D3Graph = React.forwardRef<any, D3GraphProps>(({
 
     // In the debug section, add console logs
     const metadata = getStatesWithMetadata(nodes, documents);
-    console.log('States with metadata:', {
-      nodes,
-      documents,
-      statesWithActions: metadata.statesWithActions,
-      statesWithDocs: metadata.statesWithDocs
-    });
 
     return () => {
       document.head.removeChild(style);

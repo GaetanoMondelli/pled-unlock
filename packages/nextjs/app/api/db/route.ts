@@ -6,29 +6,9 @@ import { getServerSession } from "next-auth";
 
 export async function GET() {
   try {
-
-    //  Uncomment this to authenticate with username and password
-    
-    // const session = await getServerSession(options);
-
-    // // Check if there is a valid session (user is logged in)
-    // if (!session) {
-    //   console.log("Unauthorized");
-    //   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    // }
-
-    // const username = session.user?.name; // Assuming you store the username in the session
-    // if (!username || !allowedUsernamesPasswords.has(username)) {
-    //   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    // }
-
-    // Reference the file in Firebase Storage
     const file = bucket.file(filePath);
-
-    // Download the file contents as a string
     const [fileContents] = await file.download();
     const data = JSON.parse(fileContents.toString());
-
     return NextResponse.json(data);
   } catch (error) {
     console.error("Error fetching data from Firebase Storage:", error);
@@ -103,91 +83,21 @@ export async function PUT(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    let { index, item } = await request.json();
+    const { action, data } = await request.json();
 
-    // if id === tags, then update the description of the tag
-    if (item.id === "tags") {
-      console.log("Updating tag description");
-      const file = bucket.file(filePath);
-      const [fileContents] = await file.download();
-      let data = JSON.parse(fileContents.toString());
-
-      // update only the description of the tag
-
-      const indexTagsId = data.findIndex(
-        (tagsItem: any) => tagsItem.id === "tags"
-      );
-
-      // if item.name is not in the content object, add it
-      if (indexTagsId === -1) {
-        data.push({
-          id: "tags",
-          content: {
-            [item.name]: item.content[item.description],
-          },
-        });
-      } else {
-        data[indexTagsId].content = {
-          ...data[indexTagsId].content,
-          ...item.content,
-        };
-      }
-
-      await file.save(JSON.stringify(data, null, 2), {
-        contentType: "application/json",
-      });
-      console.log("Tag description updated successfully3");
-
-      return NextResponse.json({ message: "Item updated successfully!" });
+    if (action !== 'update') {
+      return NextResponse.json({ error: "Invalid action" }, { status: 400 });
     }
 
-    if (!item.id) {
-      return NextResponse.json({ error: "Invalid item" }, { status: 400 });
-    }
+    // Get the current file
+    const file = bucket.file(filePath);
+    
+    // Save the updated data
+    await file.save(JSON.stringify(data, null, 2), {
+      contentType: "application/json",
+    });
 
-    if (index) {
-      // Reference the file in Firebase Storage
-      const file = bucket.file(filePath);
-
-      // Download the current data from the file
-      const [fileContents] = await file.download();
-      let data = JSON.parse(fileContents.toString());
-
-      // Validate the input index
-      if (typeof index !== "number" || index < 0 || index >= data.length) {
-        return NextResponse.json({ error: "Invalid index" }, { status: 400 });
-      }
-
-      // Update the specific item in the array
-      data[index] = { ...data[index], ...item };
-
-      // Write the updated JSON back to the file in Firebase Storage
-      await file.save(JSON.stringify(data, null, 2), {
-        contentType: "application/json",
-      });
-      return NextResponse.json({ message: "Item updated successfully!" });
-    } else {
-      //  find the index of the item in the array with the same id
-
-      const file = bucket.file(filePath);
-      const [fileContents] = await file.download();
-      let data = JSON.parse(fileContents.toString());
-
-      const index = data.findIndex((newItem: any) => item.id === newItem.id);
-
-      if (index === -1) {
-        return NextResponse.json({ error: "Item not found" }, { status: 404 });
-      }
-
-      // Update the specific item in the array
-      data[index] = { ...data[index], ...item };
-
-      // Write the updated JSON back to the file in Firebase Storage
-      await file.save(JSON.stringify(data, null, 2), {
-        contentType: "application/json",
-      });
-      return NextResponse.json({ message: "Item updated successfully!" });
-    }
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error updating file in Firebase Storage:", error);
     return NextResponse.json(

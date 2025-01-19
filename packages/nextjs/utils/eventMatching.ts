@@ -19,47 +19,43 @@ interface Variables {
   [key: string]: any;
 }
 
-export function matchEventToRule(
-  event: any, 
-  rule: MatchRule, 
-  variables: Variables = {}
-): boolean {
+export function matchEventToRule(event: any, rule: any, variables: any = {}) {
+  if (!event || !rule) return false;
+
   // First check if event type matches
-  if (event.type !== rule.type) {
+  if (rule.type !== event.type) {
     return false;
   }
 
-  // Check each condition
+  // If there are no conditions, it's a match
+  if (!rule.conditions) {
+    return true;
+  }
+
+  // Check all conditions
   return Object.entries(rule.conditions).every(([path, pattern]) => {
-    const value = getValueByPath(event.data, path);
+    const value = path.split('.').reduce((obj: any, key: string) => obj?.[key], event.data);
     
     if (typeof pattern !== 'string') return false;
 
-    // Handle variable substitution first
-    if (pattern.includes('{{') && pattern.includes('}}')) {
-      const variablePath = pattern
-        .replace('{{', '')
-        .replace('}}', '')
-        .trim();
-      const variableValue = getValueByPath(variables, variablePath);
-      
-      // If we have a variable value, use it for comparison
-      if (variableValue !== undefined) {
-        return value === variableValue;
-      }
-      // If variable is not found, condition fails
-      return false;
-    }
-
-    // Handle other patterns
+    // Handle special operators
     if (pattern.startsWith('(contains)')) {
-      const searchTerm = pattern.replace('(contains)', '').trim();
-      return String(value).toLowerCase().includes(searchTerm.toLowerCase());
+      const searchTerm = pattern.replace('(contains)', '').trim().toLowerCase();
+      const valueStr = String(value || '').toLowerCase();
+      return valueStr.includes(searchTerm);
     }
     
     if (pattern.startsWith('(llm-prompt)')) {
-      // For now, always return true for llm-prompt patterns
       return true;
+    }
+
+    // Handle template variables
+    if (pattern.includes('{{')) {
+      const interpolatedPattern = pattern.replace(/\{\{([^}]+)\}\}/g, (_, path) => {
+        return path.split('.')
+          .reduce((obj: any, key: string) => obj?.[key], variables) ?? '';
+      });
+      return value === interpolatedPattern;
     }
 
     // Direct equality match

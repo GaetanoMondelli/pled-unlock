@@ -2,7 +2,7 @@
 
 import { Card } from "@/components/ui/card";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -12,8 +12,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import pledData from "@/public/pled.json";
 import { formatTemplateContent } from "@/components/ui/template-content";
+import { fetchFromDb } from "../../utils/api";
+import { generateMessages } from "../../utils/messageGeneration";
+import { matchEventToRule } from "../../utils/eventMatching";
 
 interface MessageRulesProps {
   procedureId: string;
@@ -21,6 +23,10 @@ interface MessageRulesProps {
 
 export default function MessageRules({ procedureId }: MessageRulesProps) {
   const [expandedRules, setExpandedRules] = useState<string[]>([]);
+  const [instance, setInstance] = useState<any>(null);
+  const [template, setTemplate] = useState<any>(null);
+  const [generatedMessages, setGeneratedMessages] = useState<any[]>([]);
+  const [outputs, setOutputs] = useState<Record<string, any>>({});
 
   const toggleRule = (ruleId: string) => {
     setExpandedRules(prev => 
@@ -30,25 +36,160 @@ export default function MessageRules({ procedureId }: MessageRulesProps) {
     );
   };
 
-  const instance = pledData.procedureInstances.find(
-    p => p.instanceId === procedureId
-  );
-  
-  if (!instance) return null;
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const data = await fetchFromDb();
+        const instance = data.procedureInstances?.find((p: any) => p.instanceId === procedureId);
+        const template = data.procedureTemplates?.find((t: any) => t.templateId === instance?.templateId);
+        
+        if (!instance || !template) {
+          throw new Error('Procedure not found');
+        }
 
-  const template = pledData.procedureTemplates.find(
-    t => t.templateId === instance.templateId
-  );
+        setInstance(instance);
+        setTemplate(template);
 
-  if (!template) return null;
+        console.log('Debug Info:', {
+          events: instance.history?.events || [],
+          rules: template.messageRules || [],
+          variables: instance.variables || {}
+        });
+
+        // Generate messages based on events
+        const { messages, outputs } = generateMessages(
+          instance.history?.events || [],
+          template.messageRules || [],
+          instance.variables || {}
+        );
+
+        console.log('Generated Messages:', messages);
+        console.log('Generated Outputs:', outputs);
+
+        setGeneratedMessages(messages);
+        setOutputs(outputs);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      }
+    }
+    fetchData();
+  }, [procedureId]);
+
+  if (!instance || !template) return null;
+
+  function getRuleMatchingInfo(event: any, rules: any[]) {
+    return rules.map(rule => {
+      // Normalize rule structure to match what works in messageGeneration
+      const normalizedRule = {
+        type: rule.matches.type,
+        conditions: rule.matches.conditions
+      };
+      
+      const matches = matchEventToRule(event, normalizedRule, {});
+      return {
+        ruleId: rule.id,
+        matches,
+        reason: !matches ? getNotMatchingReason(event, normalizedRule) : 'Matches!'
+      };
+    });
+  }
+
+  function getNotMatchingReason(event: any, rule: any): string {
+    // Normalize the rule structure
+    const ruleType = typeof rule.type === 'string' ? rule.type : rule.matches?.type;
+    
+    if (ruleType !== event.type) {
+      return `Event type '${event.type}' doesn't match rule type '${ruleType}'`;
+    }
+
+    // Get conditions from the appropriate place in the rule structure
+    const conditions = rule.conditions || rule.matches?.conditions;
+
+    if (!conditions) {
+      return 'No conditions defined';
+    }
+
+    const failedConditions = Object.entries(conditions)
+      .map(([path, expectedValue]) => {
+        const actualValue = path.split('.')
+          .reduce((obj: any, key: string) => obj?.[key], event.data);
+        
+        if (actualValue === undefined) {
+          return `Path '${path}' not found in event data`;
+        }
+
+        if (typeof expectedValue === 'string' && expectedValue.includes('{{')) {
+          return null; // Template variables always match if path exists
+        }
+
+        if (actualValue !== expectedValue) {
+          return `Expected '${expectedValue}' at path '${path}', but got '${actualValue}'`;
+        }
+
+        return null;
+      })
+      .filter(Boolean);
+
+    return failedConditions.join(', ');
+  }
 
   return (
     <div className="space-y-8 mr-4">
+      {/* Debug Section
+      <div>
+        <h3 className="font-semibold mb-4">Debug Info</h3>
+        <div className="space-y-4">
+          <div>
+            <h4 className="text-sm font-medium mb-2">Events:</h4>
+            <pre className="text-xs bg-muted p-2 rounded overflow-auto max-h-40">
+              {JSON.stringify(instance.history?.events || [], null, 2)}
+            </pre>
+          </div>
+          <div>
+            <h4 className="text-sm font-medium mb-2">Rule Matching Analysis:</h4>
+            {(instance.history?.events || []).map((event: any) => (
+              <div key={event.id} className="mb-4 bg-muted p-2 rounded">
+                <p className="text-xs font-medium">Event: {event.type} ({event.id})</p>
+                <div className="ml-4">
+                  {getRuleMatchingInfo(event, template.messageRules || []).map((info) => (
+                    <div key={info.ruleId} className="text-xs flex items-center gap-2 mt-1">
+                      <span className={`w-2 h-2 rounded-full ${info.matches ? 'bg-green-500' : 'bg-red-500'}`} />
+                      <span className="font-medium">{info.ruleId}:</span>
+                      <span className={info.matches ? 'text-green-600' : 'text-red-600'}>
+                        {info.reason}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div>
+            <h4 className="text-sm font-medium mb-2">Message Rules:</h4>
+            <pre className="text-xs bg-muted p-2 rounded overflow-auto max-h-40">
+              {JSON.stringify(template.messageRules || [], null, 2)}
+            </pre>
+          </div>
+          <div>
+            <h4 className="text-sm font-medium mb-2">Variables:</h4>
+            <pre className="text-xs bg-muted p-2 rounded overflow-auto max-h-40">
+              {JSON.stringify(instance.variables || {}, null, 2)}
+            </pre>
+          </div>
+          <div>
+            <h4 className="text-sm font-medium mb-2">Generated Messages:</h4>
+            <pre className="text-xs bg-muted p-2 rounded overflow-auto max-h-40">
+              {JSON.stringify(generatedMessages, null, 2)}
+            </pre>
+          </div>
+        </div>
+      </div> */}
+
       {/* Message Rules - Collapsible */}
       <div>
         <h3 className="font-semibold mb-4">Rules</h3>
         <div className="space-y-2">
-          {template.messageRules.map((rule) => (
+          {(template.messageRules || []).map((rule: any) => (
             <Card key={rule.id} className="p-2">
               <Button
                 variant="ghost"
@@ -110,6 +251,33 @@ export default function MessageRules({ procedureId }: MessageRulesProps) {
         </div>
       </div>
 
+      {/* Captured Outputs section */}
+      {Object.keys(outputs).length > 0 && (
+        <div>
+          <h3 className="font-semibold mb-4">Captured Outputs</h3>
+          <div className="space-y-4">
+            {Object.entries(outputs).map(([messageType, captures]) => (
+              <div key={messageType} className="space-y-1">
+                <h4 className="text-sm font-medium capitalize">{messageType}</h4>
+                <div className="grid gap-1">
+                  {Object.entries(captures).map(([key, value]) => (
+                    <div key={key} className="flex items-center justify-between p-1.5 rounded bg-muted text-xs">
+                      <div>
+                        <p className="font-medium">{key}</p>
+                        <p className="text-muted-foreground text-[10px]">Captured from event</p>
+                      </div>
+                      <span className="text-primary font-mono">
+                        {JSON.stringify(value)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Generated Messages - Table Format */}
       <div>
         <h3 className="font-semibold mb-4">Generated Messages</h3>
@@ -124,7 +292,7 @@ export default function MessageRules({ procedureId }: MessageRulesProps) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {instance.history?.messages?.map((message) => (
+            {generatedMessages.map((message: any) => (
               <TableRow key={message.id}>
                 <TableCell className="text-xs">
                   {new Date(message.timestamp).toLocaleString()}
@@ -143,14 +311,7 @@ export default function MessageRules({ procedureId }: MessageRulesProps) {
                 <TableCell className="text-xs">{message.fromEvent}</TableCell>
                 <TableCell>
                   <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-                    {(() => {
-                      const matchingRule = template.messageRules
-                        .sort((a, b) => a.priority - b.priority)  // Sort by priority
-                        .find(r => r.generates.type === message.type);
-                      return matchingRule 
-                        ? `${matchingRule.id} (P${matchingRule.priority})`
-                        : 'unknown';
-                    })()}
+                    {message.rule}
                   </span>
                 </TableCell>
               </TableRow>
