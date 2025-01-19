@@ -7,7 +7,6 @@ import { ArrowRight, ArrowLeft, ChevronDown, ChevronUp, Plus, Trash2 } from "luc
 import { Event } from "../../types/events";
 import { CreateEventModal } from "../events/CreateEventModal";
 import { matchEventToRule } from "../../utils/eventMatching";
-import pledData from "@/public/pled.json";
 import { getValueByPath } from "../../utils/eventMatching";
 
 interface EventListProps {
@@ -15,6 +14,8 @@ interface EventListProps {
 }
 
 export default function EventList({ procedureId }: EventListProps) {
+  const [pledData, setPledData] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [availableEvents, setAvailableEvents] = useState<Record<string, any>>({});
   const [processedEvents, setProcessedEvents] = useState<Event[]>([]);
   const [selectedAvailable, setSelectedAvailable] = useState<string[]>([]);
@@ -23,21 +24,51 @@ export default function EventList({ procedureId }: EventListProps) {
   const [expandedEvents, setExpandedEvents] = useState<string[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
 
-  // Get the instance
-  const instance = pledData.procedureInstances.find(
+  // Load JSON data through API
+  useEffect(() => {
+    const loadPledData = async () => {
+      try {
+        setIsLoading(true);
+        const response = await fetch('/api/get-pled-json');
+        if (!response.ok) throw new Error('Failed to fetch data');
+        const data = await response.json();
+        setPledData(data);
+      } catch (error) {
+        console.error('Failed to load pled data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadPledData();
+  }, []);
+
+  // Get the instance with null check
+  const instance = pledData?.procedureInstances?.find(
     p => p.instanceId === procedureId
   );
 
   useEffect(() => {
-    fetchEvents();
-  }, []);
+    if (pledData && !isLoading) {
+      fetchEvents();
+    }
+  }, [pledData, isLoading]);
 
   const fetchEvents = async () => {
+    if (!pledData?.eventTemplates) return;
+    
     try {
-      const response = await fetch('/api/events');
-      const data = await response.json();
-      setAvailableEvents(data.events);
-      setProcessedEvents(data.receivedEvents);
+      const availableEvts = Object.entries(pledData.eventTemplates)
+        .reduce((acc, [key, event]) => {
+          if (!event.received) {
+            acc[key] = event;
+          }
+          return acc;
+        }, {} as Record<string, any>);
+
+      const processedEvts = instance?.history?.events || [];
+
+      setAvailableEvents(availableEvts);
+      setProcessedEvents(processedEvts);
     } catch (error) {
       console.error('Failed to fetch events:', error);
     }
@@ -50,44 +81,117 @@ export default function EventList({ procedureId }: EventListProps) {
   };
 
   const handleTransfer = async (direction: 'receive' | 'revert') => {
+    if (!pledData) return;
+    
     setIsProcessing(true);
     try {
-      const eventsToProcess = direction === 'receive' 
-        ? selectedAvailable.map(key => ({
-            id: `${availableEvents[key].id}-${Date.now()}`,
-            type: availableEvents[key].type,
-            source: availableEvents[key].template.source,
-            data: availableEvents[key].template.data,
-          }))
-        : processedEvents.filter(e => selectedProcessed.includes(e.id));
-
-      await Promise.all(
-        eventsToProcess.map(event =>
-          fetch('/api/events', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ event, action: direction })
-          })
-        )
+      const updatedPledData = JSON.parse(JSON.stringify(pledData));
+      
+      const instanceIndex = updatedPledData.procedureInstances.findIndex(
+        p => p.instanceId === procedureId
       );
 
-      // Update available events locally
+      if (instanceIndex === -1) {
+        throw new Error('Instance not found');
+      }
+
       if (direction === 'receive') {
-        setAvailableEvents(prev => {
-          const updated = { ...prev };
-          selectedAvailable.forEach(key => {
-            updated[key] = {
-              ...updated[key],
-              received: true
-            };
-          });
-          return updated;
+        // Process selected events
+        const eventsToProcess = selectedAvailable.map(key => {
+          const event = availableEvents[key];
+          return {
+            id: `${event.id}-${Date.now()}`,
+            type: event.type,
+            timestamp: new Date().toISOString(),
+            data: event.template.data
+          };
+        });
+
+        // Update instance history
+        if (!updatedPledData.procedureInstances[instanceIndex].history) {
+          updatedPledData.procedureInstances[instanceIndex].history = { events: [], messages: [] };
+        }
+        
+        updatedPledData.procedureInstances[instanceIndex].history.events = [
+          ...(updatedPledData.procedureInstances[instanceIndex].history.events || []),
+          ...eventsToProcess
+        ];
+
+        // Mark events as received in eventTemplates
+        selectedAvailable.forEach(key => {
+          if (updatedPledData.eventTemplates[key]) {
+            updatedPledData.eventTemplates[key].received = true;
+          }
+        });
+      } else {
+        // Revert: Remove events from processed and their associated messages
+        const updatedProcessedEvents = processedEvents.filter(
+          event => !selectedProcessed.includes(event.id)
+        );
+        
+        // Update events
+        updatedPledData.procedureInstances[instanceIndex].history.events = updatedProcessedEvents;
+        
+        // Update messages - remove messages associated with the reverted events
+        const existingMessages = updatedPledData.procedureInstances[instanceIndex].history.messages || [];
+        const updatedMessages = existingMessages.filter(
+          message => !selectedProcessed.includes(message.fromEvent)
+        );
+        
+        updatedPledData.procedureInstances[instanceIndex].history.messages = updatedMessages;
+
+        // Mark events as not received in eventTemplates
+        selectedProcessed.forEach(eventId => {
+          // Find the event template key by matching the event ID pattern
+          const templateKey = Object.keys(updatedPledData.eventTemplates).find(key => 
+            eventId.startsWith(`${updatedPledData.eventTemplates[key].id}-`)
+          );
+          if (templateKey) {
+            updatedPledData.eventTemplates[templateKey].received = false;
+          }
         });
       }
 
-      await fetchEvents();
-      setSelectedAvailable([]);
-      setSelectedProcessed([]);
+      // Save updated JSON to file
+      const saveResponse = await fetch('/api/save-pled-json', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedPledData)
+      });
+
+      if (!saveResponse.ok) {
+        throw new Error('Failed to save JSON');
+      }
+
+      // Refresh data from API
+      const refreshResponse = await fetch('/api/get-pled-json');
+      if (!refreshResponse.ok) throw new Error('Failed to refresh data');
+      const refreshedData = await refreshResponse.json();
+      
+      // Update all state
+      setPledData(refreshedData);
+      
+      // Update available events
+      const availableEvts = Object.entries(refreshedData.eventTemplates)
+        .reduce((acc, [key, event]) => {
+          if (!event.received) {
+            acc[key] = event;
+          }
+          return acc;
+        }, {} as Record<string, any>);
+
+      const processedEvts = refreshedData.procedureInstances[instanceIndex].history.events || [];
+
+      setAvailableEvents(availableEvts);
+      setProcessedEvents(processedEvts);
+      
+      // Clear selections
+      if (direction === 'receive') {
+        setSelectedAvailable([]);
+      } else {
+        setSelectedProcessed([]);
+      }
+
     } catch (error) {
       console.error(`Error ${direction}ing events:`, error);
     } finally {
@@ -211,25 +315,57 @@ export default function EventList({ procedureId }: EventListProps) {
   };
 
   const handleDeleteEvent = async (eventId: string) => {
+    if (!pledData) return;
+    
     try {
-      const response = await fetch('/api/events', {
-        method: 'DELETE',
+      const updatedPledData = JSON.parse(JSON.stringify(pledData));
+      
+      if (updatedPledData.eventTemplates[eventId]) {
+        delete updatedPledData.eventTemplates[eventId];
+      }
+
+      const saveResponse = await fetch('/api/save-pled-json', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ eventId })
+        body: JSON.stringify(updatedPledData)
       });
 
-      if (!response.ok) throw new Error('Failed to delete event');
+      if (!saveResponse.ok) {
+        throw new Error('Failed to save JSON');
+      }
+
+      // Refresh data from API
+      const refreshResponse = await fetch('/api/get-pled-json');
+      if (!refreshResponse.ok) throw new Error('Failed to refresh data');
+      const refreshedData = await refreshResponse.json();
       
-      // Update local state
+      setPledData(refreshedData);
       setAvailableEvents(prev => {
         const updated = { ...prev };
         delete updated[eventId];
         return updated;
       });
+
     } catch (error) {
       console.error('Error deleting event:', error);
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center p-4">
+        Loading...
+      </div>
+    );
+  }
+
+  if (!pledData) {
+    return (
+      <div className="flex justify-center items-center p-4">
+        Error loading data
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -240,7 +376,7 @@ export default function EventList({ procedureId }: EventListProps) {
             <h3 className="font-semibold">Available Events</h3>
             <div className="flex gap-2 items-center">
               <span className="text-sm text-gray-500">
-                {selectedAvailable.length}/{Object.keys(availableEvents).length} selected
+                {selectedAvailable.length}/{Object.keys(availableEvents || {})?.length || 0} selected
               </span>
               <Button
                 size="sm"
@@ -252,7 +388,7 @@ export default function EventList({ procedureId }: EventListProps) {
             </div>
           </div>
           <div className="space-y-2 max-h-[400px] overflow-auto">
-            {Object.entries(availableEvents)
+            {Object.entries(availableEvents || {})
               .filter(([_, event]) => !event.received)
               .map(([key, event]: [string, any]) => (
                 <div key={key} className="border rounded">
@@ -351,11 +487,11 @@ export default function EventList({ procedureId }: EventListProps) {
           <div className="flex justify-between items-center mb-4">
             <h3 className="font-semibold">Processed Events</h3>
             <span className="text-sm text-gray-500">
-              {selectedProcessed.length}/{processedEvents.length} selected
+              {selectedProcessed.length}/{processedEvents?.length || 0} selected
             </span>
           </div>
           <div className="space-y-2 max-h-[400px] overflow-auto">
-            {processedEvents.map((event) => (
+            {processedEvents?.map((event) => (
               <div key={event.id} className="border rounded">
                 <div 
                   className={`p-2 cursor-pointer ${

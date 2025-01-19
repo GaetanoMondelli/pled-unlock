@@ -53,9 +53,8 @@ export const VariablesSection = ({ procedureId, template, instance }: VariablesS
 
   const getCapturedOutputs = () => {
     if (!instance?.messages) return {};
-
     const outputs: Record<string, Record<string, any>> = {};
-    const receivedEvents = pledData.receivedEvents || [];
+    const receivedEvents: Event[] = (pledData as any).receivedEvents || [];
     
     try {
       instance.messages.forEach((message: Message) => {
@@ -106,7 +105,7 @@ export const VariablesSection = ({ procedureId, template, instance }: VariablesS
                         <span className="bg-primary/10 text-primary px-1.5 py-0.5 rounded text-[10px]">Required</span>
                       )}
                       <span className="text-primary">
-                        {instance.variables[section as keyof Variables]?.[field as keyof Variables[keyof Variables]] || '-'}
+                        {instance.variables && instance.variables[section]?.[field] !== undefined ? instance.variables[section][field] : '-'}
                       </span>
                     </div>
                   </div>

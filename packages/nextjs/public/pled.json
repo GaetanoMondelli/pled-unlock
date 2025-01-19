@@ -329,77 +329,7 @@
       }
     }
   ],
-  "procedureInstances": [
-    {
-      "instanceId": "proc_123",
-      "templateId": "hiring_process",
-      "variables": {
-        "candidate": {
-          "email": "john@example.com",
-          "name": "John Doe"
-        },
-        "company": {
-          "email": "hr@company.com",
-          "department": "Engineering"
-        }
-      },
-      "currentState": {
-        "to": "contacting_candidate",
-        "conditions": {
-          "requestTime": "(after) {{previousState.time}}"
-        }
-      },
-      "stateTransition": {
-        "from": "idle",
-        "to": "contacting_candidate",
-        "conditions": {
-          "requestTime": "(after) {{previousState.time}}"
-        }
-      },
-      "events": [
-        {
-          "id": "evt_1",
-          "type": "EMAIL_RECEIVED",
-          "timestamp": "2024-03-20T10:00:00Z",
-          "data": {
-            "from": "john@example.com",
-            "to": "hr@company.com",
-            "subject": "Interview request",
-            "body": "I'd like to schedule an interview",
-            "time": "2024-03-20T09:58:00Z"
-          }
-        }
-      ],
-      "messages": [
-        {
-          "id": "msg_1737163819178_vjlif119b",
-          "type": "contact_candidate",
-          "timestamp": "2025-01-18T01:30:19.178Z",
-          "title": "Interview requested by John Doe",
-          "content": "Candidate has requested an interview for Engineering position",
-          "fromEvent": "interview-request-1737163819158",
-          "rule": "interview_request_pattern"
-        }
-      ],
-      "completedActions": [
-        {
-          "id": "act_1",
-          "type": "SEND_EMAIL",
-          "timestamp": "2024-03-20T10:00:02Z",
-          "result": {
-            "success": true,
-            "data": {
-              "from": "hr@company.com",
-              "to": "john@example.com",
-              "subject": "Interview Request Received for Engineering",
-              "messageId": "msg_123"
-            }
-          }
-        }
-      ]
-    }
-  ],
-  "events": {
+  "eventTemplates": {
     "candidate_interview_request": {
       "id": "interview-request",
       "name": "Candidate Interview Request",
@@ -415,7 +345,7 @@
           "time": "2024-01-17T10:00:00Z"
         }
       },
-      "received": false
+      "received": true
     },
     "role_discussion": {
       "id": "role-discuss",
@@ -586,42 +516,116 @@
       "received": false
     }
   },
-  "receivedEvents": [
+  "procedureInstances": [
     {
-      "id": "interview-request-1737159922937",
-      "type": "EMAIL_RECEIVED",
-      "source": "gmail",
-      "data": {
-        "from": "john@example.com",
-        "to": "hr@company.com",
-        "subject": "Interview request",
-        "body": "I would like to schedule an interview",
-        "time": "2024-01-17T10:00:00Z"
+      "instanceId": "proc_123",
+      "templateId": "hiring_process",
+      "variables": {
+        "candidate": {
+          "email": "john.doe@example.com",
+          "name": "John Doe"
+        },
+        "company": {
+          "email": "hr@company.com",
+          "department": "Engineering"
+        }
       },
-      "timestamp": "2025-01-18T00:25:22.997Z",
-      "processed": true
+      "currentState": {
+        "name": "contract_prepared",
+        "enteredAt": "2024-03-20T14:30:00Z"
+      },
+      "history": {
+        "messages": [
+          {
+            "id": "msg_1",
+            "type": "contact_candidate",
+            "timestamp": "2024-03-20T10:00:00Z",
+            "title": "Interview requested by John Doe",
+            "content": "Candidate has requested an interview for Engineering position",
+            "fromEvent": "evt_1"
+          },
+          {
+            "id": "msg_2",
+            "type": "discuss_role",
+            "timestamp": "2024-03-20T11:00:00Z",
+            "title": "Role discussion with John Doe",
+            "content": "Candidate wants to discuss role details",
+            "fromEvent": "evt_2"
+          },
+          {
+            "id": "msg_3",
+            "type": "schedule_interview",
+            "timestamp": "2024-03-20T12:00:00Z",
+            "title": "Interview scheduled with John Doe",
+            "content": "Interview scheduled for 2024-03-20T13:00:00Z",
+            "fromEvent": "evt_3"
+          },
+          {
+            "id": "msg_4",
+            "type": "conduct_interview",
+            "timestamp": "2024-03-20T13:55:00Z",
+            "title": "Interview completed with John Doe",
+            "content": "Interview lasted 55 minutes",
+            "fromEvent": "evt_4"
+          },
+          {
+            "id": "msg_5",
+            "type": "positive_feedback",
+            "timestamp": "2024-03-20T14:15:00Z",
+            "title": "Positive feedback for John Doe",
+            "content": "Interview feedback: Strong technical skills and good culture fit",
+            "fromEvent": "evt_5"
+          },
+          {
+            "id": "msg_6",
+            "type": "prepare_contract",
+            "timestamp": "2024-03-20T14:30:00Z",
+            "title": "Prepare employment contract",
+            "content": "Contract preparation initiated for candidate",
+            "fromEvent": "evt_6"
+          }
+        ],
+        "events": [
+          {
+            "id": "interview-request-1737256963800",
+            "type": "EMAIL_RECEIVED",
+            "timestamp": "2025-01-19T03:22:43.800Z",
+            "data": {
+              "from": "john@example.com",
+              "to": "hr@company.com",
+              "subject": "Interview request",
+              "body": "I would like to schedule an interview",
+              "time": "2024-01-17T10:00:00Z"
+            }
+          }
+        ],
+        "completedActions": []
+      },
+      "startDate": "2024-03-20T10:00:00Z"
     },
     {
-      "id": "interview-request-1737163819158",
-      "type": "EMAIL_RECEIVED",
-      "source": "gmail",
-      "data": {
-        "from": "john@example.com",
-        "to": "hr@company.com",
-        "subject": "Interview request",
-        "body": "I would like to schedule an interview",
-        "time": "2024-01-17T10:00:00Z"
-      },
-      "timestamp": "2025-01-18T01:30:19.178Z",
-      "processed": true,
-      "triggeredTransitions": [
-        {
-          "to": "contacting_candidate",
-          "conditions": {
-            "requestTime": "(after) {{previousState.time}}"
-          }
+      "instanceId": "proc_1737237009601",
+      "templateId": "hiring_process",
+      "variables": {
+        "candidate": {
+          "email": "steve@gmail.com",
+          "name": "Steve McDonald"
+        },
+        "company": {
+          "email": "hr@pled.com",
+          "department": "Accounting"
         }
-      ]
+      },
+      "currentState": {
+        "name": "idle",
+        "enteredAt": "2025-01-18T21:50:09.601Z"
+      },
+      "history": {
+        "events": [],
+        "messages": [],
+        "completedActions": []
+      },
+      "startDate": "2025-01-18T21:50:09.601Z"
     }
   ]
 }

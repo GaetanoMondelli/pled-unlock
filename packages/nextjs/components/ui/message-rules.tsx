@@ -124,7 +124,7 @@ export default function MessageRules({ procedureId }: MessageRulesProps) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {instance.messages.map((message) => (
+            {instance.history?.messages?.map((message) => (
               <TableRow key={message.id}>
                 <TableCell className="text-xs">
                   {new Date(message.timestamp).toLocaleString()}

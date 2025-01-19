@@ -83,7 +83,7 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
     const fsm = createStateMachine(definition);
     let currentState = 'idle'; // Start from initial state
     
-    messagesProp.forEach(msg => {
+    messagesProp?.forEach(msg => {
       fsm.go(currentState);
       const prevState = currentState;
       fsm.action(msg.type);

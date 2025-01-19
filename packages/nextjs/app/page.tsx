@@ -84,10 +84,10 @@ export default function Home() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {pledData.procedureInstances
               .filter(instance => instance.templateId === template.templateId)
-              .map((instance: ProcedureInstance) => {
-                const currentState = calculateCurrentState(template.stateMachine.fsl, instance.messages);
-                const lastActivity = instance.messages[instance.messages.length - 1]?.timestamp;
-                const firstEventDate = instance.events[0]?.timestamp;
+              .map((instance) => {
+                const currentState = calculateCurrentState(template.stateMachine.fsl, instance.history.messages);
+                const lastActivity = instance.history.messages[instance.history.messages.length - 1]?.timestamp;
+                const firstEventDate = instance.history.events[0]?.timestamp;
 
                 return (
                   <Link 
@@ -116,28 +116,40 @@ export default function Home() {
                         <div className="grid grid-cols-3 gap-2 text-sm">
                           <div className="flex items-center gap-1">
                             <MessageCircle className="h-4 w-4 text-muted-foreground" />
-                            <span>{instance.messages.length} msgs</span>
+                            <span>{instance.history.messages.length} msgs</span>
                           </div>
                           <div className="flex items-center gap-1">
                             <Activity className="h-4 w-4 text-muted-foreground" />
-                            <span>{instance.events.length} events</span>
+                            <span>{instance.history.events.length} events</span>
                           </div>
                           <div className="flex items-center gap-1">
                             <GitBranch className="h-4 w-4 text-muted-foreground" />
                             <span>{template.templateId}</span>
                           </div>
                         </div>
+                      <CardContent>
+                        <CardFooter>
+                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                            <Calendar className="h-4 w-4" />
+                            <span>
+                              {instance.history.events[0]?.timestamp 
+                                ? format(new Date(instance.history.events[0].timestamp), "MMM d")
+                                : "Not started"}
+                            </span>
+                          </div>
+                        </CardFooter>
+                        </CardContent>
+                        <CardFooter>
+                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                            <Calendar className="h-4 w-4" />
+                            <span>
+                              {instance.history.events[0]?.timestamp 
+                                ? format(new Date(instance.history.events[0].timestamp), "MMM d")
+                                : "Not started"}
+                            </span>
+                          </div>
+                        </CardFooter>
                       </CardContent>
-                      <CardFooter>
-                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                          <Calendar className="h-4 w-4" />
-                          <span>
-                            {instance.events[0]?.timestamp 
-                              ? format(new Date(instance.events[0].timestamp), "MMM d")
-                              : "Not started"}
-                          </span>
-                        </div>
-                      </CardFooter>
                     </Card>
                   </Link>
                 );
