@@ -286,7 +286,10 @@ export default function Home() {
                           </div>
                           
                           {/* Add debug section that shows on hover */}
-                          <div className="hidden group-hover:block absolute right-2 top-2 z-10 bg-black/90 text-white p-2 rounded text-xs">
+                          <div 
+                            data-debug 
+                            className="hidden group-hover:block absolute right-2 top-2 z-10 bg-black/90 text-white p-2 rounded text-xs"
+                          >
                             <pre className="whitespace-pre-wrap">
                               {JSON.stringify(debugInfo, null, 2)}
                             </pre>

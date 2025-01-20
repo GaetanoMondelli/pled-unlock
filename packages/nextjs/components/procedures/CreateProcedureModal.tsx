@@ -560,7 +560,7 @@ export const CreateProcedureModal = ({ open, onClose, onSave }: CreateProcedureM
                           {Object.entries(fields).map(([key, value]) => (
                             <div key={key} className="text-sm">
                               <span className="text-muted-foreground">{key}:</span>
-                              <span className="ml-2 font-medium">{value}</span>
+                              <span className="ml-2 font-medium">{String(value)}</span>
                             </div>
                           ))}
                         </div>

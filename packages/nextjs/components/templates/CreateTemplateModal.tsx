@@ -317,9 +317,10 @@ export function CreateTemplateModal() {
       const db = await fetchFromDb();
       
       // Generate templateId using hash of name and timestamp
-      const hash = createHash('sha256')
-      hash.update(`${templateName}_${Date.now()}`)
-      const templateId = hash.digest('hex').substring(0, 12)
+      const templateId = createHash('sha256')
+        .update(`${templateName}_${Date.now()}`)
+        .digest('hex')
+        .substring(0, 12);
 
       const template = {
         templateId,
