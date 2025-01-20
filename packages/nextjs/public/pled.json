@@ -340,7 +340,7 @@
         "data": {
           "from": "john@example.com",
           "to": "hr@company.com",
-          "subject": "interview request",
+          "subject": "Interview request",
           "body": "I would like to schedule an interview",
           "time": "2024-01-17T10:00:00Z"
         }
@@ -544,7 +544,7 @@
             "data": {
               "from": "john@example.com",
               "to": "hr@company.com",
-              "subject": "interview request",
+              "subject": "Interview request",
               "body": "I would like to schedule an interview",
               "time": "2024-01-17T10:00:00Z"
             }

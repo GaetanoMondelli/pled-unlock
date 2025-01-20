@@ -89,6 +89,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid action" }, { status: 400 });
     }
 
+    console.log("data", data)
     // Get the current file
     const file = bucket.file(filePath);
     

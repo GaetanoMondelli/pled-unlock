@@ -152,6 +152,7 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
     // Get all unique states from the FSM definition
     const stateSet = new Set<string>()
     
+
     definition.split(';').forEach(line => {
       line = line.trim()
       if (line) {
