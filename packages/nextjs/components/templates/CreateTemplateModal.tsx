@@ -19,8 +19,9 @@ import { D3Graph } from '../ui/d3-graph'
 import { createStateMachine } from "@/lib/fsm"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { createHash } from 'crypto'
-import { ChevronDown, ChevronRight, PlusCircle } from "lucide-react"
+import { ChevronDown, ChevronRight, PlusCircle, Loader2 } from "lucide-react"
 import { fetchFromDb, updateDb } from "~~/utils/api"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface Step {
   title: string
@@ -288,28 +289,61 @@ export function CreateTemplateModal() {
   const [eventTypes, setEventTypes] = useState<EventType[]>(DEFAULT_EVENT_TYPES)
   const [showVariablesModal, setShowVariablesModal] = useState(false)
   const [showEventTypesModal, setShowEventTypesModal] = useState(false)
+  const [documentContent, setDocumentContent] = useState('')
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [analysisError, setAnalysisError] = useState('')
+  const [selectedModel, setSelectedModel] = useState<string>("gpt-4")
 
   const handleDocumentAnalysis = async () => {
-    setIsLoading(true)
+    if (!documentContent.trim()) {
+      setAnalysisError('Please enter document content');
+      return;
+    }
+
+    setIsAnalyzing(true);
+    setAnalysisError('');
+
     try {
       const response = await fetch("/api/analyze-document", {
-        method: "POST",
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ document: documentText }),
-      })
+        body: JSON.stringify({ 
+          documentContent,
+          model: selectedModel 
+        })
+      });
 
-      const data = await response.json()
-      // Make the AI suggestion available but don't automatically apply it
-      setFsmDefinition(prev => prev || data.fsm)
-      setMessageRules(prev => prev || data.messageRules)
-    } catch (error) {
-      console.error("Error analyzing document:", error)
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.details || data.error || 'Failed to analyze document');
+      }
+
+      if (!data.template) {
+        throw new Error('Invalid response format from server');
+      }
+
+      // Update the form with the suggested template
+      setFsmDefinition(data.template.stateMachine.fsl || '');
+      setMessageRules(JSON.stringify(data.template.messageRules || [], null, 2));
+      setVariables(data.template.variables || {});
+      setTemplateName(data.template.name || '');
+      setDescription(data.template.description || '');
+      
+      // Optional updates based on what's available in the response
+      if (data.template.actions) {
+        setContract(JSON.stringify({ actions: data.template.actions }, null, 2));
+      }
+
+    } catch (error: any) {
+      console.error('Error:', error);
+      setAnalysisError(error.message || 'Failed to analyze document');
     } finally {
-      setIsLoading(false)
+      setIsAnalyzing(false);
     }
-  }
+  };
 
   const handleSave = async () => {
     try {
@@ -377,6 +411,7 @@ export function CreateTemplateModal() {
     setIsEditingRules(false)
     setVariables(DEFAULT_VARIABLES)
     setEventTypes(DEFAULT_EVENT_TYPES)
+    setDocumentContent("")
   }
 
   const validateContract = (value: string) => {
@@ -402,50 +437,74 @@ export function CreateTemplateModal() {
     switch (currentStep) {
       case 0:
         return (
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="templateName">Template Name</Label>
-              <Input
-                id="templateName"
-                value={templateName}
-                onChange={(e) => setTemplateName(e.target.value)}
-                placeholder="Enter template name"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Describe the purpose of this template..."
-                className="h-[80px]"
-              />
-            </div>
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <Label htmlFor="document">Document Analysis (Optional)</Label>
-                <Button 
-                  variant="outline"
-                  size="sm"
-                  onClick={handleDocumentAnalysis}
-                  disabled={!documentText || isLoading}
-                >
-                  {isLoading ? "Analyzing..." : "Generate Suggestions"}
-                </Button>
-              </div>
-              <div className="h-[250px] w-full rounded-md border">
-                <Textarea
-                  id="document"
-                  value={documentText}
-                  onChange={(e) => setDocumentText(e.target.value)}
-                  placeholder="Paste your contract, policy, or any document text here to get AI-generated suggestions for the state machine and message rules..."
-                  className="h-full resize-none border-0"
+          <div className="space-y-6">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Template Name</Label>
+                <Input
+                  id="name"
+                  value={templateName}
+                  onChange={(e) => setTemplateName(e.target.value)}
+                  placeholder="Enter template name..."
                 />
               </div>
-              <p className="text-xs text-muted-foreground">
-                Upload any document to get AI-generated suggestions for your workflow. You can edit the suggestions in the next steps.
-              </p>
+
+              <div className="space-y-2">
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Enter template description..."
+                />
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <Label>Document Analysis</Label>
+                  <div className="flex gap-2">
+                    <div className="w-48">
+                      <Select
+                        value={selectedModel}
+                        onValueChange={setSelectedModel}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select AI Model" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="gpt-4-turbo-preview">GPT-4 Turbo (Fastest)</SelectItem>
+                          <SelectItem value="gpt-4">GPT-4 (Most Reliable)</SelectItem>
+                          <SelectItem value="gpt-3.5-turbo">GPT-3.5 (Basic)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleDocumentAnalysis}
+                      disabled={!documentContent || isAnalyzing}
+                    >
+                      {isAnalyzing && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                      {isAnalyzing ? 'Analyzing...' : 'Analyze Document'}
+                    </Button>
+                  </div>
+                </div>
+                <div className="h-[250px] w-full rounded-md border">
+                  <Textarea
+                    id="document"
+                    value={documentContent}
+                    onChange={(e) => setDocumentContent(e.target.value)}
+                    placeholder="Paste your contract, policy, or any document text here to get AI-generated suggestions for the state machine and message rules..."
+                    className="h-full resize-none border-0"
+                  />
+                </div>
+                {analysisError && (
+                  <p className="text-sm text-red-500">{analysisError}</p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Upload any document to get AI-generated suggestions for your workflow. You can edit the suggestions in the next steps.
+                </p>
+              </div>
             </div>
           </div>
         )
