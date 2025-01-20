@@ -55,6 +55,24 @@ const EVENT_TEMPLATES = {
   }
 };
 
+const fetchProcedureState = async (procedureId: string) => {
+  try {
+    const data = await getProcedureData(procedureId);
+    
+    // Find the current state from the procedure data
+    const currentState = data.currentState || 'idle';
+    const fsmDefinition = data.template?.stateMachine?.fsl || '';
+
+    return {
+      currentState,
+      fsmDefinition
+    };
+  } catch (error) {
+    console.error('Error fetching procedure state:', error);
+    throw new Error('Failed to fetch procedure state');
+  }
+};
+
 export const CreateEventModal = ({ open, onClose, onSave, procedureId }: CreateEventModalProps) => {
   const [selectedEndpoint, setSelectedEndpoint] = useState<string>("");
   const [selectedAction, setSelectedAction] = useState<string>("");
@@ -93,6 +111,12 @@ export const CreateEventModal = ({ open, onClose, onSave, procedureId }: CreateE
 
   // Add this state for the debug section
   const [showDebug, setShowDebug] = useState(false);
+
+  // Add state for Navigator API call
+  const [isLoadingAgreement, setIsLoadingAgreement] = useState(false);
+
+  // Add state for Navigator API result
+  const [navigatorResult, setNavigatorResult] = useState<any>(null);
 
   // Update event type handler to set template
   const handleEventTypeChange = (type: string) => {
@@ -389,38 +413,46 @@ export const CreateEventModal = ({ open, onClose, onSave, procedureId }: CreateE
     );
   };
 
-  const handleSave = async () => {
+  const handleNavigatorAction = async () => {
+    if (!selectedEnvelope) return;
+    
+    setIsLoadingAgreement(true);
     try {
-      const eventObj = {
+      // Call the mock Navigator API endpoint
+      const response = await fetch(`/api/docusign/navigator?agreementId=${selectedEnvelope}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch agreement data');
+      }
+      
+      const data = await response.json();
+      setNavigatorResult(data);
+    } catch (error) {
+      console.error('Error calling Navigator API:', error);
+    } finally {
+      setIsLoadingAgreement(false);
+    }
+  };
+
+  // Add handler for adding Navigator result as event
+  const addNavigatorResultAsEvent = async () => {
+    if (!navigatorResult) return;
+    
+    try {
+      const event = {
         id: `evt_${Date.now()}`,
-        type: eventType,
-        timestamp: new Date().toISOString(),
-        data: JSON.parse(eventData)
+        type: 'DOCUSIGN_NAVIGATOR_GET_AGREEMENT',
+        data: {
+          accountId: '{{docusign.accountId}}',
+          agreementId: selectedEnvelope,
+          result: navigatorResult
+        },
+        timestamp: new Date().toISOString()
       };
 
-      // Get current state and FSM definition
-      const { currentState, fsmDefinition } = await fetchProcedureState(procedureId);
-      
-      // Generate messages and handle state transitions
-      const { messages, transitions, finalState } = handleEventAndGenerateMessages(
-        eventObj,
-        templateRules,
-        instanceVariables,
-        currentState,
-        fsmDefinition
-      );
-
-      // Save everything
-      await onSave({
-        event: eventObj,
-        messages,
-        stateTransitions: transitions,
-        newState: finalState
-      });
-
+      await onSave({ event });
       onClose();
     } catch (error) {
-      console.error('Error saving event:', error);
+      console.error('Error adding Navigator result as event:', error);
     }
   };
 
@@ -648,20 +680,29 @@ export const CreateEventModal = ({ open, onClose, onSave, procedureId }: CreateE
                     </Select>
                   </div>
 
-                  <Button 
-                    onClick={handleDocusignAction}
-                    disabled={!selectedEnvelope || isCheckingStatus}
-                  >
-                    {isCheckingStatus ? "Checking..." : "Check Status"}
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button 
+                      onClick={handleDocusignAction}
+                      disabled={!selectedEnvelope || isCheckingStatus}
+                    >
+                      {isCheckingStatus ? "Checking..." : "Check Status"}
+                    </Button>
+                    <Button 
+                      onClick={handleNavigatorAction}
+                      disabled={!selectedEnvelope || isLoadingAgreement}
+                      variant="outline"
+                    >
+                      {isLoadingAgreement ? "Loading..." : "Get Agreement Insight (Navigator)"}
+                    </Button>
+                  </div>
 
-                  {statusResult && (
+                  {(statusResult || navigatorResult) && (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <h4 className="text-sm font-medium">API Result</h4>
                         <Button 
                           size="sm" 
-                          onClick={addAsVerifiedEvent}
+                          onClick={statusResult ? addAsVerifiedEvent : addNavigatorResultAsEvent}
                         >
                           Add as Event
                         </Button>
@@ -669,7 +710,7 @@ export const CreateEventModal = ({ open, onClose, onSave, procedureId }: CreateE
                       <Card className="bg-muted">
                         <ScrollArea className="h-[200px]">
                           <pre className="p-4 text-xs mt-2 bg-gray-50 p-2 rounded overflow-x-auto whitespace-pre">
-                            {JSON.stringify(statusResult, null, 2)}
+                            {JSON.stringify(statusResult || navigatorResult, null, 2)}
                           </pre>
                         </ScrollArea>
                       </Card>

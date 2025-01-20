@@ -53,7 +53,12 @@ interface EventType {
   };
 }
 
-type ActionType = 'SEND_EMAIL' | 'CALL_API' | 'DOCUSIGN_EVENT';
+type ActionType = 
+  | 'SEND_EMAIL' 
+  | 'CALL_API' 
+  | 'DOCUSIGN_EVENT'
+  | 'DOCUSIGN_NAVIGATOR_GET_AGREEMENTS'
+  | 'DOCUSIGN_NAVIGATOR_GET_AGREEMENT';
 
 interface StateAction {
   type: ActionType;
@@ -70,6 +75,11 @@ interface StateAction {
     // For DocuSign
     eventType?: string;
     envelopeId?: string;
+    // New Navigator API configs
+    accountId?: string;
+    agreementId?: string;
+    limit?: number;
+    ctoken?: string;
   };
 }
 
@@ -348,6 +358,21 @@ const StateActionView = ({ state, actions }: { state: string; actions: StateActi
                 <div><span className="text-gray-500">Event Type:</span> {action.config.eventType}</div>
               </div>
             )}
+            {action.type === 'DOCUSIGN_NAVIGATOR_GET_AGREEMENTS' && (
+              <div className="space-y-1 text-sm">
+                <div><span className="text-gray-500">Account ID:</span> {action.config.accountId}</div>
+                <div><span className="text-gray-500">Limit:</span> {action.config.limit}</div>
+                {action.config.ctoken && (
+                  <div><span className="text-gray-500">Continuation Token:</span> {action.config.ctoken}</div>
+                )}
+              </div>
+            )}
+            {action.type === 'DOCUSIGN_NAVIGATOR_GET_AGREEMENT' && (
+              <div className="space-y-1 text-sm">
+                <div><span className="text-gray-500">Account ID:</span> {action.config.accountId}</div>
+                <div><span className="text-gray-500">Agreement ID:</span> {action.config.agreementId}</div>
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -448,7 +473,7 @@ export function CreateTemplateModal() {
       const db = await fetchFromDb();
 
       // Generate templateId using hash of name and timestamp
-      const templateId = createHash('sha256')
+      const templateId : string = createHash('sha256')
         .update(`${templateName}_${Date.now()}`)
         .digest('hex')
         .substring(0, 12);
@@ -535,11 +560,31 @@ export function CreateTemplateModal() {
     if (!currentActions.actions) currentActions.actions = {};
     if (!currentActions.actions[state]) currentActions.actions[state] = [];
     
-    currentActions.actions[state].push({
-      type: 'SEND_EMAIL',
-      config: {}
-    });
+    const actionType = 'DOCUSIGN_NAVIGATOR_GET_AGREEMENTS' as ActionType ; // This should be selected by user
     
+    let newAction: StateAction = {
+      type: actionType,
+      config: {}
+    };
+
+    // Set default configs based on action type
+    switch (actionType) {
+      case 'DOCUSIGN_NAVIGATOR_GET_AGREEMENTS':
+        newAction.config = {
+          accountId: '{{docusign.accountId}}',
+          limit: 10
+        };
+        break;
+      case 'DOCUSIGN_NAVIGATOR_GET_AGREEMENT':
+        newAction.config = {
+          accountId: '{{docusign.accountId}}',
+          agreementId: '{{docusign.agreementId}}'
+        };
+        break;
+      // ... existing cases
+    }
+    
+    currentActions.actions[state].push(newAction);
     setContract(JSON.stringify(currentActions, null, 2));
   };
 
@@ -851,7 +896,10 @@ export function CreateTemplateModal() {
           },
           documents: documentText ? {
             contracts: [{
-              id: `doc_${templateId}`,
+              id: `doc_${createHash('sha256')
+                .update(`${templateName}_${Date.now()}`)
+                .digest('hex')
+                .substring(0, 12)}`,
               name: templateName,
               type: "document",
               content: documentText,

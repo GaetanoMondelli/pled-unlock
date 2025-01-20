@@ -170,33 +170,33 @@ ${states.join(', ')}
 Available template variables:
 ${JSON.stringify(variables, null, 2)}
 
-Define automated actions for each state. Each action must be one of: SEND_EMAIL, CALL_API, or DOCUSIGN_EVENT.
-Use template variables where appropriate (e.g., {{candidate.name}}, {{company.email}}).
+Define automated actions for each state. Each action must be one of:
+- SEND_EMAIL
+- CALL_API
+- DOCUSIGN_EVENT
+- DOCUSIGN_NAVIGATOR_GET_AGREEMENTS (Lists all agreements)
+- DOCUSIGN_NAVIGATOR_GET_AGREEMENT (Gets specific agreement details)
 
-Examples of good actions:
-- Send welcome email to candidate using {{candidate.email}}
-- Check DocuSign status for envelope {{docusign.envelopeId}}
-- Send notification to hiring manager at {{company.email}}
+Use template variables where appropriate (e.g., {{docusign.accountId}}, {{docusign.agreementId}}).
 
 Format response as JSON:
 {
   "actions": {
     "review": [
       {
-        "type": "SEND_EMAIL",
+        "type": "DOCUSIGN_NAVIGATOR_GET_AGREEMENTS",
         "config": {
-          "to": "{{company.email}}",
-          "subject": "Review Required: Application from {{candidate.name}}",
-          "body": "Please review the application submitted by {{candidate.name}} for {{company.department}}."
+          "accountId": "{{docusign.accountId}}",
+          "limit": 10
         }
       }
     ],
     "pending_signature": [
       {
-        "type": "DOCUSIGN_EVENT",
+        "type": "DOCUSIGN_NAVIGATOR_GET_AGREEMENT",
         "config": {
-          "eventType": "check_status",
-          "envelopeId": "{{docusign.envelopeId}}"
+          "accountId": "{{docusign.accountId}}",
+          "agreementId": "{{docusign.agreementId}}"
         }
       }
     ]
