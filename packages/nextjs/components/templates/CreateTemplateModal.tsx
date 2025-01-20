@@ -876,15 +876,16 @@ export function CreateTemplateModal() {
               </p>
             </div>
             <ScrollArea className="h-[400px]">
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-sm font-medium mb-2">Basic Information</h3>
-                  <JsonView data={{ name: templateName, description }} />
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-medium mb-2">Variables</h3>
-                  <JsonView data={variables} />
+              <div className="space-y-6 pr-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <h3 className="text-sm font-medium mb-2">Basic Information</h3>
+                    <JsonView data={{ name: templateName, description }} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-medium mb-2">Variables</h3>
+                    <JsonView data={variables} />
+                  </div>
                 </div>
 
                 <div>
@@ -894,15 +895,19 @@ export function CreateTemplateModal() {
 
                 <div>
                   <h3 className="text-sm font-medium mb-2">State Machine</h3>
-                  <JsonView data={{ fsl: fsmDefinition }} />
-                  <div className="mt-2 border rounded-lg p-2">
-                    <D3Graph
-                      nodes={getNodesFromFsm(fsmDefinition)}
-                      links={getLinksFromFsm(fsmDefinition)}
-                      width={450}
-                      height={150}
-                      direction="LR"
-                    />
+                  <div className="flex gap-4">
+                    <div className="flex-1">
+                      <JsonView data={{ fsl: fsmDefinition }} />
+                    </div>
+                    <div className="flex-1 border rounded-lg p-2">
+                      <D3Graph
+                        nodes={getNodesFromFsm(fsmDefinition)}
+                        links={getLinksFromFsm(fsmDefinition)}
+                        width={350}
+                        height={150}
+                        direction="LR"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -963,7 +968,7 @@ export function CreateTemplateModal() {
           Create New Template
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{steps[currentStep].title}</DialogTitle>
           <DialogDescription>{steps[currentStep].description}</DialogDescription>

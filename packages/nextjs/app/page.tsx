@@ -270,11 +270,15 @@ export default function Home() {
                             <div className="space-y-1">
                               <CardTitle className="flex items-center gap-2">
                                 <User className="h-4 w-4" />
-                                {instance.variables?.candidate?.name || 'Unnamed'}
+                                {instance.variables?.candidate?.name || 
+                                 (Object.entries(instance.variables || {})[0]?.[0]) ||
+                                 'Unnamed'}
                               </CardTitle>
                               <CardDescription className="flex items-center gap-2">
                                 <Building2 className="h-4 w-4" />
-                                {instance.variables?.company?.department || 'No department'}
+                                {instance.variables?.company?.department || 
+                                 (Object.entries(instance.variables || {})[0]?.[1]?.department) ||
+                                 'No department'}
                               </CardDescription>
                             </div>
                             <Badge 
