@@ -9,122 +9,45 @@ const AVAILABLE_MODELS = {
 
 type ModelId = keyof typeof AVAILABLE_MODELS;
 
+// Rate limiting setup
+const REQUESTS_PER_MINUTE = 3;
+const requestTimestamps: number[] = [];
+
+function canMakeRequest(): boolean {
+  const now = Date.now();
+  const oneMinuteAgo = now - 60000;
+  
+  while (requestTimestamps.length > 0 && requestTimestamps[0] < oneMinuteAgo) {
+    requestTimestamps.shift();
+  }
+  
+  return requestTimestamps.length < REQUESTS_PER_MINUTE;
+}
+
+function trackRequest() {
+  requestTimestamps.push(Date.now());
+}
+
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
-// Add mock response for development
-const MOCK_RESPONSE = {
-  name: "Contract Review Process",
-  description: "Standard procedure for reviewing and signing legal documents",
-  stateMachine: {
-    fsl: "idle 'start' -> review; review 'approve' -> signing; review 'reject' -> rejected; signing 'signed' -> completed; rejected 'revise' -> review;"
-  },
-  eventTypes: [
-    {
-      type: "EMAIL_RECEIVED",
-      schema: {
-        from: "string",
-        to: "string",
-        subject: "string",
-        body: "string"
-      }
-    },
-    {
-      type: "DOCUSIGN_CLICKWRAP",
-      schema: {
-        userId: "string",
-        agreementId: "string",
-        status: "string",
-        timestamp: "string"
-      }
-    },
-    {
-      type: "DOCUSIGN_ENVELOPE",
-      schema: {
-        envelopeId: "string",
-        status: "string",
-        signers: "array",
-        documentName: "string"
-      }
-    }
-  ],
-  messageRules: [
-    {
-      matches: {
-        type: "EMAIL_RECEIVED",
-        conditions: {
-          from: "{{sender.email}}",
-          subject: "(contains) start review"
-        }
-      },
-      generates: {
-        type: "start",
-        template: {
-          title: "New Review Process Started",
-          content: "Review process initiated by {{sender.name}}"
-        }
-      }
-    },
-    {
-      matches: {
-        type: "EMAIL_RECEIVED",
-        conditions: {
-          from: "{{reviewer.email}}",
-          subject: "(contains) approved"
-        }
-      },
-      generates: {
-        type: "approve",
-        template: {
-          title: "Document Approved",
-          content: "Document approved by {{reviewer.name}}"
-        }
-      }
-    },
-    {
-      matches: {
-        type: "DOCUSIGN_ENVELOPE",
-        conditions: {
-          status: "completed"
-        }
-      },
-      generates: {
-        type: "signed",
-        template: {
-          title: "Document Signed",
-          content: "Contract has been signed by all parties"
-        }
-      }
-    }
-  ],
-  variables: {
-    sender: {
-      name: { type: "string", required: true },
-      email: { type: "string", required: true }
-    },
-    reviewer: {
-      name: { type: "string", required: true },
-      email: { type: "string", required: true }
-    },
-    contract: {
-      title: { type: "string", required: true },
-      type: { type: "string", required: true }
-    }
-  },
-  actions: {
-    review: ["send_review_notification", "create_docusign_envelope"],
-    signing: ["send_signing_request"],
-    completed: ["send_completion_notification", "archive_document"]
-  }
-};
+// Single prompt for regular mode
+const getSinglePrompt = `Analyze this document and create a complete workflow template.
 
-// First prompt to get state machine and event types
-const getBasicStructurePrompt = `Analyze the document and create:
+Create:
+1. A state machine in FSL notation
+2. Event types that can trigger transitions
+3. Message rules that map events to transitions
+4. Required variables
+5. Automated actions for each state
 
-1. A state machine in FSL notation that represents the document workflow
-2. Event types that will trigger transitions
-3. Required variables for the workflow
+REQUIREMENTS:
+- FSL must start with 'idle' state
+- Every transition must have corresponding message rules
+- Event types must be realistic (emails, DocuSign events, etc.)
+- Include meaningful automated actions for each state
+- Use template variables (e.g., {{candidate.name}}, {{company.email}}) in actions where appropriate
 
 Format response as JSON:
 {
@@ -136,8 +59,21 @@ Format response as JSON:
   "eventTypes": [
     {
       "type": "EVENT_TYPE",
-      "schema": {
-        "field1": "type"
+      "schema": { "field1": "type" }
+    }
+  ],
+  "messageRules": [
+    {
+      "matches": {
+        "type": "EVENT_TYPE",
+        "conditions": {}
+      },
+      "generates": {
+        "type": "MUST_MATCH_FSM_TRANSITION",
+        "template": {
+          "title": "string",
+          "content": "string"
+        }
       }
     }
   ],
@@ -145,53 +81,171 @@ Format response as JSON:
     "group": {
       "field": { "type": "string", "required": boolean }
     }
+  },
+  "actions": {
+    "state_name": [
+      {
+        "type": "SEND_EMAIL",
+        "config": {
+          "to": "{{company.email}}",
+          "subject": "Application from {{candidate.name}}",
+          "body": "Dear hiring manager,\n\nA new application has been received from {{candidate.name}}."
+        }
+      },
+      {
+        "type": "DOCUSIGN_EVENT",
+        "config": {
+          "eventType": "check_status",
+          "envelopeId": "{{docusign.envelopeId}}"
+        }
+      }
+    ]
   }
 }`;
 
-// Second prompt to generate message rules based on state machine
-const getMessageRulesPrompt = (fsm: string, eventTypes: any[], variables: any) => `
-Given this state machine:
-${fsm}
-
-And these event types:
-${JSON.stringify(eventTypes, null, 2)}
-
-Create message rules where:
-1. EVERY rule MUST generate an event that matches one of the FSM transitions
-2. EVERY transition in the FSM must have at least one rule that generates it
-3. Use ONLY the provided event types
-4. Reference these available variables:
-${JSON.stringify(variables, null, 2)}
-
-Available transitions from FSM:
-${extractTransitions(fsm).map(t => `- '${t}'`).join('\n')}
-
-Format response as JSON array of rules:
-[
-  {
-    "matches": {
-      "type": "EVENT_TYPE",
-      "conditions": {}
-    },
-    "generates": {
-      "type": "MUST_MATCH_FSM_TRANSITION",
-      "template": {
-        "title": "string",
-        "content": "string"
-      }
-    }
-  }
-]
+// Expert mode prompts
+const expertPrompts = {
+  getFSL: `Analyze this document and create a state machine in FSL notation.
 
 REQUIREMENTS:
-- Each rule's "generates.type" MUST exactly match one of the FSM transitions
-- Every FSM transition must have a corresponding rule
-- Rules must use the provided event types
-- Rules should have meaningful conditions and templates`;
+- FSL must start with 'idle' state
+- Include all necessary states and transitions
+- End with final states (e.g., 'completed', 'rejected', 'terminated')
+- Use meaningful transition names
+
+Format response as JSON:
+{
+  "name": "Template name",
+  "description": "Workflow description",
+  "stateMachine": {
+    "fsl": "idle 'start' -> state1; state1 'event1' -> state2; state2 'complete' -> completed;"
+  }
+}`,
+
+  getMessageRules: (fsl: string, transitions: string[]) => 
+  `Given this state machine:
+${fsl}
+
+And these transitions:
+${transitions.join(', ')}
+
+Create message rules and event types that map to these transitions.
+
+Format response as JSON:
+{
+  "eventTypes": [
+    {
+      "type": "EVENT_TYPE",
+      "schema": {
+        "field1": "string"
+      }
+    }
+  ],
+  "messageRules": [
+    {
+      "matches": {
+        "type": "EVENT_TYPE",
+        "conditions": {}
+      },
+      "generates": {
+        "type": "TRANSITION_NAME",
+        "template": {
+          "title": "string",
+          "content": "string"
+        }
+      }
+    }
+  ],
+  "variables": {
+    "group": {
+      "field": { "type": "string", "required": true }
+    }
+  }
+}`,
+
+  getStateActions: (states: string[], variables: any = {}) => 
+  `For these states:
+${states.join(', ')}
+
+Available template variables:
+${JSON.stringify(variables, null, 2)}
+
+Define automated actions for each state. Each action must be one of: SEND_EMAIL, CALL_API, or DOCUSIGN_EVENT.
+Use template variables where appropriate (e.g., {{candidate.name}}, {{company.email}}).
+
+Examples of good actions:
+- Send welcome email to candidate using {{candidate.email}}
+- Check DocuSign status for envelope {{docusign.envelopeId}}
+- Send notification to hiring manager at {{company.email}}
+
+Format response as JSON:
+{
+  "actions": {
+    "review": [
+      {
+        "type": "SEND_EMAIL",
+        "config": {
+          "to": "{{company.email}}",
+          "subject": "Review Required: Application from {{candidate.name}}",
+          "body": "Please review the application submitted by {{candidate.name}} for {{company.department}}."
+        }
+      }
+    ],
+    "pending_signature": [
+      {
+        "type": "DOCUSIGN_EVENT",
+        "config": {
+          "eventType": "check_status",
+          "envelopeId": "{{docusign.envelopeId}}"
+        }
+      }
+    ]
+  }
+}`
+};
+
+// Helper functions
+function extractTransitions(fsl: string): string[] {
+  const transitions: string[] = [];
+  const regex = /'([^']+)'/g;
+  let match;
+  while ((match = regex.exec(fsl)) !== null) {
+    transitions.push(match[1]);
+  }
+  return transitions;
+}
+
+function extractStates(fsl: string): string[] {
+  const states = new Set<string>();
+  const regex = /(\w+)\s+'[^']+'\s*->\s*(\w+)/g;
+  let match;
+  while ((match = regex.exec(fsl)) !== null) {
+    states.add(match[1]);
+    states.add(match[2]);
+  }
+  return Array.from(states);
+}
+
+// Helper function to create completion with proper options
+async function createCompletion(model: ModelId, messages: any[]) {
+  const options: any = {
+    model,
+    messages,
+    temperature: 0.7,
+  };
+
+  // Add response_format only for models that support it
+  if (model === "gpt-4-turbo-preview") {
+    options.response_format = { type: "json_object" };
+  }
+
+  const completion = await openai.chat.completions.create(options);
+  return completion;
+}
 
 export async function POST(req: Request) {
   try {
-    const { documentContent, model = "gpt-4" } = await req.json();
+    const { documentContent, model = "gpt-4", expertMode = false } = await req.json();
 
     if (!documentContent) {
       return NextResponse.json(
@@ -200,89 +254,118 @@ export async function POST(req: Request) {
       );
     }
 
-    if (!Object.keys(AVAILABLE_MODELS).includes(model)) {
+    if (!canMakeRequest()) {
       return NextResponse.json(
-        { error: 'Invalid model selected' },
-        { status: 400 }
+        { 
+          error: 'Rate limit exceeded',
+          details: 'Please wait 1 minute before making another request.'
+        },
+        { status: 429 }
       );
     }
 
-    // Use mock response for development
-    if (process.env.NODE_ENV === 'development') {
-      return NextResponse.json({
+    if (expertMode) {
+      // Step 1: Generate FSL with GPT-4 (more reliable for structure)
+      trackRequest();
+      const fslCompletion = await createCompletion("gpt-4", [
+        { role: "system", content: expertPrompts.getFSL },
+        { role: "user", content: documentContent }
+      ]);
+
+      const fslStructure = JSON.parse(fslCompletion.choices[0].message.content || "{}");
+      
+      // Extract transitions and states from FSL
+      const transitions = extractTransitions(fslStructure.stateMachine.fsl);
+      const states = extractStates(fslStructure.stateMachine.fsl);
+
+      // Step 2: Get message rules and event types using GPT-4 Turbo (faster)
+      trackRequest();
+      const rulesCompletion = await createCompletion("gpt-4-turbo-preview", [
+        { 
+          role: "system", 
+          content: expertPrompts.getMessageRules(fslStructure.stateMachine.fsl, transitions)
+        }
+      ]);
+
+      const rulesAndEvents = JSON.parse(rulesCompletion.choices[0].message.content || "{}");
+
+      // Step 3: Get actions for states using GPT-4 Turbo (faster)
+      trackRequest();
+      const actionsCompletion = await createCompletion("gpt-4-turbo-preview", [
+        { 
+          role: "system", 
+          content: expertPrompts.getStateActions(states, rulesAndEvents.variables)
+        }
+      ]);
+
+      const actionsResult = JSON.parse(actionsCompletion.choices[0].message.content || "{}");
+
+      // Validate the results
+      const ruleEvents = rulesAndEvents.messageRules?.map((rule: any) => rule.generates.type) || [];
+      
+      // Check for missing rules
+      const missingRules = transitions.filter(t => !ruleEvents.includes(t));
+      if (missingRules.length > 0) {
+        throw new Error(`Missing message rules for transitions: ${missingRules.join(', ')}`);
+      }
+
+      // Combine results
+      const template = {
+        ...fslStructure,
+        eventTypes: rulesAndEvents.eventTypes || [],
+        messageRules: rulesAndEvents.messageRules || [],
+        variables: rulesAndEvents.variables || {},
+        actions: actionsResult.actions || {},
+        templateId: `template_${Date.now()}`,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        modelUsed: AVAILABLE_MODELS[model as ModelId]
+      };
+
+      return NextResponse.json({ 
+        template,
+        progress: 'Analysis completed'
+      });
+
+    } else {
+      // For regular mode, use the selected model (if not expert)
+      trackRequest();
+      
+      const completion = await createCompletion(model as ModelId, [
+        { role: "system", content: getSinglePrompt },
+        { role: "user", content: documentContent }
+      ]);
+
+      const template = JSON.parse(completion.choices[0].message.content || "{}");
+
+      // Only do basic validation in regular mode
+      if (!template.stateMachine?.fsl || !template.messageRules) {
+        throw new Error('Invalid template format: missing required fields');
+      }
+
+      return NextResponse.json({ 
         template: {
-          ...MOCK_RESPONSE,
+          ...template,
           templateId: `template_${Date.now()}`,
           createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
+          updatedAt: new Date().toISOString(),
+          modelUsed: AVAILABLE_MODELS[model as ModelId]
         }
       });
     }
-
-    // First API call - Get basic structure
-    const structureCompletion = await openai.chat.completions.create({
-      model: model as ModelId,
-      messages: [
-        { role: "system", content: getBasicStructurePrompt },
-        { role: "user", content: documentContent }
-      ],
-      temperature: 0.7,
-      max_tokens: 1000,
-      response_format: { type: "json_object" }
-    });
-
-    const basicStructure = JSON.parse(structureCompletion.choices[0].message.content || "{}");
-
-    // Second API call - Get message rules
-    const rulesCompletion = await openai.chat.completions.create({
-      model: model as ModelId,
-      messages: [
-        { 
-          role: "system", 
-          content: getMessageRulesPrompt(
-            basicStructure.stateMachine.fsl,
-            basicStructure.eventTypes,
-            basicStructure.variables
-          )
-        }
-      ],
-      temperature: 0.7,
-      max_tokens: 1000,
-      response_format: { type: "json_object" }
-    });
-
-    const messageRules = JSON.parse(rulesCompletion.choices[0].message.content || "[]");
-
-    // Validate rules and transitions
-    const transitions = extractTransitions(basicStructure.stateMachine.fsl);
-    const ruleEvents = messageRules.map((rule: any) => rule.generates.type);
-    
-    // Check for missing rules
-    const missingRules = transitions.filter(t => !ruleEvents.includes(t));
-    if (missingRules.length > 0) {
-      throw new Error(`Missing message rules for transitions: ${missingRules.join(', ')}`);
-    }
-
-    // Check for invalid rules
-    const invalidRules = ruleEvents.filter(e => !transitions.includes(e));
-    if (invalidRules.length > 0) {
-      throw new Error(`Rules generate invalid transitions: ${invalidRules.join(', ')}`);
-    }
-
-    // Combine results
-    const template = {
-      ...basicStructure,
-      messageRules,
-      templateId: `template_${Date.now()}`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      modelUsed: AVAILABLE_MODELS[model as ModelId]
-    };
-
-    return NextResponse.json({ template });
-
   } catch (error: any) {
     console.error('Error analyzing document:', error);
+    
+    if (error.response?.status === 429 || error.message.includes('quota')) {
+      return NextResponse.json(
+        { 
+          error: 'OpenAI API quota exceeded',
+          details: 'Please check your OpenAI API key and billing settings.'
+        },
+        { status: 429 }
+      );
+    }
+
     return NextResponse.json(
       { 
         error: 'Failed to analyze document',
@@ -291,17 +374,4 @@ export async function POST(req: Request) {
       { status: 500 }
     );
   }
-}
-
-// Helper function to extract transitions from FSM
-function extractTransitions(fsl: string): string[] {
-  const transitions: string[] = [];
-  const regex = /'([^']+)'/g;
-  let match;
-  
-  while ((match = regex.exec(fsl)) !== null) {
-    transitions.push(match[1]);
-  }
-  
-  return transitions;
 } 

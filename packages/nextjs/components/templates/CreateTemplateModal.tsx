@@ -19,9 +19,16 @@ import { D3Graph } from '../ui/d3-graph'
 import { createStateMachine } from "@/lib/fsm"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { createHash } from 'crypto'
-import { ChevronDown, ChevronRight, PlusCircle, Loader2 } from "lucide-react"
+import { ChevronDown, ChevronRight, PlusCircle, Loader2, HelpCircle } from "lucide-react"
 import { fetchFromDb, updateDb } from "~~/utils/api"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Checkbox } from "@/components/ui/checkbox"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 interface Step {
   title: string
@@ -44,6 +51,30 @@ interface EventType {
   schema: {
     [key: string]: string;
   };
+}
+
+type ActionType = 'SEND_EMAIL' | 'CALL_API' | 'DOCUSIGN_EVENT';
+
+interface StateAction {
+  type: ActionType;
+  config: {
+    // For email
+    to?: string;
+    subject?: string;
+    body?: string;
+    // For API
+    url?: string;
+    method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+    headers?: Record<string, string>;
+    body?: any;
+    // For DocuSign
+    eventType?: string;
+    envelopeId?: string;
+  };
+}
+
+interface StateActions {
+  [state: string]: StateAction[];
 }
 
 const DEFAULT_VARIABLES: Variables = {
@@ -81,23 +112,27 @@ const DEFAULT_EVENT_TYPES: EventType[] = [
 const steps: Step[] = [
   {
     title: "Basic Information",
-    description: "Enter template details and optionally upload a document for AI suggestions"
+    description: "Start by providing a name and description for your template."
   },
   {
-    title: "Variables & Events",
-    description: "Configure template variables and event types"
+    title: "Variables & Event Types",
+    description: "Define the variables and event types used in your workflow."
   },
   {
     title: "State Machine",
-    description: "Define the states and transitions of your process"
+    description: "Define the states and transitions of your workflow."
   },
   {
     title: "Message Rules",
-    description: "Configure how events are transformed into messages"
+    description: "Configure how events map to state transitions."
+  },
+  {
+    title: "State Actions",
+    description: "Define automated actions for each state."
   },
   {
     title: "Review",
-    description: "Review the complete template configuration"
+    description: "Review your template configuration before creating."
   }
 ]
 
@@ -236,7 +271,7 @@ const CollapsibleRule = ({ rule, index }: CollapsibleRuleProps) => {
 const JsonView = ({ data }: { data: any }) => {
   const formatJson = (obj: any, indent = 0): string => {
     const space = ' '.repeat(indent * 2)
-    
+
     if (typeof obj !== 'object' || obj === null) {
       if (typeof obj === 'string') return `<span class="text-green-600">"${obj}"</span>`
       if (typeof obj === 'boolean') return `<span class="text-purple-600">${obj}</span>`
@@ -265,13 +300,60 @@ const JsonView = ({ data }: { data: any }) => {
 
   return (
     <pre className="bg-slate-50 p-4 rounded-lg overflow-auto">
-      <code 
+      <code
         className="text-sm"
         dangerouslySetInnerHTML={{ __html: formatJson(data) }}
       />
     </pre>
   )
 }
+
+const ANALYSIS_MODES = {
+  "gpt-4-turbo-preview": "GPT-4 Turbo (Fastest)",
+  "gpt-4": "GPT-4 (Most Reliable)",
+  "gpt-3.5-turbo": "GPT-3.5 (Basic)",
+  "expert": "Expert System Mode"
+} as const;
+
+const StateActionView = ({ state, actions }: { state: string; actions: StateAction[] }) => {
+  return (
+    <div className="border rounded-lg">
+      <button className="w-full flex items-center justify-between p-3 bg-slate-50">
+        <div className="flex items-center gap-2">
+          <span className="font-medium text-sm">{state}</span>
+        </div>
+        <span className="text-sm text-gray-500">{actions.length} action(s)</span>
+      </button>
+      <div className="p-3 border-t space-y-2">
+        {actions.map((action, index) => (
+          <div key={index} className="bg-white rounded border p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-sm font-medium text-blue-600">{action.type}</span>
+            </div>
+            {action.type === 'SEND_EMAIL' && (
+              <div className="space-y-1 text-sm">
+                <div><span className="text-gray-500">To:</span> {action.config.to}</div>
+                <div><span className="text-gray-500">Subject:</span> {action.config.subject}</div>
+                <div><span className="text-gray-500">Body:</span> {action.config.body}</div>
+              </div>
+            )}
+            {action.type === 'CALL_API' && (
+              <div className="space-y-1 text-sm">
+                <div><span className="text-gray-500">URL:</span> {action.config.url}</div>
+                <div><span className="text-gray-500">Method:</span> {action.config.method}</div>
+              </div>
+            )}
+            {action.type === 'DOCUSIGN_EVENT' && (
+              <div className="space-y-1 text-sm">
+                <div><span className="text-gray-500">Event Type:</span> {action.config.eventType}</div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 export function CreateTemplateModal() {
   const [open, setOpen] = useState(false)
@@ -293,6 +375,8 @@ export function CreateTemplateModal() {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysisError, setAnalysisError] = useState('')
   const [selectedModel, setSelectedModel] = useState<string>("gpt-4")
+  const [expertMode, setExpertMode] = useState(false)
+  const [analysisProgress, setAnalysisProgress] = useState<string>('')
 
   const handleDocumentAnalysis = async () => {
     if (!documentContent.trim()) {
@@ -302,6 +386,7 @@ export function CreateTemplateModal() {
 
     setIsAnalyzing(true);
     setAnalysisError('');
+    setAnalysisProgress('');
 
     try {
       const response = await fetch("/api/analyze-document", {
@@ -309,20 +394,29 @@ export function CreateTemplateModal() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           documentContent,
-          model: selectedModel 
+          model: selectedModel,
+          expertMode: selectedModel === "expert"
         })
       });
 
       const data = await response.json();
 
       if (!response.ok) {
+        if (response.status === 429) {
+          throw new Error(`Rate limit exceeded. ${data.details}`);
+        }
         throw new Error(data.details || data.error || 'Failed to analyze document');
       }
 
       if (!data.template) {
         throw new Error('Invalid response format from server');
+      }
+
+      // Update progress if available
+      if (data.progress) {
+        setAnalysisProgress(data.progress);
       }
 
       // Update the form with the suggested template
@@ -331,10 +425,13 @@ export function CreateTemplateModal() {
       setVariables(data.template.variables || {});
       setTemplateName(data.template.name || '');
       setDescription(data.template.description || '');
-      
-      // Optional updates based on what's available in the response
+
+      // Update contract with actions
       if (data.template.actions) {
         setContract(JSON.stringify({ actions: data.template.actions }, null, 2));
+      } else {
+        console.warn('No actions found in template response');
+        setContract('{}'); // Set empty contract if no actions
       }
 
     } catch (error: any) {
@@ -349,7 +446,7 @@ export function CreateTemplateModal() {
     try {
       // Fetch current DB state
       const db = await fetchFromDb();
-      
+
       // Generate templateId using hash of name and timestamp
       const templateId = createHash('sha256')
         .update(`${templateName}_${Date.now()}`)
@@ -379,7 +476,7 @@ export function CreateTemplateModal() {
       }
 
       // Use the updateDb helper function
-      console.log("atemplate", template) 
+      console.log("atemplate", template)
       console.log("adb", db)
 
       const updatedDb = {
@@ -388,7 +485,7 @@ export function CreateTemplateModal() {
       }
 
       await updateDb(updatedDb)
-      
+
 
       setOpen(false)
 
@@ -433,6 +530,31 @@ export function CreateTemplateModal() {
     setContractError(validateContract(value))
   }
 
+  const handleAddAction = (state: string) => {
+    const currentActions = JSON.parse(contract);
+    if (!currentActions.actions) currentActions.actions = {};
+    if (!currentActions.actions[state]) currentActions.actions[state] = [];
+    
+    currentActions.actions[state].push({
+      type: 'SEND_EMAIL',
+      config: {}
+    });
+    
+    setContract(JSON.stringify(currentActions, null, 2));
+  };
+
+  const handleRemoveAction = (state: string, index: number) => {
+    const currentActions = JSON.parse(contract);
+    currentActions.actions[state].splice(index, 1);
+    setContract(JSON.stringify(currentActions, null, 2));
+  };
+
+  const handleUpdateAction = (state: string, index: number, field: string, value: any) => {
+    const currentActions = JSON.parse(contract);
+    currentActions.actions[state][index].config[field] = value;
+    setContract(JSON.stringify(currentActions, null, 2));
+  };
+
   const renderStepContent = () => {
     switch (currentStep) {
       case 0:
@@ -462,21 +584,46 @@ export function CreateTemplateModal() {
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <Label>Document Analysis</Label>
-                  <div className="flex gap-2">
+                  <div className="flex items-center gap-4">
                     <div className="w-48">
                       <Select
                         value={selectedModel}
                         onValueChange={setSelectedModel}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Select AI Model" />
+                          <SelectValue placeholder="Select analysis mode" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="gpt-4-turbo-preview">GPT-4 Turbo (Fastest)</SelectItem>
                           <SelectItem value="gpt-4">GPT-4 (Most Reliable)</SelectItem>
                           <SelectItem value="gpt-3.5-turbo">GPT-3.5 (Basic)</SelectItem>
+                          <SelectItem value="expert">Expert System Mode</SelectItem>
                         </SelectContent>
                       </Select>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-sm">
+                            <p className="font-medium">Analysis Modes:</p>
+                            <ul className="mt-2 list-disc list-inside text-sm">
+                              <li><span className="font-medium">GPT-4 Turbo:</span> Fastest analysis, good for most cases</li>
+                              <li><span className="font-medium">GPT-4:</span> More thorough but slower analysis</li>
+                              <li><span className="font-medium">GPT-3.5:</span> Basic analysis, fastest and cheapest</li>
+                              <li><span className="font-medium">Expert System:</span> Uses multiple specialized prompts:
+                                <ul className="ml-4 mt-1 list-disc list-inside text-xs">
+                                  <li>GPT-4 for state machine design</li>
+                                  <li>GPT-4 Turbo for message rules</li>
+                                  <li>GPT-4 Turbo for state actions</li>
+                                </ul>
+                              </li>
+                            </ul>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     </div>
                     <Button
                       variant="outline"
@@ -498,6 +645,11 @@ export function CreateTemplateModal() {
                     className="h-full resize-none border-0"
                   />
                 </div>
+                {isAnalyzing && analysisProgress && (
+                  <p className="text-sm text-muted-foreground">
+                    {analysisProgress}
+                  </p>
+                )}
                 {analysisError && (
                   <p className="text-sm text-red-500">{analysisError}</p>
                 )}
@@ -631,6 +783,57 @@ export function CreateTemplateModal() {
         )
 
       case 4:
+        const states = getNodesFromFsm(fsmDefinition).map(node => node.id);
+        const currentActions = JSON.parse(contract)?.actions || {};
+        
+        return (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <Label>State Actions</Label>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsEditingRules(!isEditingRules)}
+              >
+                {isEditingRules ? "Preview" : "Edit JSON"}
+              </Button>
+            </div>
+            {isEditingRules ? (
+              <Textarea
+                value={contract}
+                onChange={(e) => setContract(e.target.value)}
+                className="h-[400px] font-mono"
+              />
+            ) : (
+              <ScrollArea className="h-[400px]">
+                <div className="space-y-2">
+                  {states.map(state => (
+                    <div key={state} className="space-y-2">
+                      <StateActionView 
+                        state={state} 
+                        actions={currentActions[state] || []} 
+                      />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full border border-dashed"
+                        onClick={() => handleAddAction(state)}
+                      >
+                        <PlusCircle className="h-4 w-4 mr-2" />
+                        Add Action to {state}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            )}
+            {contractError && (
+              <p className="text-sm text-red-500 mt-2">{contractError}</p>
+            )}
+          </div>
+        );
+
+      case 5:
         const reviewData = {
           templateId: createHash('sha256')
             .update(`${templateName}_${Date.now()}`)
@@ -660,7 +863,7 @@ export function CreateTemplateModal() {
           <div className="space-y-4">
             <div className="flex justify-between items-center mb-4">
               <Label>Review Template Configuration</Label>
-              <Button 
+              <Button
                 onClick={handleSave}
                 className="gap-2"
               >
@@ -678,17 +881,17 @@ export function CreateTemplateModal() {
                   <h3 className="text-sm font-medium mb-2">Basic Information</h3>
                   <JsonView data={{ name: templateName, description }} />
                 </div>
-                
+
                 <div>
                   <h3 className="text-sm font-medium mb-2">Variables</h3>
                   <JsonView data={variables} />
                 </div>
-                
+
                 <div>
                   <h3 className="text-sm font-medium mb-2">Event Types</h3>
                   <JsonView data={eventTypes} />
                 </div>
-                
+
                 <div>
                   <h3 className="text-sm font-medium mb-2">State Machine</h3>
                   <JsonView data={{ fsl: fsmDefinition }} />
@@ -702,7 +905,7 @@ export function CreateTemplateModal() {
                     />
                   </div>
                 </div>
-                
+
                 <div>
                   <h3 className="text-sm font-medium mb-2">Message Rules</h3>
                   <div className="space-y-2">
@@ -736,6 +939,13 @@ export function CreateTemplateModal() {
       case 3:
         try {
           JSON.parse(messageRules)
+          return true
+        } catch {
+          return false
+        }
+      case 4:
+        try {
+          JSON.parse(contract)
           return true
         } catch {
           return false
@@ -778,7 +988,7 @@ export function CreateTemplateModal() {
                 Cancel
               </Button>
               {currentStep !== steps.length - 1 && (
-                <Button 
+                <Button
                   onClick={() => setCurrentStep((prev) => Math.min(steps.length - 1, prev + 1))}
                   disabled={!canProceed()}
                 >
@@ -796,13 +1006,13 @@ export function CreateTemplateModal() {
 // Helper functions to convert FSM definition to graph data
 function getNodesFromFsm(definition: string) {
   const stateSet = new Set<string>()
-  
+
   definition.split(';').forEach(line => {
     line = line.trim()
     if (line) {
       const sourceState = line.split(/\s+/)[0]
       const targetState = line.split('->')[1]?.trim()
-      
+
       if (sourceState) stateSet.add(sourceState)
       if (targetState) stateSet.add(targetState)
     }
@@ -816,7 +1026,7 @@ function getNodesFromFsm(definition: string) {
 
 function getLinksFromFsm(definition: string) {
   const links: { source: string; target: string; label: string }[] = []
-  
+
   definition.split(';').forEach(line => {
     line = line.trim()
     if (!line) return
