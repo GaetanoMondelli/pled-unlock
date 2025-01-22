@@ -14,7 +14,8 @@ import {
   Upload,
   List,
   Eye,
-  EyeOff
+  EyeOff,
+  LogOut
 } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./dialog"
 
@@ -198,7 +199,12 @@ export const PlaygroundView = () => {
 
   const [authenticated, setAuthenticated] = useState(false);
   const [envelopeId, setEnvelopeId] = useState<string>("");
-  const [auth, setAuth] = useState<{ accessToken: string; accountId: string } | null>(null);
+  const [auth, setAuth] = useState<{
+    accessToken: string;
+    accountId: string;
+    baseUrl: string;
+    type: 'navigator'
+  } | null>(null);
   const [signingUrl, setSigningUrl] = useState<string | null>(null);
   const [showSigningDialog, setShowSigningDialog] = useState(false);
   const [tabPositions, setTabPositions] = useState<TabPosition[]>([]);
@@ -569,9 +575,227 @@ export const PlaygroundView = () => {
           "Please check recipient emails and try again."
         );
       }
+    },
+
+    // Add new Navigator API operations
+    testNavigator: async () => {
+      if (!auth || !authenticated) {
+        setStatus("Error: Please authenticate first");
+        return;
+      }
+
+      try {
+        setStatus(`🔄 Testing Navigator API...\nUsing Base URL: ${auth.baseUrl}\n\nFetching agreements list...`);
+        
+        const listResponse = await fetch('/api/docusign/navigator?useMock=false', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${auth.accessToken}`,
+            'Account-Id': auth.accountId
+          }
+        });
+
+        const data = await listResponse.json();
+
+        // Handle token expiration
+        if (listResponse.status === 401) {
+          console.log('Token expired, re-authenticating...');
+          // Clear auth and try authenticating again
+          setAuth(null);
+          setAuthenticated(false);
+          localStorage.removeItem('navigatorAuth');
+          
+          // Trigger authentication
+          await operations.authenticateNavigator();
+          return;
+        }
+
+        // Update status with agreements list
+        setStatus(prev => prev + "\n\nAgreements found:\n" + 
+          (data.agreements?.length ? 
+            data.agreements.map((a: any) => 
+              `• ${a.file_name} (ID: ${a.id})`
+            ).join('\n')
+            : "No agreements found")
+        );
+
+        // If we have agreements, get details for the first one
+        if (data.agreements?.length > 0) {
+          const firstAgreement = data.agreements[0];
+          
+          setStatus(prev => prev + "\n\nFetching details for first agreement...");
+          
+          const detailsResponse = await fetch(
+            `/api/docusign/navigator?agreementId=${firstAgreement.id}&useMock=false`,
+            {
+              headers: {
+                'Authorization': `Bearer ${auth.accessToken}`,
+                'Account-Id': auth.accountId
+              }
+            }
+          );
+
+          if (!detailsResponse.ok) {
+            const errorText = await detailsResponse.text();
+            throw new Error(`Failed to fetch agreement details: ${errorText}`);
+          }
+
+          const details = await detailsResponse.json();
+          
+          setStatus(prev => prev + "\n\nAgreement Details:\n" + 
+            JSON.stringify(details, null, 2)
+          );
+        }
+
+      } catch (error: any) {
+        console.error('Navigator API error:', error);
+        setStatus(
+          "❌ Navigator API Test Failed\n\n" +
+          `Error: ${error.message}\n\n` +
+          "Check the browser console for more details."
+        );
+      }
+    },
+
+    testNavigatorMock: async () => {
+      try {
+        setStatus("🔄 Testing Navigator API (Mock Mode)...\n\nFetching mock agreements list...");
+        
+        // Get mock agreements list
+        const listResponse = await fetch('/api/docusign/navigator?useMock=true', {
+          method: 'POST'
+        });
+
+        if (!listResponse.ok) {
+          throw new Error('Failed to fetch mock agreements list');
+        }
+
+        const agreements = await listResponse.json();
+        
+        setStatus(prev => prev + "\n\nMock Agreements:\n" + 
+          agreements.agreements.map((a: any) => 
+            `• ${a.file_name} (ID: ${a.id})`
+          ).join('\n')
+        );
+
+        // Get mock details for first agreement
+        const detailsResponse = await fetch(
+          `/api/docusign/navigator?agreementId=mock-agreement-1&useMock=true`
+        );
+
+        if (!detailsResponse.ok) {
+          throw new Error('Failed to fetch mock agreement details');
+        }
+
+        const details = await detailsResponse.json();
+        
+        setStatus(prev => prev + "\n\nMock Agreement Details:\n" + 
+          JSON.stringify(details, null, 2)
+        );
+
+      } catch (error: any) {
+        setStatus(`Failed to test Navigator API mock: ${error.message}`);
+      }
+    },
+
+    authenticateNavigator: async () => {
+      try {
+        setStatus("🔄 Authenticating with Navigator API...");
+        
+        const response = await fetch('/api/docusign/navigator/authenticate', {
+          method: 'POST'
+        });
+
+        const data = await response.json();
+        console.log('Authentication response:', data);
+
+        if (data.error === 'Consent required' && data.consentUrl) {
+          const consentWindow = window.open(data.consentUrl, '_blank');
+          
+          if (!consentWindow) {
+            setStatus(
+              "❌ Popup Blocked\n\n" +
+              "Please allow popups for this site and try again.\n" +
+              "Consent URL: " + data.consentUrl
+            );
+            return;
+          }
+
+          setStatus(
+            "⚠️ Consent Required\n\n" +
+            "A new window has opened for you to grant consent.\n" +
+            "Please complete the consent process in the new window.\n" +
+            "After granting consent, click 'Authenticate (Navigator)' again.\n\n" +
+            "If you don't see the window, click here: " +
+            data.consentUrl
+          );
+
+          setAuth(null);
+          setAuthenticated(false);
+          localStorage.removeItem('navigatorAuth');
+          return;
+        }
+
+        if (!response.ok || !data.baseUrl) {
+          throw new Error(data.error || 'Failed to authenticate with Navigator');
+        }
+
+        const authData = {
+          accessToken: data.accessToken,
+          accountId: data.accountId,
+          baseUrl: data.baseUrl,
+          type: 'navigator' as const
+        };
+
+        localStorage.setItem('navigatorAuth', JSON.stringify(authData));
+        setAuth(authData);
+        setAuthenticated(true);
+        setStatus(`✅ Navigator Authentication Successful\nBase URL: ${data.baseUrl}`);
+
+      } catch (error: any) {
+        console.error('Navigator authentication error:', error);
+        setStatus(
+          "❌ Navigator Authentication Failed\n\n" +
+          `Error: ${error.message}\n\n` +
+          "Please check your configuration and try again."
+        );
+      }
     }
   };
 
+  // Add this to handle the callback
+  useEffect(() => {
+    // First check URL parameters
+    const params = new URLSearchParams(window.location.search);
+    const error = params.get('error');
+
+    if (error) {
+      setStatus(`❌ Navigator Authentication Failed: ${error}`);
+      window.history.replaceState({}, '', window.location.pathname);
+      return;
+    }
+
+    // Then check localStorage
+    const storedAuth = localStorage.getItem('navigatorAuth');
+    if (storedAuth) {
+      try {
+        const authData = JSON.parse(storedAuth);
+        setAuth(authData);
+        setAuthenticated(true);
+        setStatus(`✅ Navigator Authentication Successful\nBase URL: ${authData.baseUrl}`);
+      } catch (e) {
+        console.error('Failed to parse stored auth:', e);
+        localStorage.removeItem('navigatorAuth');
+      }
+    }
+  }, []);
+
+  // Update the logout or cleanup function to clear localStorage
+  const handleLogout = () => {
+    setAuth(null);
+    setAuthenticated(false);
+    localStorage.removeItem('navigatorAuth');
+  };
 
   return (
     <>
@@ -662,14 +886,31 @@ export const PlaygroundView = () => {
 
             <TabsContent value="docusign" className="space-y-6">
               <div className="grid gap-4">
-                <Button
-                  variant="default"
-                  className="w-full"
-                  onClick={operations.authenticate}
-                  disabled={authenticated}
-                >
-                  {authenticated ? "Authenticated ✓" : "Authenticate"}
-                </Button>
+                <div className="grid grid-cols-3 gap-4">
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={operations.authenticate}
+                  >
+                    Authenticate (eSignature)
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={operations.authenticateNavigator}
+                  >
+                    Authenticate (Navigator)
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={handleLogout}
+                    disabled={!authenticated}
+                  >
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Logout
+                  </Button>
+                </div>
 
                 <div className="p-4 border rounded-lg space-y-4">
                   <h3 className="font-medium">Document Upload</h3>
@@ -807,6 +1048,27 @@ export const PlaygroundView = () => {
                       }}
                     >
                       Add Variable
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="p-4 border rounded-lg space-y-4">
+                  <h3 className="font-medium">Navigator API Testing</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={operations.testNavigator}
+                      disabled={!authenticated}
+                    >
+                      Test Navigator API
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={operations.testNavigatorMock}
+                    >
+                      Test Navigator API (Mock)
                     </Button>
                   </div>
                 </div>
