@@ -1,17 +1,9 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
-import jwt from 'jsonwebtoken';
 
-const AUTH_BASE_URL = 'https://account-d.docusign.com';
-const PLAYGROUND_URL = 'http://localhost:3000/procedures/proc_123?tab=playground';  // Hardcode for now
-
-// Add getConfig function
-function getConfig() {
-  const configPath = path.join(process.cwd(), 'app/api/docusign/config/jwtConfig.json');
-  console.log('[Navigator Callback] Reading config from:', configPath);
-  return JSON.parse(fs.readFileSync(configPath, 'utf8'));
-}
+const REDIRECT_URI = 'http://localhost:3000/api/docusign/navigator/callback';
+const PLAYGROUND_URL = 'http://localhost:3000/procedures/proc_123?tab=playground';
 
 export async function GET(req: Request) {
   try {
@@ -22,11 +14,10 @@ export async function GET(req: Request) {
     const returnUrl = searchParams.get('state') || PLAYGROUND_URL;
     
     console.log('[Navigator Callback] Received params:', { 
-      code: code?.substring(0, 20) + '...', // Truncate for logging
+      code: code?.substring(0, 20) + '...', 
       error, 
       error_description, 
-      returnUrl,
-      allParams: Object.fromEntries(searchParams.entries())
+      returnUrl
     });
 
     if (error || error_description) {
@@ -38,10 +29,11 @@ export async function GET(req: Request) {
     }
 
     // Read configuration
-    const config = getConfig();
+    const configPath = path.join(process.cwd(), 'app/api/docusign/config/jwtConfig.json');
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
 
     // Exchange code for token
-    const tokenResponse = await fetch(`${AUTH_BASE_URL}/oauth/token`, {
+    const tokenResponse = await fetch(`${config.dsOauthServer}/oauth/token`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded'
@@ -51,7 +43,7 @@ export async function GET(req: Request) {
         'code': code,
         'client_id': config.dsJWTClientId,
         'client_secret': config.secret,
-        'redirect_uri': `${req.headers.get('origin')}/api/docusign/navigator/callback`  // Add this back
+        'redirect_uri': REDIRECT_URI
       })
     });
 
@@ -62,10 +54,20 @@ export async function GET(req: Request) {
     });
 
     if (!tokenResponse.ok) {
-      throw new Error(`Token exchange failed: ${responseText}`);
+      throw new Error(`Failed to exchange code: ${responseText}`);
     }
 
     const tokenData = JSON.parse(responseText);
+
+    // Get user info to get accountId
+    const userInfoResponse = await fetch(`${config.dsOauthServer}/oauth/userinfo`, {
+      headers: {
+        'Authorization': `Bearer ${tokenData.access_token}`
+      }
+    });
+
+    const userInfo = await userInfoResponse.json();
+    console.log('[Navigator Callback] User info:', userInfo);
 
     // Create an HTML response that sets localStorage and redirects
     const html = `
@@ -75,17 +77,18 @@ export async function GET(req: Request) {
           <title>Authenticating...</title>
           <script>
             try {
-              // Store both consent and auth data
               localStorage.setItem('navigatorConsent', 'granted');
               localStorage.setItem('navigatorAuth', JSON.stringify({
                 accessToken: '${tokenData.access_token}',
-                accountId: '${config.impersonatedUserGuid}',
-                baseUrl: 'https://api-d.docusign.com/v1',
-                type: 'navigator'
+                refreshToken: '${tokenData.refresh_token}',
+                expiresIn: ${tokenData.expires_in},
+                tokenType: '${tokenData.token_type}',
+                accountId: '${userInfo.accounts[0].account_id}',
+                baseUrl: 'https://api-d.docusign.net/navigator/v1'
               }));
               
-              // Redirect back to the app
-              window.location.href = '${returnUrl}';
+              // Redirect to playground
+              window.location.href = '${PLAYGROUND_URL}';
             } catch (e) {
               console.error('Failed to store auth data:', e);
               document.body.innerHTML = 'Error: ' + e.message;
@@ -104,9 +107,6 @@ export async function GET(req: Request) {
 
   } catch (error: any) {
     console.error('[Navigator Callback] Error:', error);
-    const returnUrl = searchParams?.get('state') || PLAYGROUND_URL;
-    const redirectUrl = new URL(returnUrl);
-    redirectUrl.searchParams.set('error', error.message);
-    return NextResponse.redirect(redirectUrl.toString());
+    return NextResponse.redirect('/error?message=' + encodeURIComponent(error.message));
   }
 } 

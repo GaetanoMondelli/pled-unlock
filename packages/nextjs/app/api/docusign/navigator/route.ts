@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import jwt from 'jsonwebtoken';
 
 // Remove hardcoded base URL since we'll get it from auth
 async function getNavigatorToken(origin: string | null) {
@@ -11,10 +12,12 @@ async function getNavigatorToken(origin: string | null) {
 
   // Handle consent required case
   if (data.error === 'Consent required' && data.consentUrl) {
-    throw new Error('consent_required');
+    const error = new Error('consent_required');
+    error.consentUrl = data.consentUrl;  // Pass the URL through
+    throw error;
   }
 
-  if (!authResponse.ok || !data.accessToken || !data.accountId) {
+  if (!authResponse.ok || !data.accessToken || !data.accountId || !data.baseUrl) {
     console.error('[Navigator] Auth failed:', data);
     throw new Error('Failed to authenticate with Navigator');
   }
@@ -22,9 +25,17 @@ async function getNavigatorToken(origin: string | null) {
   return {
     accessToken: data.accessToken,
     accountId: data.accountId,
-    baseUrl: data.baseUrl || 'https://api-d.docusign.com/v1'  // Use default if not provided
+    baseUrl: data.baseUrl
   };
 }
+
+// Try beta endpoints since Navigator is in beta
+const POSSIBLE_BASE_URLS = [
+  // Demo beta URLs - try simpler patterns first
+  "https://api-d.docusign.net/navigator/v1",
+  "https://api-d.docusign.net/navigator/v1/agreements",
+  "https://api-d.docusign.net/navigator/v1/accounts/{accountId}/agreements"
+];
 
 export async function GET(req: Request) {
   // Get agreementId and useMock from URL params
@@ -70,11 +81,11 @@ export async function GET(req: Request) {
   }
 
   try {
-    const { accessToken, accountId, baseUrl } = await getNavigatorToken(req.headers.get('origin'));
+    const { accessToken, accountId } = await getNavigatorToken(req.headers.get('origin'));
     console.log('[Navigator GET] Authenticated successfully');
 
     // Call Navigator API for agreement details
-    const navigatorUrl = `${baseUrl}/accounts/${accountId}/agreements/${agreementId}`;
+    const navigatorUrl = POSSIBLE_BASE_URLS[0].replace('{accountId}', accountId);
     console.log('[Navigator GET] Calling Navigator API:', navigatorUrl);
     
     const navigatorResponse = await fetch(navigatorUrl, {
@@ -105,94 +116,67 @@ export async function GET(req: Request) {
 
 // Add new endpoint to list all agreements
 export async function POST(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const useMock = searchParams.get('useMock') === 'true';
-
-  console.log('[Navigator POST] Starting request, useMock:', useMock);
-
-  if (useMock) {
-    console.log('[Navigator POST] Returning mock data');
-    return NextResponse.json({
-      agreements: [
-        {
-          id: "mock-agreement-1",
-          file_name: "Mock Agreement 1.pdf",
-          status: "active"
-        },
-        {
-          id: "mock-agreement-2", 
-          file_name: "Mock Agreement 2.pdf",
-          status: "expired"
-        }
-      ]
-    });
-  }
-
   try {
-    // Get auth from request headers
-    const authHeader = req.headers.get('Authorization');
-    const accountId = req.headers.get('Account-Id');
+    const { url, method, body, useMock = false } = await req.json();
+    
+    console.log('[Navigator POST] Starting request:', { useMock });
 
-    if (!authHeader || !accountId) {
-      return NextResponse.json(
-        { error: 'Missing authorization headers' },
-        { status: 401 }
-      );
+    if (useMock) {
+      console.log('[Navigator POST] Returning mock data');
+      return NextResponse.json({
+        agreements: [
+          {
+            id: "mock-agreement-1",
+            file_name: "Mock Agreement 1.pdf",
+            status: "active"
+          },
+          {
+            id: "mock-agreement-2", 
+            file_name: "Mock Agreement 2.pdf",
+            status: "expired"
+          }
+        ]
+      });
     }
 
-    // Use the token from the request header
-    const token = authHeader.replace('Bearer ', '');
-    const baseUrl = 'https://api-d.docusign.com/v1';  // Use constant base URL for Navigator API
+    // Get Navigator-specific token
+    console.log('[Navigator] Getting Navigator-specific token...');
+    const authResponse = await fetch('/api/docusign/navigator/authenticate', {
+      method: 'POST'
+    });
     
-    // Call Navigator API with the provided token
-    const navigatorUrl = `${baseUrl}/accounts/${accountId}/agreements`;
-    console.log('[Navigator POST] Calling Navigator API:', navigatorUrl);
+    const authData = await authResponse.json();
     
-    const navigatorResponse = await fetch(navigatorUrl, {
-      method: 'GET',
+    if (authData.error === 'Consent required') {
+      throw new Error('consent_required');
+    }
+
+    // Make the actual Navigator API call through our proxy
+    const proxyResponse = await fetch('/api/docusign/navigator/proxy', {
+      method: 'POST',
       headers: {
-        'Authorization': `Bearer ${token}`,
-        'Accept': 'application/json',
         'Content-Type': 'application/json'
-      }
+      },
+      body: JSON.stringify({
+        url,
+        method,
+        body,
+        token: authData.accessToken
+      })
     });
 
-    // Log full response for debugging
-    const responseText = await navigatorResponse.text();
-    console.log('[Navigator POST] Raw response:', {
-      status: navigatorResponse.status,
-      statusText: navigatorResponse.statusText,
-      headers: Object.fromEntries(navigatorResponse.headers.entries())
-    });
-
-    if (!navigatorResponse.ok) {
-      // If token is expired or invalid, return 401
-      if (navigatorResponse.status === 401) {
-        return NextResponse.json(
-          { error: 'Token expired or invalid' },
-          { status: 401 }
-        );
-      }
-      throw new Error(`Navigator API error (${navigatorResponse.status}): ${responseText}`);
+    if (!proxyResponse.ok) {
+      throw new Error(`Navigator API call failed: ${proxyResponse.statusText}`);
     }
 
-    let data;
-    try {
-      data = JSON.parse(responseText);
-    } catch (e) {
-      console.error('[Navigator POST] Failed to parse response as JSON:', responseText);
-      throw new Error('Invalid JSON response from Navigator API');
-    }
-
-    console.log('[Navigator POST] Success, returning data:', data);
-    
+    const data = await proxyResponse.json();
     return NextResponse.json(data);
 
   } catch (error: any) {
     console.error('[Navigator POST] Error:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch agreements' },
-      { status: 500 }
+      { error: error.message || 'Navigator request failed' },
+      { status: error.status || 401 }
     );
   }
 } 

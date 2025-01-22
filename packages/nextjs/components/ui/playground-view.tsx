@@ -210,6 +210,12 @@ export const PlaygroundView = () => {
   const [tabPositions, setTabPositions] = useState<TabPosition[]>([]);
   const [templateVariables, setTemplateVariables] = useState<Record<string, string>>({});
 
+  const [testResult, setTestResult] = useState<{
+    success: boolean;
+    message: string;
+    details: any;
+  } | null>(null);
+
   useEffect(() => {
     // Fetch initial configuration
     fetch('/api/docusign/config')
@@ -579,81 +585,105 @@ export const PlaygroundView = () => {
 
     // Add new Navigator API operations
     testNavigator: async () => {
-      if (!auth || !authenticated) {
-        setStatus("Error: Please authenticate first");
-        return;
-      }
-
       try {
-        setStatus(`🔄 Testing Navigator API...\nUsing Base URL: ${auth.baseUrl}\n\nFetching agreements list...`);
+        setStatus(`🔄 Testing Navigator API...`);
         
-        const listResponse = await fetch('/api/docusign/navigator?useMock=false', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${auth.accessToken}`,
-            'Account-Id': auth.accountId
-          }
-        });
+        // First try with stored auth
+        const storedAuth = localStorage.getItem('navigatorAuth');
+        let response;
+        
+        if (storedAuth) {
+          const authData = JSON.parse(storedAuth);
+          console.log('Using stored auth:', {
+            baseUrl: authData.baseUrl,
+            accountId: authData.accountId,
+            tokenStart: authData.accessToken.substring(0, 20) + '...'
+          });
 
-        const data = await listResponse.json();
+          response = await fetch('/api/docusign/navigator/proxy', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              url: `${authData.baseUrl}/accounts/${authData.accountId}/agreements`,
+              token: authData.accessToken
+            })
+          });
 
-        // Handle token expiration
-        if (listResponse.status === 401) {
-          console.log('Token expired, re-authenticating...');
-          // Clear auth and try authenticating again
-          setAuth(null);
-          setAuthenticated(false);
-          localStorage.removeItem('navigatorAuth');
-          
-          // Trigger authentication
-          await operations.authenticateNavigator();
-          return;
-        }
+          const data = await response.json();
 
-        // Update status with agreements list
-        setStatus(prev => prev + "\n\nAgreements found:\n" + 
-          (data.agreements?.length ? 
-            data.agreements.map((a: any) => 
-              `• ${a.file_name} (ID: ${a.id})`
-            ).join('\n')
-            : "No agreements found")
-        );
-
-        // If we have agreements, get details for the first one
-        if (data.agreements?.length > 0) {
-          const firstAgreement = data.agreements[0];
-          
-          setStatus(prev => prev + "\n\nFetching details for first agreement...");
-          
-          const detailsResponse = await fetch(
-            `/api/docusign/navigator?agreementId=${firstAgreement.id}&useMock=false`,
-            {
-              headers: {
-                'Authorization': `Bearer ${auth.accessToken}`,
-                'Account-Id': auth.accountId
-              }
+          // If we need new consent, clear stored auth and redirect
+          if (response.status === 401 && data.needsConsent) {
+            console.log('Need new consent, clearing stored auth...');
+            localStorage.removeItem('navigatorAuth');
+            localStorage.removeItem('navigatorConsent');
+            
+            // Redirect to get fresh auth
+            response = await fetch('/api/docusign/navigator?useMock=false', {
+              method: 'POST'
+            });
+            const freshData = await response.json();
+            
+            if (freshData.consentUrl) {
+              setStatus(
+                "⚠️ Authentication expired\n\n" +
+                "You will be redirected to re-authenticate.\n" +
+                "After granting consent, click 'Test Navigator API' again."
+              );
+              window.location.href = freshData.consentUrl;
+              return;
             }
-          );
-
-          if (!detailsResponse.ok) {
-            const errorText = await detailsResponse.text();
-            throw new Error(`Failed to fetch agreement details: ${errorText}`);
           }
 
-          const details = await detailsResponse.json();
+          // Handle other errors
+          if (!response.ok) {
+            throw new Error(data.error || 'Failed to call Navigator API');
+          }
+
+          // Success!
+          setTestResult({
+            success: true,
+            message: `✅ Navigator API Test Successful!\n\nAgreements found:`,
+            details: data.agreements.map((agreement: any) => ({
+              ...agreement,
+              action: (
+                <button
+                  key={agreement.id}
+                  onClick={() => testNavigatorAgreement(agreement.id)}
+                  className="bg-primary text-white px-4 py-2 rounded"
+                >
+                  View Details
+                </button>
+              )
+            }))
+          });
+
+        } else {
+          // No stored auth, get fresh auth
+          response = await fetch('/api/docusign/navigator?useMock=false', {
+            method: 'POST'
+          });
+          const data = await response.json();
           
-          setStatus(prev => prev + "\n\nAgreement Details:\n" + 
-            JSON.stringify(details, null, 2)
-          );
+          if (data.consentUrl) {
+            setStatus(
+              "⚠️ Authentication Required\n\n" +
+              "You will be redirected to authenticate.\n" +
+              "After granting consent, click 'Test Navigator API' again."
+            );
+            window.location.href = data.consentUrl;
+            return;
+          }
         }
 
       } catch (error: any) {
         console.error('Navigator API error:', error);
-        setStatus(
-          "❌ Navigator API Test Failed\n\n" +
-          `Error: ${error.message}\n\n` +
-          "Check the browser console for more details."
-        );
+        setTestResult({
+          success: false,
+          message: error.message,
+          details: null
+        });
       }
     },
 
@@ -672,11 +702,26 @@ export const PlaygroundView = () => {
 
         const agreements = await listResponse.json();
         
-        setStatus(prev => prev + "\n\nMock Agreements:\n" + 
-          agreements.agreements.map((a: any) => 
-            `• ${a.file_name} (ID: ${a.id})`
-          ).join('\n')
-        );
+        setTestResult({
+          success: true,
+          message: `✅ Navigator API Test Successful!\n\nMock Agreements:\n${
+            agreements.agreements.map((a: any) => 
+              `• ${a.file_name} (ID: ${a.id})`
+            ).join('\n')
+          }`,
+          details: agreements.agreements.map((a: any) => ({
+            ...a,
+            action: (
+              <button
+                key={a.id}
+                onClick={() => testNavigatorAgreement(a.id)}
+                className="bg-primary text-white px-4 py-2 rounded"
+              >
+                View Details
+              </button>
+            )
+          }))
+        });
 
         // Get mock details for first agreement
         const detailsResponse = await fetch(
@@ -689,12 +734,28 @@ export const PlaygroundView = () => {
 
         const details = await detailsResponse.json();
         
-        setStatus(prev => prev + "\n\nMock Agreement Details:\n" + 
-          JSON.stringify(details, null, 2)
-        );
+        setTestResult(prev => ({
+          ...prev,
+          details: {
+            ...details,
+            action: (
+              <button
+                key={details.id}
+                onClick={() => testNavigatorAgreement(details.id)}
+                className="bg-primary text-white px-4 py-2 rounded"
+              >
+                View Details
+              </button>
+            )
+          }
+        }));
 
       } catch (error: any) {
-        setStatus(`Failed to test Navigator API mock: ${error.message}`);
+        setTestResult({
+          success: false,
+          message: error.message,
+          details: null
+        });
       }
     },
 
@@ -795,6 +856,54 @@ export const PlaygroundView = () => {
     setAuth(null);
     setAuthenticated(false);
     localStorage.removeItem('navigatorAuth');
+  };
+
+  // Add new test function
+  const testNavigatorAgreement = async (agreementId: string) => {
+    try {
+      console.log('[Navigator] Getting agreement details:', agreementId);
+      
+      const response = await fetch('/api/docusign/navigator/proxy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: `${auth?.baseUrl}/accounts/${auth?.accountId}/agreements/${agreementId}`,
+          method: 'GET',
+          token: auth?.accessToken
+        })
+      });
+
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+
+      console.log('Agreement details:', data);
+      
+      // Format the details for display
+      setTestResult({
+        success: true,
+        message: `Agreement Details for: ${data.name || data.file_name}`,
+        details: {
+          id: data.id,
+          name: data.name,
+          fileName: data.file_name,
+          type: data.type,
+          category: data.category,
+          status: data.status,
+          created: data.created_date ? new Date(data.created_date).toLocaleString() : 'N/A',
+          modified: data.last_modified_date ? new Date(data.last_modified_date).toLocaleString() : 'N/A',
+          // Add any other fields you want to display
+          rawData: data // Include raw data at the bottom
+        }
+      });
+
+    } catch (error: any) {
+      console.error('Navigator API error:', error);
+      setTestResult({
+        success: false,
+        message: `Failed to get agreement details: ${error.message}`,
+        details: null
+      });
+    }
   };
 
   return (
@@ -1121,6 +1230,48 @@ export const PlaygroundView = () => {
               {status && (
                 <div className="p-4 bg-muted rounded-lg">
                   <pre className="text-sm whitespace-pre-wrap">{status}</pre>
+                </div>
+              )}
+
+              {testResult && (
+                <div className="mt-4">
+                  <h3 className={testResult.success ? "text-green-500" : "text-red-500"}>
+                    {testResult.message}
+                  </h3>
+                  {testResult.details && (
+                    <div className="mt-4">
+                      {Array.isArray(testResult.details) ? (
+                        // Show list of agreements with buttons
+                        <table className="min-w-full">
+                          <thead>
+                            <tr>
+                              <th>File Name</th>
+                              <th>Type</th>
+                              <th>Category</th>
+                              <th>Status</th>
+                              <th>Action</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {testResult.details.map((agreement: any) => (
+                              <tr key={agreement.id}>
+                                <td>{agreement.fileName}</td>
+                                <td>{agreement.type}</td>
+                                <td>{agreement.category}</td>
+                                <td>{agreement.status}</td>
+                                <td>{agreement.action}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      ) : (
+                        // Show agreement details
+                        <pre className="bg-gray-100 p-4 rounded overflow-auto">
+                          {JSON.stringify(testResult.details, null, 2)}
+                        </pre>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </TabsContent>
