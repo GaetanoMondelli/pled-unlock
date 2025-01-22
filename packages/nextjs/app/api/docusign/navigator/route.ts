@@ -12,20 +12,29 @@ export async function GET(req: Request) {
     );
   }
 
-  // Mock response
+  // Mock response matching the format from the example
   const mockResponse = {
     id: agreementId,
-    title: "Software Development Agreement",
-    type: "service_agreement",
-    status: "active",
-    parties: [
-      { role: "contractor", name: "John Developer" },
-      { role: "client", name: "Tech Corp Inc" }
-    ],
-    provisions: {
-      payment: { amount: "5000", currency: "USD" },
-      duration: "3 months",
-      scope: "Full-stack development"
+    agreement_type: {
+      primary: "Other",
+      refresh: true
+    },
+    party: "SAN LUIS COUNTY FLOOD CONTROL AND WATER CONSERVATION DISTRICT, CITY OF ARROW",
+    dates: {
+      effective: "2020/11/01",
+      expiration: "2029/10/31"
+    },
+    renewal: {
+      type: "NO_OR_CONSENT_REQUIRED",
+      notice_period: null,
+      notice_date: null,
+      term: "1 year",
+      owner: "SAN LUIS COUNTY FLOOD CONTROL AND WATER CONSERVATION DISTRICT"
+    },
+    additional_information: null,
+    metadata: {
+      last_updated: new Date().toISOString(),
+      source: "DocuSign Navigator API"
     }
   };
 
