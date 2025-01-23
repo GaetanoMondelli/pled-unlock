@@ -3,7 +3,24 @@
 import { useState, useEffect } from "react";
 import { Card } from "./card";
 import { Button } from "./button";
-import { ArrowRight, ArrowLeft, ChevronDown, ChevronUp, Plus, Trash2 } from "lucide-react";
+import { ArrowRight, ArrowLeft, ChevronDown, ChevronRight, Plus, Trash2, MoveHorizontal } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useSearchParams } from 'next/navigation';
 import { Event } from "../../types/events";
 import { CreateEventModal } from "../events/CreateEventModal";
 import { matchEventToRule } from "../../utils/eventMatching";
@@ -29,6 +46,9 @@ export default function EventList({ procedureId }: EventListProps) {
     messages: any[];
     stateTransitions: any[];
   }>();
+  const searchParams = useSearchParams();
+  const highlightedEvent = searchParams.get('highlight');
+  const [showTransferModal, setShowTransferModal] = useState(false);
 
   // Load data through DB API
   useEffect(() => {
@@ -330,6 +350,28 @@ export default function EventList({ procedureId }: EventListProps) {
     }
   };
 
+  const toggleEvent = (eventId: string) => {
+    setExpandedEvents(prev => 
+      prev.includes(eventId) 
+        ? prev.filter(id => id !== eventId)
+        : [...prev, eventId]
+    );
+  };
+
+  // Auto-expand and scroll to highlighted event
+  useEffect(() => {
+    if (highlightedEvent && !expandedEvents.includes(highlightedEvent)) {
+      setExpandedEvents(prev => [...prev, highlightedEvent]);
+      // Scroll into view
+      setTimeout(() => {
+        const element = document.getElementById(highlightedEvent);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
+    }
+  }, [highlightedEvent]);
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center p-4">
@@ -347,203 +389,284 @@ export default function EventList({ procedureId }: EventListProps) {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex gap-4 items-start">
-        {/* Available Events */}
-        <Card className="flex-1 p-4">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="font-semibold">Available Events</h3>
-            <div className="flex gap-2 items-center">
-              <span className="text-sm text-gray-500">
-                {selectedAvailable.length}/{Object.keys(availableEvents || {})?.length || 0} selected
-              </span>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setShowCreateModal(true)}
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-          <div className="space-y-2 max-h-[400px] overflow-auto">
-            {Object.entries(availableEvents || {})
-              .filter(([_, event]) => !event.received)
-              .map(([key, event]: [string, any]) => (
-                <div key={key} className="border rounded">
-                  <div 
-                    className={`p-2 ${
-                      selectedAvailable.includes(key) ? 'bg-blue-50 border-blue-200' : 'hover:bg-gray-50'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1 cursor-pointer" onClick={() => {
-                        setSelectedAvailable(prev =>
-                          prev.includes(key)
-                            ? prev.filter(id => id !== key)
-                            : [...prev, key]
-                        );
-                      }}>
-                        <span className="font-medium text-sm">{event.type}</span>
-                      </div>
-                      <div className="flex gap-2 items-center">
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteEvent(key);
-                          }}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleEventExpand(key);
-                          }}
-                        >
-                          {expandedEvents.includes(key) ? (
-                            <ChevronUp className="h-4 w-4" />
-                          ) : (
-                            <ChevronDown className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </div>
-                    </div>
-                    {getMatchingRules(event).length > 0 && (
-                      <div className="flex gap-1 mt-1">
-                        <p className="text-xs font-medium">Matches:</p>
-                        <div className="flex flex-wrap gap-1">
-                          {getMatchingRules(event).map((rule: any) => (
-                            <span 
-                              key={rule.id} 
-                              className="text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded"
-                            >
-                              {rule.id}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  {expandedEvents.includes(key) && (
-                    <div className="p-2 border-t bg-gray-50">
-                      <pre className="text-xs overflow-auto">
-                        {JSON.stringify(event.template.data, null, 2)}
-                      </pre>
-                    </div>
-                  )}
-                </div>
-              ))}
-          </div>
-        </Card>
-
-        {/* Transfer Controls */}
-        <div className="flex flex-col gap-2 py-4">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => handleTransfer('receive')}
-            disabled={isProcessing || selectedAvailable.length === 0}
-          >
-            <ArrowRight className="h-4 w-4" />
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => handleTransfer('revert')}
-            disabled={isProcessing || selectedProcessed.length === 0}
-          >
-            <ArrowLeft className="h-4 w-4" />
+    <div className="space-y-8">
+      {/* Events Table Section */}
+      <div>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-lg font-semibold">Events</h2>
+          <Button onClick={() => setShowTransferModal(true)}>
+            <MoveHorizontal className="h-4 w-4 mr-2" />
+            Manage Events
           </Button>
         </div>
-
-        {/* Processed Events */}
-        <Card className="flex-1 p-4">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="font-semibold">Processed Events</h3>
-            <span className="text-sm text-gray-500">
-              {selectedProcessed.length}/{processedEvents?.length || 0} selected
-            </span>
-          </div>
-          <div className="space-y-2 max-h-[400px] overflow-auto">
-            {processedEvents?.map((event: any) => (
-              <div key={event.id} className="border rounded">
-                <div 
-                  className={`p-2 cursor-pointer ${
-                    selectedProcessed.includes(event.id) ? 'bg-blue-50 border-blue-200' : 'hover:bg-gray-50'
-                  }`}
-                  onClick={() => {
-                    setSelectedProcessed(prev =>
-                      prev.includes(event.id)
-                        ? prev.filter(id => id !== event.id)
-                        : [...prev, event.id]
-                    );
-                  }}
+        
+        <Card>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Type</TableHead>
+                <TableHead>Timestamp</TableHead>
+                <TableHead>Data</TableHead>
+                <TableHead>Matching Rules</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {processedEvents?.map((event: any) => (
+                <TableRow 
+                  key={event.id}
+                  className={`${highlightedEvent === event.id ? 'bg-yellow-50' : ''}`}
+                  id={event.id}
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium text-sm">{event.type}</span>
-                    <div className="flex gap-2 items-center">
-                      <span className="text-xs text-gray-500">
-                        {new Date(event.timestamp).toLocaleString()}
-                      </span>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleEventExpand(event.id);
-                        }}
-                      >
-                        {expandedEvents.includes(event.id) ? (
-                          <ChevronUp className="h-4 w-4" />
-                        ) : (
-                          <ChevronDown className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                  {event.triggeredTransitions?.length > 0 && (
-                    <div className="flex gap-1 mt-1">
-                      {event.triggeredTransitions.map((transition: any, i: any) => (
-                        <div key={i} className="flex gap-1 mt-1">
-                          {renderTransition(transition)}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                {expandedEvents.includes(event.id) && (
-                  <div className="p-2 border-t bg-gray-50">
-                    {getMatchingRules(event).length > 0 && (
-                      <div className="mb-2">
-                        <p className="text-xs font-medium mb-1">Matching Rules:</p>
-                        <div className="flex flex-wrap gap-1">
-                          {getMatchingRules(event).map((rule: any) => (
-                            <span 
-                              key={rule.id} 
-                              className="text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded"
-                            >
-                              {rule.id}
-                            </span>
-                          ))}
-                        </div>
+                  <TableCell>
+                    <div className="font-medium">{event.type}</div>
+                  </TableCell>
+                  <TableCell>
+                    {new Date(event.timestamp).toLocaleString()}
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => toggleEvent(event.id)}
+                    >
+                      {expandedEvents.includes(event.id) ? (
+                        <ChevronDown className="h-4 w-4" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4" />
+                      )}
+                    </Button>
+                    {expandedEvents.includes(event.id) && (
+                      <div className="mt-2">
+                        <pre className="text-xs whitespace-pre-wrap bg-gray-50 p-2 rounded">
+                          {JSON.stringify(event.data, null, 2)}
+                        </pre>
                       </div>
                     )}
-                    <pre className="text-xs overflow-auto">
-                      {JSON.stringify(event.data, null, 2)}
-                    </pre>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1">
+                      {getMatchingRules(event).map((rule: any) => (
+                        <span 
+                          key={rule.id} 
+                          className="text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded"
+                        >
+                          {rule.id}
+                        </span>
+                      ))}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </Card>
       </div>
 
+      {/* Event Transfer Modal */}
+      <Dialog open={showTransferModal} onOpenChange={setShowTransferModal}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Manage Events</DialogTitle>
+          </DialogHeader>
+          <div className="flex gap-4">
+            {/* Available Events */}
+            <Card className="flex-1 p-4">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="font-semibold">Available Events</h3>
+                <div className="flex gap-2 items-center">
+                  <span className="text-sm text-gray-500">
+                    {selectedAvailable.length}/{Object.keys(availableEvents || {})?.length || 0} selected
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setShowCreateModal(true)}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-2 max-h-[400px] overflow-auto">
+                {Object.entries(availableEvents || {})
+                  .filter(([_, event]) => !event.received)
+                  .map(([key, event]: [string, any]) => (
+                    <div key={key} className="border rounded">
+                      <div 
+                        className={`p-2 ${
+                          selectedAvailable.includes(key) ? 'bg-blue-50 border-blue-200' : 'hover:bg-gray-50'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1 cursor-pointer" onClick={() => {
+                            setSelectedAvailable(prev =>
+                              prev.includes(key)
+                                ? prev.filter(id => id !== key)
+                                : [...prev, key]
+                            );
+                          }}>
+                            <span className="font-medium text-sm">{event.type}</span>
+                          </div>
+                          <div className="flex gap-2 items-center">
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteEvent(key);
+                              }}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleEventExpand(key);
+                              }}
+                            >
+                              {expandedEvents.includes(key) ? (
+                                <ChevronDown className="h-4 w-4" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                        {getMatchingRules(event).length > 0 && (
+                          <div className="flex gap-1 mt-1">
+                            <p className="text-xs font-medium">Matches:</p>
+                            <div className="flex flex-wrap gap-1">
+                              {getMatchingRules(event).map((rule: any) => (
+                                <span 
+                                  key={rule.id} 
+                                  className="text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded"
+                                >
+                                  {rule.id}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      {expandedEvents.includes(key) && (
+                        <div className="p-2 border-t bg-gray-50">
+                          <pre className="text-xs overflow-auto">
+                            {JSON.stringify(event.template.data, null, 2)}
+                          </pre>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+              </div>
+            </Card>
+
+            {/* Transfer Controls */}
+            <div className="flex flex-col gap-2 py-4">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleTransfer('receive')}
+                disabled={isProcessing || selectedAvailable.length === 0}
+              >
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleTransfer('revert')}
+                disabled={isProcessing || selectedProcessed.length === 0}
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Processed Events */}
+            <Card className="flex-1 p-4">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="font-semibold">Processed Events</h3>
+                <span className="text-sm text-gray-500">
+                  {selectedProcessed.length}/{processedEvents?.length || 0} selected
+                </span>
+              </div>
+              <div className="space-y-2 max-h-[400px] overflow-auto">
+                {processedEvents?.map((event: any) => (
+                  <div key={event.id} className="border rounded">
+                    <div 
+                      className={`p-2 cursor-pointer ${
+                        selectedProcessed.includes(event.id) ? 'bg-blue-50 border-blue-200' : 'hover:bg-gray-50'
+                      }`}
+                      onClick={() => {
+                        setSelectedProcessed(prev =>
+                          prev.includes(event.id)
+                            ? prev.filter(id => id !== event.id)
+                            : [...prev, event.id]
+                        );
+                      }}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-sm">{event.type}</span>
+                        <div className="flex gap-2 items-center">
+                          <span className="text-xs text-gray-500">
+                            {new Date(event.timestamp).toLocaleString()}
+                          </span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleEventExpand(event.id);
+                            }}
+                          >
+                            {expandedEvents.includes(event.id) ? (
+                              <ChevronDown className="h-4 w-4" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                      {event.triggeredTransitions?.length > 0 && (
+                        <div className="flex gap-1 mt-1">
+                          {event.triggeredTransitions.map((transition: any, i: any) => (
+                            <div key={i} className="flex gap-1 mt-1">
+                              {renderTransition(transition)}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    {expandedEvents.includes(event.id) && (
+                      <div className="p-2 border-t bg-gray-50">
+                        {getMatchingRules(event).length > 0 && (
+                          <div className="mb-2">
+                            <p className="text-xs font-medium mb-1">Matching Rules:</p>
+                            <div className="flex flex-wrap gap-1">
+                              {getMatchingRules(event).map((rule: any) => (
+                                <span 
+                                  key={rule.id} 
+                                  className="text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded"
+                                >
+                                  {rule.id}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        <pre className="text-xs overflow-auto">
+                          {JSON.stringify(event.data, null, 2)}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Instance Variables Card */}
       <Card className="p-4">
         <h3 className="font-semibold mb-4">Instance Variables</h3>
         <div className="space-y-4">
@@ -563,6 +686,7 @@ export default function EventList({ procedureId }: EventListProps) {
         </div>
       </Card>
 
+      {/* Create Event Modal */}
       <CreateEventModal
         open={showCreateModal}
         onClose={() => setShowCreateModal(false)}

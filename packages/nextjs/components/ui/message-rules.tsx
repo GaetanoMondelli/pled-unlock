@@ -16,6 +16,8 @@ import { formatTemplateContent } from "@/components/ui/template-content";
 import { fetchFromDb } from "../../utils/api";
 import { generateMessages } from "../../utils/messageGeneration";
 import { matchEventToRule } from "../../utils/eventMatching";
+import { useSearchParams, useRouter } from 'next/navigation';
+import { ScrollArea } from "./scroll-area";
 
 interface MessageRulesProps {
   procedureId: string;
@@ -27,6 +29,9 @@ export default function MessageRules({ procedureId }: MessageRulesProps) {
   const [template, setTemplate] = useState<any>(null);
   const [generatedMessages, setGeneratedMessages] = useState<any[]>([]);
   const [outputs, setOutputs] = useState<Record<string, any>>({});
+  const [expandedEvents, setExpandedEvents] = useState<string[]>([]);
+  const searchParams = useSearchParams();
+  const router = useRouter();
 
   const toggleRule = (ruleId: string) => {
     setExpandedRules(prev => 
@@ -34,6 +39,19 @@ export default function MessageRules({ procedureId }: MessageRulesProps) {
         ? prev.filter(id => id !== ruleId)
         : [...prev, ruleId]
     );
+  };
+
+  const toggleEvent = (eventId: string) => {
+    setExpandedEvents(prev => 
+      prev.includes(eventId) 
+        ? prev.filter(id => id !== eventId)
+        : [...prev, eventId]
+    );
+  };
+
+  const highlightEvent = (eventId: string) => {
+    // Navigate to Events tab with highlight parameter while staying in the procedure context
+    router.push(`/procedures/${procedureId}?tab=events&highlight=${eventId}`);
   };
 
   useEffect(() => {
@@ -325,7 +343,15 @@ export default function MessageRules({ procedureId }: MessageRulesProps) {
                     <div className="text-xs text-muted-foreground">{message.content}</div>
                   </div>
                 </TableCell>
-                <TableCell className="text-xs">{message.fromEvent}</TableCell>
+                <TableCell className="text-xs">
+                  <Button 
+                    variant="link" 
+                    className="p-0 h-auto font-normal"
+                    onClick={() => highlightEvent(message.fromEvent)}
+                  >
+                    {message.fromEvent}
+                  </Button>
+                </TableCell>
                 <TableCell>
                   <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
                     {message.rule}
