@@ -2,14 +2,18 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Button } from "./button"
 import { Eye } from "lucide-react"
 
+interface StateTransition {
+  id: string;
+  timestamp: string;
+  message: string;
+  fromState: string;
+  toState: string;
+  type?: string;
+  title?: string;
+}
+
 interface StateHistoryProps {
-  transitions: Array<{
-    id: string;
-    timestamp: string;
-    message: string;
-    fromState: string;
-    toState: string;
-  }>;
+  transitions: StateTransition[];
   onFocusState: (state: string) => void;
   focusedState: string | null;
 }
@@ -21,7 +25,8 @@ export const StateHistory = ({ transitions, onFocusState, focusedState }: StateH
         <TableHeader>
           <TableRow>
             <TableHead>Time</TableHead>
-            <TableHead>Message</TableHead>
+            <TableHead>Type</TableHead>
+            <TableHead>Title</TableHead>
             <TableHead>Transition</TableHead>
             <TableHead className="w-[100px]">Actions</TableHead>
           </TableRow>
@@ -34,7 +39,8 @@ export const StateHistory = ({ transitions, onFocusState, focusedState }: StateH
                 <TableCell className="font-mono">
                   {new Date(transition.timestamp).toLocaleTimeString()}
                 </TableCell>
-                <TableCell>{transition.message}</TableCell>
+                <TableCell>{transition.type || transition.message}</TableCell>
+                <TableCell>{transition.title || '-'}</TableCell>
                 <TableCell>
                   <span className="text-muted-foreground">{transition.fromState}</span>
                   <span className="mx-2">→</span>

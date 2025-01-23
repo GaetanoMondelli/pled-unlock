@@ -9,60 +9,82 @@ interface Message {
   fromEvent?: string;
 }
 
-export const calculateCurrentState = (fsl: string, messages: Message[]) => {
-  try {
-    const machine = sm`${fsl.trim()}`
-    let currentState = machine.state();
-    
-    const sortedMessages = [...messages].sort((a, b) => 
-      new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-    );
+interface StateMachine {
+  states: Array<{
+    id: string;
+    isInitial: boolean;
+    isWarning: boolean;
+  }>;
+  currentState: string;
+  transitions: Map<string, Map<string, string>>;
+  go: (state: string) => void;
+  action: (event: string) => boolean;
+  state: () => string;
+}
 
-    for (const message of sortedMessages) {
-      try {
-        machine.go(currentState);
-        const actionResult = machine.action(message.type);
-        if (actionResult) {
-          currentState = machine.state();
-        }
-      } catch (error) {
-        console.error(`Error applying message ${message.type}:`, error);
-      }
-    }
-    
-    return currentState;
-  } catch (error) {
-    console.error("Error initializing state machine:", error);
-    return "error";
-  }
-};
-
-export function createStateMachine(definition: string) {
-  const warningStates = new Set<string>();
+export function createStateMachine(definition: string): StateMachine {
+  const transitions = new Map<string, Map<string, string>>();
   const states = new Set<string>();
-  
+
+  // Parse the definition
   definition.split(';').forEach(line => {
     line = line.trim();
     if (!line) return;
 
     const match = line.match(/(\w+)\s+'([^']+)'\s*->\s*(\w+)/);
     if (match) {
-      const [, source, , target] = match;
+      const [, source, event, target] = match;
+      
+      // Add states to set
       states.add(source);
       states.add(target);
-      
-      // Identify warning states
-      if (source.startsWith('warning_')) warningStates.add(source);
-      if (target.startsWith('warning_')) warningStates.add(target);
+
+      // Add transition
+      if (!transitions.has(source)) {
+        transitions.set(source, new Map());
+      }
+      transitions.get(source)!.set(event, target);
     }
   });
 
+  let currentState = Array.from(states).find(state => state === 'idle') || Array.from(states)[0];
+
   return {
-    states: Array.from(states).map(state => ({
-      id: state,
-      isInitial: state === 'idle',
-      isWarning: warningStates.has(state)
+    states: Array.from(states).map(id => ({
+      id,
+      isInitial: id === 'idle',
+      isWarning: id === 'failure'
     })),
-    // ... rest of the implementation
+    currentState,
+    transitions,
+    go(state: string) {
+      if (states.has(state)) {
+        this.currentState = state;
+      }
+    },
+    action(event: string): boolean {
+      const stateTransitions = this.transitions.get(this.currentState);
+      if (!stateTransitions) return false;
+
+      const nextState = stateTransitions.get(event);
+      if (!nextState) return false;
+
+      this.currentState = nextState;
+      return true;
+    },
+    state() {
+      return this.currentState;
+    }
   };
+}
+
+export function calculateCurrentState(definition: string, messages: Array<any>): string {
+  const machine = createStateMachine(definition);
+  
+  messages.forEach(msg => {
+    machine.go(machine.state());
+    machine.action(msg.type);
+  });
+
+  return machine.state();
 } 

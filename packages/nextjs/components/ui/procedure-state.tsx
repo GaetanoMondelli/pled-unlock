@@ -87,7 +87,6 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
   useEffect(() => {
     const loadAndProcessEvents = async () => {
       try {
-        // Get the data from the API
         const data = await fetchFromDb()
         const instance = data.procedureInstances.find((p: any) => p.instanceId === procedureId)
         const template = data.procedureTemplates?.find(
@@ -99,22 +98,19 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
           return
         }
 
-        // Set the events
         const events = instance.history?.events || []
         setEvents(events)
-
-        console.log('Processing events:', {
-          events,
-          messageRules: template.messageRules,
-          variables: instance.variables
-        })
 
         // Process each event to generate messages and transitions
         let currentState = 'idle'
         const allMessages: Message[] = []
         const allTransitions: StateTransition[] = []
 
+        const machine = createStateMachine(definition)
+        machine.go(currentState)
+
         for (const event of events) {
+          const previousState = currentState
           const result = handleEventAndGenerateMessages(
             event,
             template.messageRules || [],
@@ -123,9 +119,37 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
             definition
           )
 
-          allMessages.push(...result.messages)
-          allTransitions.push(...result.transitions)
-          currentState = result.finalState
+          // Get the first message type to use for the state machine transition
+          const messageType = result.messages[0]?.type
+          if (messageType) {
+            // Apply the transition using the message type instead of event type
+            const actionResult = machine.action(messageType)
+            if (actionResult) {
+              currentState = machine.state()
+            }
+          }
+
+          const processedMessages = result.messages.map(msg => ({
+            ...msg,
+            id: msg.id || `msg_${Date.now()}_${Math.random()}`,
+            timestamp: msg.timestamp || new Date().toISOString(),
+            title: msg.title || event.title || 'Event',
+            type: msg.type,
+            content: msg.content || `Transition from ${previousState} to ${currentState}`
+          }))
+
+          allMessages.push(...processedMessages)
+          
+          // Add transition to history with message type
+          allTransitions.push({
+            id: `transition_${Date.now()}_${Math.random()}`,
+            timestamp: event.timestamp || new Date().toISOString(),
+            message: messageType || 'unknown',
+            type: messageType,
+            title: event.title || '',
+            fromState: previousState,
+            toState: currentState
+          })
         }
 
         console.log('Generated results:', {
@@ -137,7 +161,7 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
         setGeneratedMessages(allMessages)
         setStateHistory(allTransitions)
         setCurrentState(currentState)
-        setMessages(allMessages) // For backward compatibility
+        setMessages(allMessages)
 
       } catch (error) {
         console.error('Error loading and processing events:', error)
@@ -235,32 +259,42 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
 
   const handleSendMessage = (messageType: string) => {
     try {
-      stateMachine.go(currentState)
       const previousState = currentState
-      const actionResult = stateMachine.action(messageType)
+      const machine = createStateMachine(definition)
+      machine.go(previousState)
+      
+      const actionResult = machine.action(messageType)
       if (!actionResult) {
         console.warn(`Action "${messageType}" is invalid for current state ${currentState}`)
         return
       }
 
-      const newState = stateMachine.state()
+      const newState = machine.state()
+      const timestamp = new Date().toISOString()
+      
       const newMessage: Message = {
         id: `msg_${Date.now()}`,
         type: messageType,
-        timestamp: new Date().toISOString(),
-        title: `${messageType}`,
+        timestamp,
+        title: `State Change`,
         content: `Transition: ${previousState} -> ${newState}`
       }
 
-      setMessages(prev => [...prev, newMessage])
-      setStateHistory(prev => [...prev, {
+      const newTransition: StateTransition = {
         id: newMessage.id,
-        timestamp: newMessage.timestamp,
+        timestamp,
         message: messageType,
+        type: messageType,
+        title: 'State Change',
         fromState: previousState,
         toState: newState
-      }])
+      }
+
+      setMessages(prev => [...prev, newMessage])
+      setStateHistory(prev => [...prev, newTransition])
       setCurrentState(newState)
+      
+      console.log('New transition added:', newTransition)
     } catch (error) {
       console.error("Error during state transition:", error)
     }
@@ -318,6 +352,44 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
             onNodeClick={handleNodeClick}
             documents={template?.documents}
           />
+        </div>
+
+        {/* Add Available Actions */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-medium">Available Actions</h3>
+          <div className="flex gap-2 flex-wrap">
+            {links
+              .filter(link => link.source === currentState)
+              .map(link => (
+                <Button
+                  key={link.label}
+                  onClick={() => handleSendMessage(link.label)}
+                  variant="outline"
+                >
+                  {link.label}
+                </Button>
+              ))}
+          </div>
+        </div>
+
+        {/* Add Messages Display */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-medium">Messages</h3>
+          <div className="space-y-2">
+            {messages.map((message) => (
+              <Card key={message.id} className="p-4">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h4 className="font-medium">{message.title}</h4>
+                    <p className="text-sm text-gray-600">{message.content}</p>
+                  </div>
+                  <span className="text-xs text-gray-500">
+                    {new Date(message.timestamp).toLocaleString()}
+                  </span>
+                </div>
+              </Card>
+            ))}
+          </div>
         </div>
 
         <div className="space-y-4">
