@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import jwt from 'jsonwebtoken';
@@ -15,11 +15,17 @@ const NAVIGATOR_SCOPES = [
   'signature',
   'impersonation',
   'adm_store_unified_repo_read',  // Required to read agreement data
-  'models_read'                   // For forward compatibility
+  'models_read',                   // For forward compatibility
+  'click.manage',
+  'click.send'
 ];
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
+    // Get requested scopes from the request body
+    const body = await req.json().catch(() => ({}));
+    const requestedScopes = body.scopes || NAVIGATOR_SCOPES;
+
     // Read configuration
     const configPath = path.join(process.cwd(), 'app/api/docusign/config/jwtConfig.json');
     const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
@@ -34,13 +40,10 @@ export async function POST(req: Request) {
     const jwtPayload = {
       iss: config.dsJWTClientId,
       sub: config.impersonatedUserGuid,
+      aud: config.dsOauthServer.replace('https://', ''),
       iat: now,
       exp: now + 3600,
-      aud: config.dsOauthServer.replace('https://', ''),
-      scope: NAVIGATOR_SCOPES.join(' '),
-      // Add Navigator-specific claims
-      version: '2.1',
-      api_version: '2.1'
+      scope: requestedScopes.join(' ')  // Use the requested scopes
     };
 
     const assertion = jwt.sign(jwtPayload, privateKey, { algorithm: 'RS256' });
@@ -58,7 +61,7 @@ export async function POST(req: Request) {
     const tokenData = await tokenResponse.json();
 
     console.log('[Navigator Auth] Token response:', {
-      type: tokenData.token_type,  // Should be "Bearer"
+      type: tokenData.token_type,
       scopes: tokenData.scope,
       expires: tokenData.expires_in,
       tokenStart: tokenData.access_token?.substring(0, 20) + '...'
@@ -69,7 +72,7 @@ export async function POST(req: Request) {
       
       const consentUrl = `${config.dsOauthServer}/oauth/auth?` + new URLSearchParams({
         'response_type': 'code',
-        'scope': NAVIGATOR_SCOPES.join(' '),
+        'scope': requestedScopes.join(' '),
         'client_id': config.dsJWTClientId,
         'redirect_uri': REDIRECT_URI,
         'state': PLAYGROUND_URL,
@@ -79,9 +82,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Consent required', consentUrl });
     }
 
+    // Get the actual granted scopes from the token response
+    const grantedScopes = tokenData.scope ? tokenData.scope.split(' ') : requestedScopes;
+
     // Verify we have the required Navigator scope
-    if (!tokenData.scope?.includes('adm_store_unified_repo_read')) {
-      console.error('[Navigator Auth] Token missing Navigator scope:', tokenData.scope);
+    if (!grantedScopes.includes('adm_store_unified_repo_read')) {
+      console.error('[Navigator Auth] Token missing Navigator scope:', grantedScopes);
       throw new Error('Token missing required Navigator scope');
     }
 
@@ -111,13 +117,15 @@ export async function POST(req: Request) {
     console.log('[Navigator Auth] Final response:', {
       tokenStart: tokenData.access_token?.substring(0, 20) + '...',
       accountId,
-      baseUrl: NAVIGATOR_BASE_URL
+      baseUrl: NAVIGATOR_BASE_URL,
+      scopes: grantedScopes
     });
 
     return NextResponse.json({
       accessToken: tokenData.access_token,
       accountId,
-      baseUrl: NAVIGATOR_BASE_URL
+      baseUrl: NAVIGATOR_BASE_URL,
+      scopes: grantedScopes  // Return the actual granted scopes from the token
     });
 
   } catch (error: any) {

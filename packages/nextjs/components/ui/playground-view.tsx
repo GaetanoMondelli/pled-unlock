@@ -181,6 +181,15 @@ const ENVELOPE_STATUSES: EnvelopeStatus = {
   }
 };
 
+// Update AuthType to include scopes
+type AuthType = {
+  accessToken: string;
+  accountId: string;
+  baseUrl: string;
+  type: 'navigator' | 'esignature';
+  scopes?: string[];
+};
+
 export const PlaygroundView = () => {
   const [config, setConfig] = useState<DocuSignConfig>({
     integrationKey: "",
@@ -199,12 +208,7 @@ export const PlaygroundView = () => {
 
   const [authenticated, setAuthenticated] = useState(false);
   const [envelopeId, setEnvelopeId] = useState<string>("");
-  const [auth, setAuth] = useState<{
-    accessToken: string;
-    accountId: string;
-    baseUrl: string;
-    type: 'navigator'
-  } | null>(null);
+  const [auth, setAuth] = useState<AuthType | null>(null);
   const [signingUrl, setSigningUrl] = useState<string | null>(null);
   const [showSigningDialog, setShowSigningDialog] = useState(false);
   const [tabPositions, setTabPositions] = useState<TabPosition[]>([]);
@@ -215,6 +219,158 @@ export const PlaygroundView = () => {
     message: string;
     details: any;
   } | null>(null);
+
+  // Add Click API operations
+  const clickOperations = {
+    createClickwrap: async () => {
+      if (!auth || !authenticated) {
+        setStatus("Error: Please authenticate first");
+        return;
+      }
+
+      try {
+        setStatus("🔄 Creating clickwrap...");
+
+        if (!selectedFile) {
+          throw new Error('Please select a file');
+        }
+
+        // Convert file to base64
+        const fileBuffer = await selectedFile.arrayBuffer();
+        const base64File = Buffer.from(fileBuffer).toString('base64');
+
+        // Create request body
+        const requestBody = {
+          displaySettings: {
+            displayName: "Test Clickwrap",
+            consentButtonText: "I Agree",
+            format: "modal",
+            mustRead: true,
+            requireAccept: true,
+            documentDisplay: "document"
+          },
+          documents: [{
+            documentBase64: base64File,
+            documentName: selectedFile.name,
+            fileExtension: selectedFile.name.split('.').pop(),
+            order: 1
+          }]
+        };
+
+        const response = await fetch('/api/docusign/click/clickwraps', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${auth.accessToken}`,
+            'Account-Id': auth.accountId,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(requestBody)
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || 'Failed to create clickwrap');
+        }
+
+        const result = await response.json();
+        setStatus(
+          "✅ Clickwrap Created Successfully!\n\n" +
+          `Clickwrap ID: ${result.clickwrapId}\n` +
+          `Status: ${result.status}`
+        );
+
+      } catch (error: any) {
+        console.error('Error creating clickwrap:', error);
+        setStatus(
+          "❌ Failed to Create Clickwrap\n\n" +
+          `Error: ${error.message}\n\n` +
+          "Please check the console for more details."
+        );
+      }
+    },
+
+    getClickwrapStatus: async () => {
+      if (!auth || !authenticated) {
+        setStatus("Error: Please authenticate first");
+        return;
+      }
+
+      try {
+        setStatus("🔄 Getting clickwrap status...");
+
+        const response = await fetch(`/api/docusign/click/clickwraps/${clickwrapId}`, {
+          headers: {
+            'Authorization': `Bearer ${auth.accessToken}`,
+            'Account-Id': auth.accountId
+          }
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || 'Failed to get clickwrap status');
+        }
+
+        const result = await response.json();
+        setClickwrapStatus(result);
+        setStatus("✅ Retrieved Clickwrap Status");
+
+      } catch (error: any) {
+        console.error('Error getting clickwrap status:', error);
+        setStatus(
+          "❌ Failed to Get Clickwrap Status\n\n" +
+          `Error: ${error.message}\n\n` +
+          "Please check the console for more details."
+        );
+      }
+    },
+
+    checkUserAgreement: async () => {
+      if (!auth || !authenticated) {
+        setStatus("Error: Please authenticate first");
+        return;
+      }
+
+      try {
+        setStatus("🔄 Checking user agreement status...");
+
+        const response = await fetch(`/api/docusign/click/clickwraps/${clickwrapId}/agreements`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${auth.accessToken}`,
+            'Account-Id': auth.accountId,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ userIdentifier })
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || 'Failed to check agreement status');
+        }
+
+        const result = await response.json();
+        setStatus(
+          "✅ Agreement Status Retrieved\n\n" +
+          `Status: ${result.status}\n` +
+          `Agreed On: ${result.agreedOn || 'Not agreed'}\n` +
+          `IP Address: ${result.clientIPAddress || 'N/A'}`
+        );
+
+      } catch (error: any) {
+        console.error('Error checking agreement status:', error);
+        setStatus(
+          "❌ Failed to Check Agreement Status\n\n" +
+          `Error: ${error.message}\n\n` +
+          "Please check the console for more details."
+        );
+      }
+    }
+  };
+
+  // Add state for Click API
+  const [clickwrapId, setClickwrapId] = useState<string>('');
+  const [userIdentifier, setUserIdentifier] = useState<string>('');
+  const [clickwrapStatus, setClickwrapStatus] = useState<any>(null);
 
   useEffect(() => {
     // Fetch initial configuration
@@ -764,36 +920,27 @@ export const PlaygroundView = () => {
         setStatus("🔄 Authenticating with Navigator API...");
         
         const response = await fetch('/api/docusign/navigator/authenticate', {
-          method: 'POST'
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            scopes: [
+              'signature',
+              'impersonation',
+              'adm_store_unified_repo_read',
+              'models_read',
+              'click.manage',
+              'click.send'
+            ]
+          })
         });
 
         const data = await response.json();
         console.log('Authentication response:', data);
 
         if (data.error === 'Consent required' && data.consentUrl) {
-          const consentWindow = window.open(data.consentUrl, '_blank');
-          
-          if (!consentWindow) {
-            setStatus(
-              "❌ Popup Blocked\n\n" +
-              "Please allow popups for this site and try again.\n" +
-              "Consent URL: " + data.consentUrl
-            );
-            return;
-          }
-
-          setStatus(
-            "⚠️ Consent Required\n\n" +
-            "A new window has opened for you to grant consent.\n" +
-            "Please complete the consent process in the new window.\n" +
-            "After granting consent, click 'Authenticate (Navigator)' again.\n\n" +
-            "If you don't see the window, click here: " +
-            data.consentUrl
-          );
-
-          setAuth(null);
-          setAuthenticated(false);
-          localStorage.removeItem('navigatorAuth');
+          window.location.href = data.consentUrl;
           return;
         }
 
@@ -805,13 +952,26 @@ export const PlaygroundView = () => {
           accessToken: data.accessToken,
           accountId: data.accountId,
           baseUrl: data.baseUrl,
-          type: 'navigator' as const
+          type: 'navigator' as const,
+          scopes: data.scopes || [
+            'signature',
+            'impersonation',
+            'adm_store_unified_repo_read',
+            'models_read',
+            'click.manage',
+            'click.send'
+          ]
         };
 
         localStorage.setItem('navigatorAuth', JSON.stringify(authData));
         setAuth(authData);
         setAuthenticated(true);
-        setStatus(`✅ Navigator Authentication Successful\nBase URL: ${data.baseUrl}`);
+        setStatus(
+          `✅ Navigator Authentication Successful\n` +
+          `Base URL: ${data.baseUrl}\n` +
+          `Account ID: ${data.accountId}\n` +
+          `Scopes: ${authData.scopes.join(', ')}`
+        );
 
       } catch (error: any) {
         console.error('Navigator authentication error:', error);
@@ -824,7 +984,7 @@ export const PlaygroundView = () => {
     }
   };
 
-  // Add this to handle the callback
+  // Update the auth check effect
   useEffect(() => {
     // First check URL parameters
     const params = new URLSearchParams(window.location.search);
@@ -843,7 +1003,12 @@ export const PlaygroundView = () => {
         const authData = JSON.parse(storedAuth);
         setAuth(authData);
         setAuthenticated(true);
-        setStatus(`✅ Navigator Authentication Successful\nBase URL: ${authData.baseUrl}`);
+        setStatus(
+          `✅ Navigator Authentication Successful\n` +
+          `Base URL: ${authData.baseUrl}\n` +
+          `Account ID: ${authData.accountId}\n` +
+          `Scopes: ${authData.scopes?.join(', ') || 'signature, impersonation, adm_store_unified_repo_read, models_read'}`
+        );
       } catch (e) {
         console.error('Failed to parse stored auth:', e);
         localStorage.removeItem('navigatorAuth');
@@ -851,7 +1016,7 @@ export const PlaygroundView = () => {
     }
   }, []);
 
-  // Update the logout or cleanup function to clear localStorage
+  // Revert to original handleLogout
   const handleLogout = () => {
     setAuth(null);
     setAuthenticated(false);
@@ -1225,6 +1390,74 @@ export const PlaygroundView = () => {
                     Sign Document
                   </Button>
                 </div>
+
+                {/* Click API Section */}
+                <div className="p-4 border rounded-lg space-y-4">
+                  <h3 className="font-medium">Click API Operations</h3>
+                  
+                  <div className="grid gap-4">
+                    <div className="p-4 border rounded-lg">
+                      <h4 className="font-medium mb-2">Create Clickwrap</h4>
+                      <Input
+                        type="file"
+                        onChange={handleFileChange}
+                        accept=".pdf,.doc,.docx"
+                        className="mb-2"
+                      />
+                      <Button
+                        variant="outline"
+                        onClick={clickOperations.createClickwrap}
+                        disabled={!authenticated || !selectedFile}
+                      >
+                        Create Clickwrap
+                      </Button>
+                    </div>
+
+                    <div className="p-4 border rounded-lg">
+                      <h4 className="font-medium mb-2">Check Clickwrap Status</h4>
+                      <Input
+                        placeholder="Clickwrap ID"
+                        value={clickwrapId}
+                        onChange={(e) => setClickwrapId(e.target.value)}
+                        className="mb-2"
+                      />
+                      <Button
+                        variant="outline"
+                        onClick={clickOperations.getClickwrapStatus}
+                        disabled={!authenticated || !clickwrapId}
+                      >
+                        Get Status
+                      </Button>
+                    </div>
+
+                    <div className="p-4 border rounded-lg">
+                      <h4 className="font-medium mb-2">Check User Agreement</h4>
+                      <Input
+                        placeholder="User Identifier"
+                        value={userIdentifier}
+                        onChange={(e) => setUserIdentifier(e.target.value)}
+                        className="mb-2"
+                      />
+                      <Button
+                        variant="outline"
+                        onClick={clickOperations.checkUserAgreement}
+                        disabled={!authenticated || !clickwrapId || !userIdentifier}
+                      >
+                        Check Agreement
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Status Display */}
+                {clickwrapStatus && (
+                  <div className="p-4 bg-muted rounded-lg">
+                    <h3 className="font-medium mb-2">Clickwrap Details</h3>
+                    <pre className="text-sm whitespace-pre-wrap">
+                      {JSON.stringify(clickwrapStatus, null, 2)}
+                    </pre>
+                  </div>
+                )}
               </div>
 
               {status && (
