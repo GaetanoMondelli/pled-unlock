@@ -708,8 +708,8 @@ export const CreateEventModal = ({ open, onClose, onSave, procedureId }: CreateE
                         </Button>
                       </div>
                       <Card className="bg-muted">
-                        <ScrollArea className="h-[200px]">
-                          <pre className="p-4 text-xs mt-2 bg-gray-50 p-2 rounded overflow-x-auto whitespace-pre">
+                        <ScrollArea className="h-[200px] w-[500px]">
+                          <pre className="p-4 text-xs whitespace-pre-wrap break-all">
                             {JSON.stringify(statusResult || navigatorResult, null, 2)}
                           </pre>
                         </ScrollArea>
