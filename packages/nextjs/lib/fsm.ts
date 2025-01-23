@@ -37,6 +37,32 @@ export const calculateCurrentState = (fsl: string, messages: Message[]) => {
   }
 };
 
-export const createStateMachine = (fsl: string) => {
-  return sm`${fsl.trim()}`;
-}; 
+export function createStateMachine(definition: string) {
+  const warningStates = new Set<string>();
+  const states = new Set<string>();
+  
+  definition.split(';').forEach(line => {
+    line = line.trim();
+    if (!line) return;
+
+    const match = line.match(/(\w+)\s+'([^']+)'\s*->\s*(\w+)/);
+    if (match) {
+      const [, source, , target] = match;
+      states.add(source);
+      states.add(target);
+      
+      // Identify warning states
+      if (source.startsWith('warning_')) warningStates.add(source);
+      if (target.startsWith('warning_')) warningStates.add(target);
+    }
+  });
+
+  return {
+    states: Array.from(states).map(state => ({
+      id: state,
+      isInitial: state === 'idle',
+      isWarning: warningStates.has(state)
+    })),
+    // ... rest of the implementation
+  };
+} 

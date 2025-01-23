@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import { ContractStateMachine } from '@/app/lib/ContractStateMachine';
 
 const REDIRECT_URI = 'http://localhost:3000/api/docusign/navigator/callback';
-const PLAYGROUND_URL = 'http://localhost:3000/procedures/proc_123?tab=playground';
+const HOME_URL = 'http://localhost:3000';
 
 export async function GET(req: Request) {
   try {
@@ -11,7 +12,7 @@ export async function GET(req: Request) {
     const code = searchParams.get('code');
     const error = searchParams.get('error');
     const error_description = searchParams.get('error_description');
-    const returnUrl = searchParams.get('state') || PLAYGROUND_URL;
+    const returnUrl = searchParams.get('state') || HOME_URL;
     
     console.log('[Navigator Callback] Received params:', { 
       code: code?.substring(0, 20) + '...', 
@@ -87,8 +88,8 @@ export async function GET(req: Request) {
                 baseUrl: 'https://api-d.docusign.net/navigator/v1'
               }));
               
-              // Redirect to playground
-              window.location.href = '${PLAYGROUND_URL}';
+              // Redirect to home
+              window.location.href = '${HOME_URL}';
             } catch (e) {
               console.error('Failed to store auth data:', e);
               document.body.innerHTML = 'Error: ' + e.message;
@@ -109,4 +110,19 @@ export async function GET(req: Request) {
     console.error('[Navigator Callback] Error:', error);
     return NextResponse.redirect('/error?message=' + encodeURIComponent(error.message));
   }
+}
+
+export async function POST(request: Request) {
+  const navigatorData = await request.json();
+  
+  // Initialize state machine with Navigator data
+  const stateMachine = new ContractStateMachine(navigatorData);
+  
+  // Get current state and context
+  const context = stateMachine.getContext();
+  
+  // Use the context to update your UI or database
+  // ...
+
+  return Response.json({ success: true, context });
 } 

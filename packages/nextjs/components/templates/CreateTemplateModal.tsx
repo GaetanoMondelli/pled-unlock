@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -19,7 +19,7 @@ import { D3Graph } from '../ui/d3-graph'
 import { createStateMachine } from "@/lib/fsm"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { createHash } from 'crypto'
-import { ChevronDown, ChevronRight, PlusCircle, Loader2, HelpCircle } from "lucide-react"
+import { ChevronDown, ChevronRight, PlusCircle, Loader2, HelpCircle, Search } from "lucide-react"
 import { fetchFromDb, updateDb } from "~~/utils/api"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -29,6 +29,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { NavigatorInsight } from '@/app/types/navigator';
 
 interface Step {
   title: string
@@ -380,6 +381,30 @@ const StateActionView = ({ state, actions }: { state: string; actions: StateActi
   );
 };
 
+const fetchAgreementDetails = async (agreementId: string) => {
+  try {
+    const auth = JSON.parse(localStorage.getItem('navigatorAuth') || '{}');
+    const response = await fetch('/api/docusign/navigator/proxy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        url: `${auth.baseUrl}/accounts/${auth.accountId}/agreements/${agreementId}`,
+        method: 'GET',
+        token: auth.accessToken
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch agreement details');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching agreement details:', error);
+    throw error;
+  }
+};
+
 export function CreateTemplateModal() {
   const [open, setOpen] = useState(false)
   const [currentStep, setCurrentStep] = useState(0)
@@ -402,6 +427,40 @@ export function CreateTemplateModal() {
   const [selectedModel, setSelectedModel] = useState<string>("gpt-4")
   const [expertMode, setExpertMode] = useState(false)
   const [analysisProgress, setAnalysisProgress] = useState<string>('')
+  const [useNavigatorInsight, setUseNavigatorInsight] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState<string>('');
+  const [navigatorDocuments, setNavigatorDocuments] = useState<NavigatorInsight[]>([]);
+
+  const fetchNavigatorDocuments = async () => {
+    try {
+      const auth = JSON.parse(localStorage.getItem('navigatorAuth') || '{}');
+      if (!auth.accessToken || !auth.baseUrl) {
+        console.error('No Navigator authentication found');
+        return;
+      }
+
+      const response = await fetch('/api/docusign/navigator/proxy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: `${auth.baseUrl}/accounts/${auth.accountId}/agreements`,
+          method: 'GET',
+          token: auth.accessToken
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch agreements');
+      }
+
+      const data = await response.json();
+      setNavigatorDocuments(data.agreements || []);
+    } catch (error) {
+      console.error('Error fetching Navigator documents:', error);
+      // Optionally show error to user
+      setAnalysisError('Failed to fetch Navigator documents. Please check your authentication.');
+    }
+  };
 
   const handleDocumentAnalysis = async () => {
     if (!documentContent.trim()) {
@@ -420,8 +479,10 @@ export function CreateTemplateModal() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          documentContent,
+          content: documentContent,
           model: selectedModel,
+          useNavigatorInsight,
+          navigatorDocumentId: selectedDocument,
           expertMode: selectedModel === "expert"
         })
       });
@@ -600,6 +661,24 @@ export function CreateTemplateModal() {
     setContract(JSON.stringify(currentActions, null, 2));
   };
 
+  const handleNavigatorAuth = async () => {
+    try {
+      const response = await fetch('/api/docusign/navigator/authenticate', {
+        method: 'POST'
+      });
+      const data = await response.json();
+      
+      if (data.consentUrl) {
+        window.location.href = data.consentUrl;
+      } else {
+        setAnalysisError('Failed to get authentication URL');
+      }
+    } catch (error) {
+      console.error('Navigator authentication error:', error);
+      setAnalysisError('Failed to initiate Navigator authentication');
+    }
+  };
+
   const renderStepContent = () => {
     switch (currentStep) {
       case 0:
@@ -646,30 +725,6 @@ export function CreateTemplateModal() {
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger>
-                            <HelpCircle className="h-4 w-4 text-muted-foreground" />
-                          </TooltipTrigger>
-                          <TooltipContent className="max-w-sm">
-                            <p className="font-medium">Analysis Modes:</p>
-                            <ul className="mt-2 list-disc list-inside text-sm">
-                              <li><span className="font-medium">GPT-4 Turbo:</span> Fastest analysis, good for most cases</li>
-                              <li><span className="font-medium">GPT-4:</span> More thorough but slower analysis</li>
-                              <li><span className="font-medium">GPT-3.5:</span> Basic analysis, fastest and cheapest</li>
-                              <li><span className="font-medium">Expert System:</span> Uses multiple specialized prompts:
-                                <ul className="ml-4 mt-1 list-disc list-inside text-xs">
-                                  <li>GPT-4 for state machine design</li>
-                                  <li>GPT-4 Turbo for message rules</li>
-                                  <li>GPT-4 Turbo for state actions</li>
-                                </ul>
-                              </li>
-                            </ul>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </div>
                     <Button
                       variant="outline"
                       size="sm"
@@ -681,6 +736,119 @@ export function CreateTemplateModal() {
                     </Button>
                   </div>
                 </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="flex items-center space-x-2">
+                      <Checkbox
+                        checked={useNavigatorInsight}
+                        onCheckedChange={(checked) => {
+                          setUseNavigatorInsight(checked as boolean);
+                          if (checked && !navigatorDocuments.length) {
+                            fetchNavigatorDocuments();
+                          }
+                        }}
+                      />
+                      <span className="text-sm font-medium">Use Navigator Insights</span>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Use insights from existing contracts to improve analysis</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </label>
+                    {useNavigatorInsight && (
+                      <Button variant="outline" size="sm" onClick={fetchNavigatorDocuments}>
+                        Refresh
+                      </Button>
+                    )}
+                  </div>
+
+                  {useNavigatorInsight && (
+                    <div className="border rounded-lg">
+                      {navigatorDocuments.length > 0 ? (
+                        <ScrollArea className="h-[120px]">
+                          <table className="w-full">
+                            <thead className="border-b bg-muted/50">
+                              <tr className="text-xs font-medium">
+                                <th className="text-left p-2">Document</th>
+                                <th className="text-right p-2 w-24">Status</th>
+                                <th className="w-10 p-2"></th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {navigatorDocuments.map((doc) => (
+                                <tr
+                                  key={doc.id}
+                                  className={`text-sm border-b last:border-0 cursor-pointer transition-colors ${
+                                    selectedDocument === doc.id
+                                      ? 'bg-primary/10'
+                                      : 'hover:bg-muted/50'
+                                  }`}
+                                >
+                                  <td 
+                                    className="p-2 truncate max-w-[300px]"
+                                    onClick={() => setSelectedDocument(doc.id)}
+                                  >
+                                    {doc.fileName}
+                                  </td>
+                                  <td 
+                                    className="p-2 text-right text-muted-foreground"
+                                    onClick={() => setSelectedDocument(doc.id)}
+                                  >
+                                    {doc.status}
+                                  </td>
+                                  <td className="p-2 text-center">
+                                    <Dialog>
+                                      <DialogTrigger asChild>
+                                        <Button 
+                                          variant="ghost" 
+                                          size="sm"
+                                          className="h-6 w-6 p-0"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                          }}
+                                        >
+                                          <Search className="h-4 w-4" />
+                                        </Button>
+                                      </DialogTrigger>
+                                      <DialogContent>
+                                        <DialogHeader>
+                                          <DialogTitle>Agreement Details</DialogTitle>
+                                        </DialogHeader>
+                                        <DialogContentAsync 
+                                          agreementId={doc.id} 
+                                          fetchDetails={fetchAgreementDetails}
+                                        />
+                                      </DialogContent>
+                                    </Dialog>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </ScrollArea>
+                      ) : (
+                        <div className="text-center py-3 text-muted-foreground">
+                          <p className="text-sm">No documents found</p>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="mt-2"
+                            onClick={handleNavigatorAuth}
+                          >
+                            Authenticate Navigator
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 <div className="h-[250px] w-full rounded-md border">
                   <Textarea
                     id="document"
@@ -1092,4 +1260,84 @@ function getLinksFromFsm(definition: string) {
   })
 
   return links
-} 
+}
+
+const DialogContentAsync = ({ 
+  agreementId, 
+  fetchDetails 
+}: { 
+  agreementId: string;
+  fetchDetails: (id: string) => Promise<any>;
+}) => {
+  const [details, setDetails] = useState<any>(null);
+  const [error, setError] = useState<string>('');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchDetails(agreementId)
+      .then(setDetails)
+      .catch(err => setError(err.message))
+      .finally(() => setLoading(false));
+  }, [agreementId, fetchDetails]);
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center py-8">
+        <Loader2 className="h-6 w-6 animate-spin" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-8 text-red-500">
+        <p>{error}</p>
+      </div>
+    );
+  }
+
+  if (!details) {
+    return null;
+  }
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h4 className="text-sm font-medium mb-2">Parties</h4>
+        <div className="bg-muted rounded-lg p-2">
+          {details.parties?.map((party: any) => (
+            <div key={party.id} className="text-sm">
+              {party.name_in_agreement}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <h4 className="text-sm font-medium mb-2">Key Provisions</h4>
+        <div className="bg-muted rounded-lg p-2 space-y-2">
+          {Object.entries(details.provisions || {}).map(([key, value]) => (
+            <div key={key} className="text-sm flex justify-between">
+              <span className="text-muted-foreground">{key.replace(/_/g, ' ')}:</span>
+              <span>{String(value)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <h4 className="text-sm font-medium mb-2">Additional Details</h4>
+        <div className="bg-muted rounded-lg p-2 space-y-2">
+          <div className="text-sm flex justify-between">
+            <span className="text-muted-foreground">Languages:</span>
+            <span>{details.languages?.join(', ')}</span>
+          </div>
+          <div className="text-sm flex justify-between">
+            <span className="text-muted-foreground">Created:</span>
+            <span>{new Date(details.metadata?.created_at || '').toLocaleDateString()}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}; 

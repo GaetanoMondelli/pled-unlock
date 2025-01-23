@@ -14,6 +14,7 @@ interface Node {
     description?: string;
     actions?: string[];
   };
+  isWarning?: boolean;
 }
 
 interface Link {
@@ -208,7 +209,8 @@ export const D3Graph = React.forwardRef<any, D3GraphProps>(({
         height: NODE_HEIGHT,
         style: nodeStyle,
         metadata: node.metadata, // Add metadata here
-        hasDocuments: hasLinkedDocuments(node.id) // Add document info
+        hasDocuments: hasLinkedDocuments(node.id), // Add document info
+        isWarning: node.isWarning
       });
     });
 
@@ -226,7 +228,7 @@ export const D3Graph = React.forwardRef<any, D3GraphProps>(({
     const render = new dagreD3.render();
 
     // Override the default node shape
-    render.shapes().rect = function(parent, bbox, node) {
+    render.shapes().rect = function(parent, bbox, nodeData) {
       const shapeSvg = parent.insert("rect", ":first-child")
         .attr("rx", 5)
         .attr("ry", 5)
@@ -236,8 +238,8 @@ export const D3Graph = React.forwardRef<any, D3GraphProps>(({
         .attr("height", bbox.height);
 
       // Add icons if needed
-      const hasActions = (node as any).metadata?.actions?.length > 0;
-      const hasDocuments = (node as any).hasDocuments;
+      const hasActions = (nodeData as any).metadata?.actions?.length > 0;
+      const hasDocuments = (nodeData as any).hasDocuments;
 
       const iconSize = 14;
       const iconPadding = 5;
@@ -265,6 +267,21 @@ export const D3Graph = React.forwardRef<any, D3GraphProps>(({
           .attr("fill", "none")
           .attr("stroke", "currentColor")
           .attr("stroke-width", "1.5");
+      }
+
+      // Add warning icon for warning states
+      if ((nodeData as any).isWarning) {
+        parent.append("circle")
+          .attr("r", 20)
+          .attr("fill", "#fff4e5")
+          .attr("stroke", "#ff9800")
+          .attr("stroke-width", 2);
+
+        parent.append("text")
+          .attr("class", "warning-icon")
+          .attr("y", -25)
+          .attr("text-anchor", "middle")
+          .text("⚠️");
       }
 
       return shapeSvg;

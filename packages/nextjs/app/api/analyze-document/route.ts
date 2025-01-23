@@ -106,19 +106,52 @@ Format response as JSON:
 // Expert mode prompts
 const expertPrompts = {
   getFSL: `Analyze this document and create a state machine in FSL notation.
+Include warning states for important dates and provisions.
 
 REQUIREMENTS:
 - FSL must start with 'idle' state
-- Include all necessary states and transitions
-- End with final states (e.g., 'completed', 'rejected', 'terminated')
-- Use meaningful transition names
+- Add warning states for critical provisions:
+  * Payment deadlines (warning_payment_due)
+  * Contract expiration (warning_expiring)
+  * Delivery milestones (warning_delivery_due)
+  * Compliance requirements (warning_compliance)
+  * Renewal deadlines (warning_renewal)
+- Each warning state should transition to:
+  * Resolution state (if handled)
+  * Violation state (if deadline missed)
+  * Escalation state (if needs attention)
+
+Example FSL patterns:
+active 'payment_due_soon' -> warning_payment_due;
+warning_payment_due 'payment_received' -> active;
+warning_payment_due 'payment_missed' -> payment_overdue;
+
+active 'approaching_expiry' -> warning_expiring;
+warning_expiring 'renewed' -> active;
+warning_expiring 'expired' -> contract_expired;
+
+active 'delivery_approaching' -> warning_delivery_due;
+warning_delivery_due 'delivered' -> delivery_complete;
+warning_delivery_due 'missed_deadline' -> delivery_overdue;
 
 Format response as JSON:
 {
   "name": "Template name",
   "description": "Workflow description",
   "stateMachine": {
-    "fsl": "idle 'start' -> state1; state1 'event1' -> state2; state2 'complete' -> completed;"
+    "fsl": "...",
+    "warningStates": [
+      {
+        "state": "warning_payment_due",
+        "deadline": "payment_terms_due_date",
+        "warningPeriod": "5 days"
+      },
+      {
+        "state": "warning_expiring",
+        "deadline": "expiration_date",
+        "warningPeriod": "30 days"
+      }
+    ]
   }
 }`,
 
@@ -245,9 +278,43 @@ async function createCompletion(model: ModelId, messages: any[]) {
 
 export async function POST(req: Request) {
   try {
-    const { documentContent, model = "gpt-4", expertMode = false } = await req.json();
+    const { content, model = "gpt-4", expertMode = false, useNavigatorInsight = false, navigatorDocumentId } = await req.json();
 
-    if (!documentContent) {
+    let navigatorData = null;
+    let prompt = getSinglePrompt;
+
+    // Get Navigator data if enabled
+    if (useNavigatorInsight && navigatorDocumentId) {
+      try {
+        const auth = JSON.parse(localStorage.getItem('navigatorAuth') || '{}');
+        const response = await fetch('/api/docusign/navigator/proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            url: `${auth.baseUrl}/accounts/${auth.accountId}/agreements/${navigatorDocumentId}`,
+            method: 'GET',
+            token: auth.accessToken
+          })
+        });
+        
+        if (response.ok) {
+          navigatorData = await response.json();
+          const { provisions, parties } = navigatorData.rawData;
+
+          // Add insights to the prompt
+          prompt += `\n\nConsider these patterns from a similar document:
+- Parties involved: ${parties.map((p: any) => p.name_in_agreement).join(', ')}
+- Contract value: ${provisions.total_agreement_value} ${provisions.total_agreement_value_currency_code}
+- Payment terms: ${provisions.payment_terms_due_date} (Late fees: ${provisions.can_charge_late_payment_fees ? `${provisions.late_payment_fee_percent}%` : 'None'})
+- Duration: ${provisions.effective_date} to ${provisions.expiration_date}
+- Termination notice: ${provisions.termination_period_for_convenience}`;
+        }
+      } catch (error) {
+        console.error('Error fetching Navigator data:', error);
+      }
+    }
+
+    if (!content) {
       return NextResponse.json(
         { error: 'Document content is required' },
         { status: 400 }
@@ -265,11 +332,27 @@ export async function POST(req: Request) {
     }
 
     if (expertMode) {
-      // Step 1: Generate FSL with GPT-4 (more reliable for structure)
+      // Add Navigator insights to each expert prompt with warning thresholds
+      const getFSLWithInsights = navigatorData ? 
+        expertPrompts.getFSL + `\n\nConsider these patterns and warning thresholds from a similar document:
+- Payment terms: ${navigatorData.rawData.provisions.payment_terms_due_date}
+  * Add warning_payment_due state 5 days before due date
+- Contract expiration: ${navigatorData.rawData.provisions.expiration_date}
+  * Add warning_expiring state 30 days before expiration
+- Late fees: ${navigatorData.rawData.provisions.can_charge_late_payment_fees ? `${navigatorData.rawData.provisions.late_payment_fee_percent}%` : 'None'}
+  * Add warning_late_fee state when payment is overdue
+- Termination notice: ${navigatorData.rawData.provisions.termination_period_for_convenience}
+  * Add warning_termination state when notice received
+- Compliance requirements:
+  * Add warning_compliance state for periodic reviews
+- Renewal deadlines:
+  * Add warning_renewal state 45 days before expiration if auto-renewal enabled` 
+        : expertPrompts.getFSL;
+
       trackRequest();
       const fslCompletion = await createCompletion("gpt-4", [
-        { role: "system", content: expertPrompts.getFSL },
-        { role: "user", content: documentContent }
+        { role: "system", content: getFSLWithInsights },
+        { role: "user", content: content }
       ]);
 
       const fslStructure = JSON.parse(fslCompletion.choices[0].message.content || "{}");
@@ -332,8 +415,8 @@ export async function POST(req: Request) {
       trackRequest();
       
       const completion = await createCompletion(model as ModelId, [
-        { role: "system", content: getSinglePrompt },
-        { role: "user", content: documentContent }
+        { role: "system", content: prompt },
+        { role: "user", content: content }
       ]);
 
       const template = JSON.parse(completion.choices[0].message.content || "{}");
