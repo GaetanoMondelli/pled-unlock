@@ -15,81 +15,57 @@ interface MessageRule {
   captures?: Record<string, string>;
 }
 
-export function generateMessages(events: any[], rules: MessageRule[], variables: any) {
+// Add the formatTemplateContent function
+function formatTemplateContent(template: string, data: any): string {
+  return template.replace(/\{\{([^}]+)\}\}/g, (_, path) => {
+    const value = path.split('.').reduce((obj: any, key: string) => {
+      return obj?.[key];
+    }, data);
+    return value !== undefined ? String(value) : '';
+  });
+}
+
+export function generateMessages(events: any[], rules: any[], variables: any) {
   const messages: any[] = [];
   const outputs: Record<string, any> = {};
-  
-  if (!Array.isArray(events) || !Array.isArray(rules)) {
-    console.error('Invalid events or rules:', { events, rules });
-    return { messages, outputs };
-  }
 
-  // Process events in chronological order
-  const sortedEvents = [...events].sort((a, b) => 
-    new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-  );
-
-  // Process each event
-  sortedEvents.forEach(event => {
-    console.log('Processing event:', event);
-    
-    // Sort rules by priority (higher priority first)
-    const sortedRules = [...rules].sort((a, b) => b.priority - a.priority);
-    
-    // Find the first matching rule
-    const matchingRule = sortedRules.find(rule => 
-      matchEventToRule(
-        event,
-        {
-          type: rule.matches.type,
-          conditions: rule.matches.conditions
-        },
-        variables
-      )
-    );
-    
-    if (matchingRule) {
-      // Process captures first
-      if (matchingRule.captures) {
-        const messageType = matchingRule.generates.type;
-        if (!outputs[messageType]) {
-          outputs[messageType] = {};
+  events.forEach(event => {
+    rules.forEach(rule => {
+      if (matchEventToRule(event, rule.matches, variables)) {
+        // Capture outputs if specified
+        if (rule.captures) {
+          outputs[rule.generates.type] = Object.entries(rule.captures).reduce((acc, [key, value]) => {
+            acc[key] = formatTemplateContent(value as string, {
+              event,
+              ...variables
+            });
+            return acc;
+          }, {} as Record<string, any>);
         }
-        
-        Object.entries(matchingRule.captures).forEach(([key, pathTemplate]) => {
-          const value = pathTemplate.replace(/\{\{event\.data\.([^}]+)\}\}/g, (_, path) => {
-            return path.split('.').reduce((obj: any, key: string) => obj?.[key], event.data) ?? '';
-          });
-          outputs[messageType][key] = value;
-        });
-      }
 
-      // Generate message from template
-      const message = {
-        id: `msg_${event.id}`,
-        type: matchingRule.generates.type,
-        timestamp: event.timestamp,
-        fromEvent: event.id,
-        rule: matchingRule.id,
-        ...Object.entries(matchingRule.generates.template).reduce((acc, [key, template]) => {
-          // Replace variables in template
-          let value = template;
-          // Replace event data placeholders
-          value = value.replace(/\{\{event\.data\.([^}]+)\}\}/g, (_, path) => {
-            const eventValue = path.split('.').reduce((obj: any, key: string) => obj?.[key], event.data);
-            return eventValue !== undefined ? eventValue : '';
-          });
-          // Replace variables placeholders
-          value = value.replace(/\{\{([^}]+)\}\}/g, (_, path) => {
-            const varValue = path.split('.').reduce((obj: any, key: string) => obj?.[key], variables);
-            return varValue !== undefined ? varValue : '';
-          });
-          return { ...acc, [key]: value };
-        }, {})
-      };
-      
-      messages.push(message);
-    }
+        // Generate message
+        const message = {
+          id: `msg_${event.id}`,
+          type: rule.generates.type,
+          title: formatTemplateContent(rule.generates.template.title, {
+            event,
+            captures: outputs[rule.generates.type],
+            ...variables
+          }),
+          content: formatTemplateContent(rule.generates.template.content, {
+            event,
+            captures: outputs[rule.generates.type],
+            ...variables
+          }),
+          timestamp: event.data.time || event.timestamp, // Use event.data.time first, fall back to event.timestamp
+          fromEvent: event.id,
+          rule: rule.id,
+          event: event // Include the full event for reference
+        };
+
+        messages.push(message);
+      }
+    });
   });
 
   return { messages, outputs };

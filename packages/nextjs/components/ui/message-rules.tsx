@@ -68,6 +68,15 @@ export default function MessageRules({ procedureId }: MessageRulesProps) {
 
         setGeneratedMessages(messages);
         setOutputs(outputs);
+
+        console.log('Generated Messages Debug:', messages.map(msg => ({
+          id: msg.id,
+          timestamp: msg.timestamp,
+          eventTime: msg.event?.data?.time,
+          eventTimestamp: msg.event?.timestamp,
+          raw: msg
+        })));
+
       } catch (error) {
         console.error('Error fetching data:', error);
       }
@@ -295,7 +304,15 @@ export default function MessageRules({ procedureId }: MessageRulesProps) {
             {generatedMessages.map((message: any) => (
               <TableRow key={message.id}>
                 <TableCell className="text-xs">
-                  {new Date(message.timestamp).toLocaleString()}
+                  {message.timestamp ? (
+                    new Date(message.timestamp).toLocaleString()
+                  ) : (
+                    message.event?.data?.time ? (
+                      new Date(message.event.data.time).toLocaleString()
+                    ) : (
+                      new Date(message.event?.timestamp).toLocaleString()
+                    )
+                  )}
                 </TableCell>
                 <TableCell>
                   <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
