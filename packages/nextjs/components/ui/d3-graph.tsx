@@ -185,6 +185,7 @@ export const D3Graph = React.forwardRef<any, D3GraphProps>(({
     nodes.forEach(node => {
       const isInitial = node.id === 'idle';
       const isFinal = finalStates.has(node.id);
+      const isWarning = node.id.startsWith('warning_');
       
       let nodeStyle = '';
       if (node.highlight) {
@@ -195,22 +196,24 @@ export const D3Graph = React.forwardRef<any, D3GraphProps>(({
         nodeStyle = 'fill: #3b82f6; stroke: #2563eb;';
       } else if (isFinal) {
         nodeStyle = 'fill: #ef4444; stroke: #dc2626;';
+      } else if (isWarning) {
+        nodeStyle = 'fill: #f3f4f6; stroke: #9ca3af;'; // Grey for warning states
       } else {
         nodeStyle = 'fill: #fff; stroke: #333;';
       }
 
       g.setNode(node.id, {
         label: node.id,
-        class: `${node.isActive ? 'active' : ''} ${isInitial ? 'initial' : ''} ${isFinal ? 'final' : ''}`,
+        class: `${node.isActive ? 'active' : ''} ${isInitial ? 'initial' : ''} ${isFinal ? 'final' : ''} ${isWarning ? 'warning' : ''}`,
         shape: 'rect',
         rx: 4,
         ry: 4,
         width: NODE_WIDTH,
         height: NODE_HEIGHT,
         style: nodeStyle,
-        metadata: node.metadata, // Add metadata here
-        hasDocuments: hasLinkedDocuments(node.id), // Add document info
-        isWarning: node.isWarning
+        metadata: node.metadata,
+        hasDocuments: hasLinkedDocuments(node.id),
+        isWarning
       });
     });
 
@@ -240,11 +243,30 @@ export const D3Graph = React.forwardRef<any, D3GraphProps>(({
       // Add icons if needed
       const hasActions = (nodeData as any).metadata?.actions?.length > 0;
       const hasDocuments = (nodeData as any).hasDocuments;
+      const isWarning = (nodeData as any).isWarning;
 
       const iconSize = 14;
       const iconPadding = 5;
       const iconY = -bbox.height/2 + iconPadding;
 
+      // Add warning icon for warning states
+      if (isWarning) {
+        // Add exclamation mark icon
+        parent.append("text")
+          .attr("class", "warning-icon")
+          .attr("y", iconY + iconSize)
+          .attr("x", -bbox.width/2 + iconPadding)
+          .attr("font-family", "sans-serif")
+          .attr("font-size", "14px")
+          .attr("fill", "#9ca3af")  // Grey color
+          .text("⚠️");
+
+        // Make the node text grey
+        parent.select("text.label")
+          .attr("fill", "#6b7280");  // Grey text
+      }
+
+      // Add existing action and document icons
       if (hasActions) {
         parent.append("path")
           .attr("d", "M8 5v14l11-7z")
@@ -267,21 +289,6 @@ export const D3Graph = React.forwardRef<any, D3GraphProps>(({
           .attr("fill", "none")
           .attr("stroke", "currentColor")
           .attr("stroke-width", "1.5");
-      }
-
-      // Add warning icon for warning states
-      if ((nodeData as any).isWarning) {
-        parent.append("circle")
-          .attr("r", 20)
-          .attr("fill", "#fff4e5")
-          .attr("stroke", "#ff9800")
-          .attr("stroke-width", 2);
-
-        parent.append("text")
-          .attr("class", "warning-icon")
-          .attr("y", -25)
-          .attr("text-anchor", "middle")
-          .text("⚠️");
       }
 
       return shapeSvg;
