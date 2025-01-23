@@ -32,8 +32,28 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify({
         clickwrapName: body.displaySettings.displayName,
-        displaySettings: body.displaySettings,
-        documents: body.documents,
+        displaySettings: {
+          displayName: body.displaySettings.displayName,
+          consentButtonText: "I Agree",
+          downloadable: true,
+          format: "modal",
+          mustRead: false,
+          requireAccept: true,
+          documentDisplay: "document",
+          sendToEmail: false,
+          allowViewHistory: true,
+          allowUnassociatedUse: true,
+          requireReacceptance: false,
+          termsAndConditionsLabel: "Terms and Conditions",
+          topLabel: "Please review the following terms and conditions",
+          bottomLabel: "Click 'I Agree' to continue"
+        },
+        documents: body.documents.map(doc => ({
+          ...doc,
+          documentName: doc.documentName || "Terms and Conditions",
+          documentDisplay: "document",
+          order: 1
+        })),
         requireReacceptance: false,
         status: "draft"
       })

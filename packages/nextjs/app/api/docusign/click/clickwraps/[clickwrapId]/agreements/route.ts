@@ -15,31 +15,54 @@ export async function POST(
       );
     }
 
-    const { userIdentifier } = await req.json();
+    console.log('Checking users for clickwrap:', params.clickwrapId);
 
-    // Get user agreement status from DocuSign
+    // Get all users who have signed this clickwrap
     const response = await fetch(
-      `https://demo.docusign.net/clickapi/v1/accounts/${accountId}/clickwraps/${params.clickwrapId}/agreements/${userIdentifier}`, 
+      `https://demo.docusign.net/clickapi/v1/accounts/${accountId}/clickwraps/${params.clickwrapId}/users`, 
       {
-        method: 'GET',
         headers: {
           'Authorization': `Bearer ${accessToken}`
         }
       }
     );
 
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: 'Failed to get agreement status' }));
-      throw new Error(error.message);
+    // Get response text first
+    const responseText = await response.text();
+    console.log('Raw response:', responseText);
+
+    // Try to parse JSON only if there's content
+    let result;
+    try {
+      result = responseText ? JSON.parse(responseText) : { userAgreements: [] };
+    } catch (e) {
+      console.error('Failed to parse response:', e);
+      result = { userAgreements: [] };
     }
 
-    const result = await response.json();
-    return NextResponse.json(result);
+    if (!response.ok) {
+      throw new Error(result.message || 'Failed to get agreements list');
+    }
+
+    // Pass through the userAgreements array directly
+    return NextResponse.json({
+      hasAgreed: result.userAgreements?.length > 0,
+      agreements: result.userAgreements || [],
+      totalAgreements: result.userAgreements?.length || 0,
+      page: result.page,
+      pageSize: result.pageSize
+    });
+
   } catch (error: any) {
-    console.error('Error getting agreement status:', error);
+    console.error('Error getting agreements list:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to get agreement status' },
-      { status: 500 }
+      { 
+        error: error.message || 'Failed to get agreements list',
+        hasAgreed: false,
+        agreements: [],
+        totalAgreements: 0
+      },
+      { status: 200 }
     );
   }
 }
@@ -59,7 +82,7 @@ export async function GET(
       );
     }
 
-    // Create agreement URL request
+    // Create agreement URL request with minimal required fields
     const response = await fetch(
       `https://demo.docusign.net/clickapi/v1/accounts/${accountId}/clickwraps/${params.clickwrapId}/agreements`, 
       {
@@ -71,19 +94,33 @@ export async function GET(
         body: JSON.stringify({
           fullName: "Test User",
           email: "test@example.com",
-          clientUserId: "test_user_1",
-          returnUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/procedures/proc_123?tab=playground`,
-          agreementId: `agreement_${Date.now()}` // Add unique agreement ID
+          clientUserId: Date.now().toString(),
+          returnUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/procedures/proc_123?tab=playground`
         })
       }
     );
 
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: 'Failed to create agreement URL' }));
-      throw new Error(error.message);
+    // Get response text first to debug
+    const responseText = await response.text();
+    console.log('Raw agreement URL response:', responseText);
+
+    // Try to parse JSON
+    let result;
+    try {
+      result = responseText ? JSON.parse(responseText) : {};
+    } catch (e) {
+      console.error('Failed to parse agreement URL response:', e);
+      throw new Error('Invalid response from DocuSign');
     }
 
-    const result = await response.json();
+    if (!response.ok) {
+      throw new Error(result.message || 'Failed to create agreement URL');
+    }
+
+    if (!result.agreementUrl) {
+      throw new Error('No agreement URL in response');
+    }
+
     return NextResponse.json({
       agreementUrl: result.agreementUrl
     });

@@ -335,39 +335,57 @@ export const PlaygroundView = () => {
     },
 
     checkUserAgreement: async () => {
-      if (!auth || !authenticated || !clickwrapId || !userIdentifier) {
-        setStatus("Error: Please provide all required information");
+      if (!auth || !authenticated || !clickwrapId) {
+        setStatus("Error: Please authenticate and provide a clickwrap ID");
         return;
       }
 
       try {
-        setStatus("🔄 Checking user agreement status...");
+        setStatus("🔄 Getting all agreements...");
 
-        const response = await fetch(`/api/docusign/click/clickwraps/${clickwrapId}/agreements/${userIdentifier}`, {
+        const response = await fetch(`/api/docusign/click/clickwraps/${clickwrapId}/agreements`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${auth.accessToken}`,
-            'Account-Id': auth.accountId
-          }
+            'Account-Id': auth.accountId,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({}) // No userIdentifier, get all agreements
         });
 
         if (!response.ok) {
           const error = await response.json();
-          throw new Error(error.message || 'Failed to check agreement status');
+          throw new Error(error.message || 'Failed to get agreements');
         }
 
         const result = await response.json();
-        setStatus(
-          "✅ Agreement Status Retrieved\n\n" +
-          `Status: ${result.status || 'Not Found'}\n` +
-          `Agreed On: ${result.agreedOn || 'Not agreed'}\n` +
-          `Client IP: ${result.clientIPAddress || 'N/A'}`
-        );
+        
+        if (result.agreements?.length > 0) {
+          setStatus(
+            "✅ Agreements Found!\n\n" +
+            `Total Agreements: ${result.totalAgreements}\n\n` +
+            "Agreement Details:\n" +
+            result.agreements.map((agreement: any) => 
+              `- Status: ${agreement.status}\n` +
+              `  Agreed On: ${new Date(agreement.agreedOn).toLocaleString()}\n` +
+              `  User ID: ${agreement.clientUserId}\n` +
+              `  Version: ${agreement.version}\n`
+            ).join('\n')
+          );
+
+          // Set clickwrap status to show the table
+          setClickwrapStatus({
+            agreements: result.agreements,
+            totalAgreements: result.totalAgreements
+          });
+        } else {
+          setStatus("⚠️ No agreements found for this clickwrap");
+        }
 
       } catch (error: any) {
-        console.error('Error checking agreement status:', error);
+        console.error('Error checking agreements:', error);
         setStatus(
-          "❌ Failed to Check Agreement Status\n\n" +
+          "❌ Failed to Get Agreements\n\n" +
           `Error: ${error.message}\n\n` +
           "Please check the console for more details."
         );
@@ -418,7 +436,6 @@ export const PlaygroundView = () => {
 
   // Add state for Click API
   const [clickwrapId, setClickwrapId] = useState<string>('');
-  const [userIdentifier, setUserIdentifier] = useState<string>('');
   const [clickwrapStatus, setClickwrapStatus] = useState<any>(null);
 
   useEffect(() => {
@@ -1480,19 +1497,13 @@ export const PlaygroundView = () => {
                     </div>
 
                     <div className="p-4 border rounded-lg">
-                      <h4 className="font-medium mb-2">Check User Agreement</h4>
-                      <Input
-                        placeholder="User Identifier"
-                        value={userIdentifier}
-                        onChange={(e) => setUserIdentifier(e.target.value)}
-                        className="mb-2"
-                      />
+                      <h4 className="font-medium mb-2">View All Agreements</h4>
                       <Button
                         variant="outline"
                         onClick={clickOperations.checkUserAgreement}
-                        disabled={!authenticated || !clickwrapId || !userIdentifier}
+                        disabled={!authenticated || !clickwrapId}
                       >
-                        Check Agreement
+                        List All Agreements
                       </Button>
                     </div>
 
@@ -1516,6 +1527,37 @@ export const PlaygroundView = () => {
                     <pre className="text-sm whitespace-pre-wrap">
                       {JSON.stringify(clickwrapStatus, null, 2)}
                     </pre>
+                  </div>
+                )}
+
+                {clickwrapStatus?.agreements && (
+                  <div className="p-4 bg-muted rounded-lg">
+                    <h3 className="font-medium mb-2">Clickwrap Agreements</h3>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full table-auto">
+                        <thead>
+                          <tr>
+                            <th className="px-4 py-2">Status</th>
+                            <th className="px-4 py-2">Agreed On</th>
+                            <th className="px-4 py-2">User ID</th>
+                            <th className="px-4 py-2">Version</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {clickwrapStatus.agreements.map((agreement: any, index: number) => (
+                            <tr key={agreement.agreementId || index}>
+                              <td className="border px-4 py-2">{agreement.status}</td>
+                              <td className="border px-4 py-2">
+                                {new Date(agreement.agreedOn).toLocaleString()}
+                              </td>
+                              <td className="border px-4 py-2">{agreement.clientUserId}</td>
+                              <td className="border px-4 py-2">{agreement.version}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <p className="mt-2 text-sm">Total Agreements: {clickwrapStatus.totalAgreements}</p>
                   </div>
                 )}
               </div>
