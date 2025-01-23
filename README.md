@@ -1,5 +1,7 @@
 ### Core Architecture
 
+https://account-d.docusign.com/me/appconsent
+
 1. **Framework & Technologies**:
 - Built using NextJS for the frontend
 - Uses Hardhat for Ethereum development

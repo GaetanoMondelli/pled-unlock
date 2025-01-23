@@ -239,10 +239,10 @@ export const PlaygroundView = () => {
         const fileBuffer = await selectedFile.arrayBuffer();
         const base64File = Buffer.from(fileBuffer).toString('base64');
 
-        // Create request body
+        // Create request body with more specific naming
         const requestBody = {
           displaySettings: {
-            displayName: "Test Clickwrap",
+            displayName: `Test Clickwrap ${new Date().toISOString()}`, // Make name unique
             consentButtonText: "I Agree",
             format: "modal",
             mustRead: true,
@@ -257,6 +257,14 @@ export const PlaygroundView = () => {
           }]
         };
 
+        console.log('Creating clickwrap with request:', {
+          ...requestBody,
+          documents: [{
+            ...requestBody.documents[0],
+            documentBase64: '[BASE64_CONTENT]' // Don't log the full base64
+          }]
+        });
+
         const response = await fetch('/api/docusign/click/clickwraps', {
           method: 'POST',
           headers: {
@@ -267,16 +275,18 @@ export const PlaygroundView = () => {
           body: JSON.stringify(requestBody)
         });
 
+        const data = await response.json();
+
         if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.message || 'Failed to create clickwrap');
+          console.error('Error response:', data);
+          throw new Error(data.error || 'Failed to create clickwrap');
         }
 
-        const result = await response.json();
+        setClickwrapId(data.clickwrapId); // Store the ID for later use
         setStatus(
           "✅ Clickwrap Created Successfully!\n\n" +
-          `Clickwrap ID: ${result.clickwrapId}\n` +
-          `Status: ${result.status}`
+          `Clickwrap ID: ${data.clickwrapId}\n` +
+          `Status: ${data.status}`
         );
 
       } catch (error: any) {
@@ -325,22 +335,20 @@ export const PlaygroundView = () => {
     },
 
     checkUserAgreement: async () => {
-      if (!auth || !authenticated) {
-        setStatus("Error: Please authenticate first");
+      if (!auth || !authenticated || !clickwrapId || !userIdentifier) {
+        setStatus("Error: Please provide all required information");
         return;
       }
 
       try {
         setStatus("🔄 Checking user agreement status...");
 
-        const response = await fetch(`/api/docusign/click/clickwraps/${clickwrapId}/agreements`, {
+        const response = await fetch(`/api/docusign/click/clickwraps/${clickwrapId}/agreements/${userIdentifier}`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${auth.accessToken}`,
-            'Account-Id': auth.accountId,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ userIdentifier })
+            'Account-Id': auth.accountId
+          }
         });
 
         if (!response.ok) {
@@ -351,15 +359,56 @@ export const PlaygroundView = () => {
         const result = await response.json();
         setStatus(
           "✅ Agreement Status Retrieved\n\n" +
-          `Status: ${result.status}\n` +
+          `Status: ${result.status || 'Not Found'}\n` +
           `Agreed On: ${result.agreedOn || 'Not agreed'}\n` +
-          `IP Address: ${result.clientIPAddress || 'N/A'}`
+          `Client IP: ${result.clientIPAddress || 'N/A'}`
         );
 
       } catch (error: any) {
         console.error('Error checking agreement status:', error);
         setStatus(
           "❌ Failed to Check Agreement Status\n\n" +
+          `Error: ${error.message}\n\n` +
+          "Please check the console for more details."
+        );
+      }
+    },
+
+    getAgreementUrl: async () => {
+      if (!auth || !authenticated || !clickwrapId) {
+        setStatus("Error: Please authenticate and create a clickwrap first");
+        return;
+      }
+
+      try {
+        setStatus("🔄 Getting agreement URL...");
+
+        const response = await fetch(`/api/docusign/click/clickwraps/${clickwrapId}/agreements`, {
+          headers: {
+            'Authorization': `Bearer ${auth.accessToken}`,
+            'Account-Id': auth.accountId
+          }
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || 'Failed to get agreement URL');
+        }
+
+        const { agreementUrl } = await response.json();
+        
+        // Open the agreement URL in a new window
+        window.open(agreementUrl, '_blank');
+        
+        setStatus(
+          "✅ Agreement URL Generated\n\n" +
+          "The agreement page has been opened in a new window."
+        );
+
+      } catch (error: any) {
+        console.error('Error getting agreement URL:', error);
+        setStatus(
+          "❌ Failed to Get Agreement URL\n\n" +
           `Error: ${error.message}\n\n` +
           "Please check the console for more details."
         );
@@ -1444,6 +1493,17 @@ export const PlaygroundView = () => {
                         disabled={!authenticated || !clickwrapId || !userIdentifier}
                       >
                         Check Agreement
+                      </Button>
+                    </div>
+
+                    <div className="p-4 border rounded-lg">
+                      <h4 className="font-medium mb-2">View Agreement</h4>
+                      <Button
+                        variant="outline"
+                        onClick={clickOperations.getAgreementUrl}
+                        disabled={!authenticated || !clickwrapId}
+                      >
+                        Open Agreement
                       </Button>
                     </div>
                   </div>
