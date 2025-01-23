@@ -11,6 +11,8 @@ import { StateHistory } from './state-history'
 import { fetchFromDb } from "~~/utils/api"
 import { handleEventAndGenerateMessages } from "@/utils/stateAndMessageHandler"
 import { Card } from "@/components/ui/card"
+import MessageRules from './message-rules'
+import { useRouter } from 'next/navigation'
 
 interface Message {
   id: string;
@@ -50,6 +52,7 @@ interface StateTransition {
   message: string;
   fromState: string;
   toState: string;
+  messageId?: string;
 }
 
 export const ProcedureState: React.FC<ProcedureStateProps> = ({ 
@@ -82,6 +85,9 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
   const containerRef = useRef<HTMLDivElement>(null)
   const [showDebug, setShowDebug] = useState(false)
   const [generatedMessages, setGeneratedMessages] = useState<Message[]>([])
+  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null)
+  const messageRef = useRef<HTMLDivElement>(null)
+  const router = useRouter()
 
   // Load events and process them
   useEffect(() => {
@@ -119,21 +125,22 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
             definition
           )
 
-          // Get the first message type to use for the state machine transition
           const messageType = result.messages[0]?.type
           if (messageType) {
-            // Apply the transition using the message type instead of event type
             const actionResult = machine.action(messageType)
             if (actionResult) {
               currentState = machine.state()
             }
           }
 
+          // Create a consistent message ID based on the event
+          const messageId = `msg_${event.id || Date.now()}`
+
           const processedMessages = result.messages.map(msg => ({
             ...msg,
-            id: msg.id || `msg_${Date.now()}_${Math.random()}`,
-            timestamp: msg.timestamp || new Date().toISOString(),
-            title: msg.title || event.title || 'Event',
+            id: messageId,
+            timestamp: msg.timestamp || event.timestamp || new Date().toISOString(),
+            title: msg.type || 'Event',
             type: msg.type,
             content: msg.content || `Transition from ${previousState} to ${currentState}`
           }))
@@ -142,13 +149,14 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
           
           // Add transition to history with message type
           allTransitions.push({
-            id: `transition_${Date.now()}_${Math.random()}`,
+            id: messageId,
             timestamp: event.timestamp || new Date().toISOString(),
             message: messageType || 'unknown',
             type: messageType,
-            title: event.title || '',
+            title: event.type || messageType || '',
             fromState: previousState,
-            toState: currentState
+            toState: currentState,
+            messageId: messageId
           })
         }
 
@@ -271,23 +279,25 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
 
       const newState = machine.state()
       const timestamp = new Date().toISOString()
+      const messageId = `msg_${Date.now()}`
       
       const newMessage: Message = {
-        id: `msg_${Date.now()}`,
+        id: messageId,
         type: messageType,
         timestamp,
-        title: `State Change`,
+        title: messageType,
         content: `Transition: ${previousState} -> ${newState}`
       }
 
       const newTransition: StateTransition = {
-        id: newMessage.id,
+        id: messageId,
         timestamp,
         message: messageType,
         type: messageType,
-        title: 'State Change',
+        title: messageType,
         fromState: previousState,
-        toState: newState
+        toState: newState,
+        messageId: messageId
       }
 
       setMessages(prev => [...prev, newMessage])
@@ -321,6 +331,22 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
     if (e.target === containerRef.current) {
       setFocusedState(null)
     }
+  }
+
+  const scrollToMessage = (messageId: string) => {
+    setSelectedMessageId(messageId)
+    // Navigate to messages tab with highlight parameter
+    router.push(`/procedures/${procedureId}?tab=messages&highlight=${messageId}`)
+    
+    // Use setTimeout to wait for navigation before scrolling
+    setTimeout(() => {
+      const messageElement = document.getElementById(`message-${messageId}`)
+      if (messageElement) {
+        messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        messageElement.classList.add('flash-highlight')
+        setTimeout(() => messageElement.classList.remove('flash-highlight'), 1000)
+      }
+    }, 100)
   }
 
   return (
@@ -372,25 +398,13 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
           </div>
         </div>
 
-        {/* Add Messages Display */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-medium">Messages</h3>
-          <div className="space-y-2">
-            {messages.map((message) => (
-              <Card key={message.id} className="p-4">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h4 className="font-medium">{message.title}</h4>
-                    <p className="text-sm text-gray-600">{message.content}</p>
-                  </div>
-                  <span className="text-xs text-gray-500">
-                    {new Date(message.timestamp).toLocaleString()}
-                  </span>
-                </div>
-              </Card>
-            ))}
-          </div>
-        </div>
+        {/* Messages section using MessageRules component */}
+        <MessageRules 
+          procedureId={procedureId}
+          messages={messages}
+          selectedMessageId={selectedMessageId}
+          onMessageSelect={scrollToMessage}
+        />
 
         <div className="space-y-4">
           <h3 className="text-lg font-medium">State Transition History {procedureId}</h3>
@@ -398,6 +412,7 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
             transitions={stateHistory}
             onFocusState={handleFocusState}
             focusedState={focusedState}
+            onMessageClick={scrollToMessage}
           />
         </div>
 

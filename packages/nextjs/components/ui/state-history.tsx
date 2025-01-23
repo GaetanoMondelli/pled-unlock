@@ -10,15 +10,22 @@ interface StateTransition {
   toState: string;
   type?: string;
   title?: string;
+  messageId?: string;
 }
 
 interface StateHistoryProps {
   transitions: StateTransition[];
   onFocusState: (state: string) => void;
   focusedState: string | null;
+  onMessageClick: (messageId: string) => void;
 }
 
-export const StateHistory = ({ transitions, onFocusState, focusedState }: StateHistoryProps) => {
+export const StateHistory = ({ 
+  transitions, 
+  onFocusState, 
+  focusedState,
+  onMessageClick 
+}: StateHistoryProps) => {
   return (
     <div className="border rounded-lg">
       <Table>
@@ -37,10 +44,17 @@ export const StateHistory = ({ transitions, onFocusState, focusedState }: StateH
             return (
               <TableRow key={transition.id}>
                 <TableCell className="font-mono">
-                  {new Date(transition.timestamp).toLocaleTimeString()}
+                  {new Date(transition.timestamp).toLocaleString()}
                 </TableCell>
                 <TableCell>{transition.type || transition.message}</TableCell>
-                <TableCell>{transition.title || '-'}</TableCell>
+                <TableCell>
+                  <button
+                    onClick={() => onMessageClick(transition.messageId || transition.id)}
+                    className="hover:underline text-primary"
+                  >
+                    {transition.title || transition.type || '-'}
+                  </button>
+                </TableCell>
                 <TableCell>
                   <span className="text-muted-foreground">{transition.fromState}</span>
                   <span className="mx-2">→</span>

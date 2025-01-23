@@ -159,3 +159,25 @@ p {
 [data-debug] {
   visibility: var(--debug-visibility) !important;
 }
+
+@keyframes flash-highlight {
+  0% { background-color: rgba(var(--primary-rgb), 0.2); }
+  100% { background-color: transparent; }
+}
+
+.flash-highlight {
+  animation: flash-highlight 1s ease-out;
+}
+
+/* Add styles for table row highlighting */
+tr.flash-highlight {
+  position: relative;
+}
+
+tr.flash-highlight::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  animation: flash-highlight 1s ease-out;
+  pointer-events: none;
+}

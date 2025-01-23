@@ -19,11 +19,28 @@ import { matchEventToRule } from "../../utils/eventMatching";
 import { useSearchParams, useRouter } from 'next/navigation';
 import { ScrollArea } from "./scroll-area";
 
-interface MessageRulesProps {
-  procedureId: string;
+interface Message {
+  id: string;
+  type: string;
+  timestamp: string;
+  title: string;
+  content: string;
+  fromEvent?: string;
 }
 
-export default function MessageRules({ procedureId }: MessageRulesProps) {
+interface MessageRulesProps {
+  procedureId: string;
+  messages?: Message[];
+  selectedMessageId?: string | null;
+  onMessageSelect?: (messageId: string) => void;
+}
+
+export const MessageRules: React.FC<MessageRulesProps> = ({ 
+  procedureId, 
+  messages = [],
+  selectedMessageId,
+  onMessageSelect 
+}) => {
   const [expandedRules, setExpandedRules] = useState<string[]>([]);
   const [instance, setInstance] = useState<any>(null);
   const [template, setTemplate] = useState<any>(null);
@@ -32,6 +49,8 @@ export default function MessageRules({ procedureId }: MessageRulesProps) {
   const [expandedEvents, setExpandedEvents] = useState<string[]>([]);
   const searchParams = useSearchParams();
   const router = useRouter();
+  const highlightedMessageId = searchParams.get('highlight');
+  const [localSelectedMessageId, setLocalSelectedMessageId] = useState<string | null>(null);
 
   const toggleRule = (ruleId: string) => {
     setExpandedRules(prev => 
@@ -101,6 +120,32 @@ export default function MessageRules({ procedureId }: MessageRulesProps) {
     }
     fetchData();
   }, [procedureId]);
+
+  useEffect(() => {
+    if (highlightedMessageId) {
+      setLocalSelectedMessageId(highlightedMessageId);
+      
+      // First scroll to the Generated Messages section
+      setTimeout(() => {
+        const generatedMessagesSection = document.getElementById('generated-messages-section');
+        if (generatedMessagesSection) {
+          generatedMessagesSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          
+          // Then scroll to the specific message row after a short delay
+          setTimeout(() => {
+            const messageRow = document.getElementById(`generated-message-${highlightedMessageId}`);
+            if (messageRow) {
+              messageRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              messageRow.classList.add('flash-highlight');
+              setTimeout(() => messageRow.classList.remove('flash-highlight'), 1000);
+            }
+          }, 500); // Wait for the section scroll to complete
+        }
+      }, 100);
+    }
+  }, [highlightedMessageId]);
+
+  const effectiveSelectedId = selectedMessageId || localSelectedMessageId;
 
   if (!instance || !template) return null;
 
@@ -306,7 +351,7 @@ export default function MessageRules({ procedureId }: MessageRulesProps) {
       )}
 
       {/* Generated Messages - Table Format */}
-      <div>
+      <div id="generated-messages-section">
         <h3 className="font-semibold mb-4">Generated Messages</h3>
         <Table>
           <TableHeader>
@@ -319,8 +364,14 @@ export default function MessageRules({ procedureId }: MessageRulesProps) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {generatedMessages.map((message: any) => (
-              <TableRow key={message.id}>
+            {generatedMessages?.map((message: any) => (
+              <TableRow 
+                key={message.id}
+                id={`generated-message-${message.id}`}
+                className={`transition-colors ${
+                  effectiveSelectedId === message.id ? 'bg-primary/5 ring-1 ring-primary' : ''
+                }`}
+              >
                 <TableCell className="text-xs">
                   {message.timestamp ? (
                     new Date(message.timestamp).toLocaleString()
@@ -362,7 +413,38 @@ export default function MessageRules({ procedureId }: MessageRulesProps) {
           </TableBody>
         </Table>
       </div>
+
+      {/* Messages - List Format */}
+      {messages && messages.length > 0 && (
+        <div className="space-y-4">
+          <h3 className="text-lg font-medium">Messages</h3>
+          <div className="space-y-2">
+            {messages.map((message) => (
+              <Card 
+                key={message.id} 
+                id={`message-${message.id}`}
+                className={`p-4 transition-colors ${
+                  effectiveSelectedId === message.id ? 'ring-2 ring-primary bg-primary/5' : ''
+                }`}
+                onClick={() => onMessageSelect?.(message.id)}
+              >
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h4 className="font-medium">{message.title}</h4>
+                    <p className="text-sm text-gray-600">{message.content}</p>
+                  </div>
+                  <span className="text-xs text-gray-500">
+                    {new Date(message.timestamp).toLocaleString()}
+                  </span>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
-}
+};
+
+export default MessageRules;
 
