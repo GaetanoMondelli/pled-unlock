@@ -1,5 +1,18 @@
+const getBaseUrl = () => {
+  if (typeof window === 'undefined') {
+    // Server-side
+    return process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  }
+  // Client-side
+  return '';  // Use relative URLs on client
+};
+
 export async function fetchFromDb() {
-  const response = await fetch('/api/db');
+  const baseUrl = getBaseUrl();
+  const response = await fetch(`${baseUrl}/api/db`, {
+    // Add cache: 'no-store' to prevent caching
+    cache: 'no-store'
+  });
   if (!response.ok) {
     throw new Error('Failed to fetch data');
   }
@@ -7,7 +20,8 @@ export async function fetchFromDb() {
 }
 
 export async function updateDb(data: any) {
-  const response = await fetch('/api/db', {
+  const baseUrl = getBaseUrl();
+  const response = await fetch(`${baseUrl}/api/db`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

@@ -16,12 +16,12 @@ import { DocuSignService } from "../../lib/docusign-service";
 import { getProcedureData, fetchFromDb } from "~~/utils/api";
 import { getNotMatchingReason } from "../../utils/message-rules";
 import { handleEventAndGenerateMessages } from "../../utils/stateAndMessageHandler";
+import { useSearchParams, usePathname } from 'next/navigation';
 
 interface CreateEventModalProps {
   open: boolean;
   onClose: () => void;
-  onSave: (template: any) => Promise<void>;
-  procedureId: string;
+  onSave: (data: any) => Promise<void>;
 }
 
 const EVENT_TEMPLATES = {
@@ -73,7 +73,11 @@ const fetchProcedureState = async (procedureId: string) => {
   }
 };
 
-export const CreateEventModal = ({ open, onClose, onSave, procedureId }: CreateEventModalProps) => {
+export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProps) => {
+  // Get procedureId from URL
+  const pathname = usePathname();
+  const procedureId = pathname?.split('/').pop()?.split('?')[0]; // This will get 'proc_123' from the URL
+
   const [selectedEndpoint, setSelectedEndpoint] = useState<string>("");
   const [selectedAction, setSelectedAction] = useState<string>("");
   const [selectedEnvelope, setSelectedEnvelope] = useState<string>("");
@@ -275,6 +279,7 @@ export const CreateEventModal = ({ open, onClose, onSave, procedureId }: CreateE
         name: `${eventType} Event`,
         description: `${eventType} event created manually`,
         type: eventType,
+        procedureId,
         template: {
           source: "manual",
           data: parsedData
@@ -289,17 +294,24 @@ export const CreateEventModal = ({ open, onClose, onSave, procedureId }: CreateE
         },
         body: JSON.stringify({
           event: template,
-          action: 'add_template'
+          action: 'add_template',
+          procedureId
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to add event');
+        const errorData = await response.json();
+        console.error('Error response:', errorData);
+        throw new Error(errorData.error || 'Failed to add event');
       }
 
-      onClose(); // Just close the modal
+      const result = await response.json();
+      
+      // Call onSave to trigger parent refresh
+      await onSave(result.event);
+      onClose();
     } catch (error) {
-      console.error("Invalid JSON data:", error);
+      console.error("Error creating event:", error);
     }
   };
 
@@ -368,39 +380,50 @@ export const CreateEventModal = ({ open, onClose, onSave, procedureId }: CreateE
   };
 
   const addAsVerifiedEvent = async () => {
-    if (!statusResult) return;
+    if (!statusResult || !procedureId) {
+      console.error('Missing required data:', { statusResult, procedureId });
+      return;
+    }
+
+    console.log('Current procedureId:', procedureId);
 
     // Create a DocuSign event template using the API response data
-    const template = {
+    const event = {
       id: `docusign-${statusResult.envelopeId}`,
       name: "DocuSign Status Update",
       description: `DocuSign envelope ${statusResult.status}`,
       type: "DOCUSIGN_EVENT",
+      procedureId,
       template: {
         source: "docusign",
-        data: statusResult  // Keep the full API response
+        data: statusResult
       }
     };
 
     try {
-      console.log('Creating DocuSign event:', template);
+      console.log('Creating DocuSign event:', event);
       const response = await fetch('/api/events', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          event: template,
-          action: 'add_template'
+          event,
+          action: 'add_template',
+          procedureId
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to add DocuSign event');
+        const errorData = await response.json();
+        console.error('Error response:', errorData);
+        throw new Error(errorData.error || 'Failed to add DocuSign event');
       }
 
+      const result = await response.json();
+      await onSave(result.event);
       setStatusResult(null);
-      onClose(); // Just close the modal
+      onClose();
     } catch (error) {
       console.error('Error adding DocuSign event:', error);
     }
@@ -441,15 +464,37 @@ export const CreateEventModal = ({ open, onClose, onSave, procedureId }: CreateE
       const event = {
         id: `evt_${Date.now()}`,
         type: 'DOCUSIGN_NAVIGATOR_GET_AGREEMENT',
-        data: {
-          accountId: '{{docusign.accountId}}',
-          agreementId: selectedEnvelope,
-          result: navigatorResult
-        },
-        timestamp: new Date().toISOString()
+        name: "DocuSign Navigator Agreement",
+        description: "Agreement details from DocuSign Navigator",
+        template: {
+          source: "docusign-navigator",
+          data: {
+            accountId: '{{docusign.accountId}}',
+            agreementId: selectedEnvelope,
+            result: navigatorResult
+          }
+        }
       };
 
-      await onSave({ event });
+      const response = await fetch('/api/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event,
+          action: 'add_template',
+          procedureId
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Error response:', errorData);
+        throw new Error(errorData.error || 'Failed to add Navigator event');
+      }
+
+      const result = await response.json();
+      await onSave(result.event);
+      setNavigatorResult(null);
       onClose();
     } catch (error) {
       console.error('Error adding Navigator result as event:', error);
@@ -460,7 +505,7 @@ export const CreateEventModal = ({ open, onClose, onSave, procedureId }: CreateE
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Create Event</DialogTitle>
+          <DialogTitle>Create Event for Procedure {procedureId}</DialogTitle>
         </DialogHeader>
 
         <Tabs defaultValue="raw" onValueChange={handleTabChange}>

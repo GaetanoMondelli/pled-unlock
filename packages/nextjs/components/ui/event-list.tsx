@@ -551,7 +551,7 @@ export default function EventList({ procedureId }: EventListProps) {
                       </div>
                       {expandedEvents.includes(key) && (
                         <div className="p-2 border-t bg-gray-50">
-                          <pre className="text-xs overflow-auto">
+                          <pre className="text-xs overflow-x-auto whitespace-pre-wrap break-all max-h-[300px]">
                             {JSON.stringify(event.template.data, null, 2)}
                           </pre>
                         </div>
@@ -653,7 +653,7 @@ export default function EventList({ procedureId }: EventListProps) {
                             </div>
                           </div>
                         )}
-                        <pre className="text-xs overflow-auto">
+                        <pre className="text-xs overflow-x-auto whitespace-pre-wrap break-all max-h-[300px]">
                           {JSON.stringify(event.data, null, 2)}
                         </pre>
                       </div>
@@ -697,19 +697,26 @@ export default function EventList({ procedureId }: EventListProps) {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 event: template,
-                action: 'create'
+                action: 'add_template',
+                procedureId
               })
             });
 
-            if (!response.ok) throw new Error('Failed to create event');
+            if (!response.ok) {
+              const errorData = await response.json();
+              console.error('Error response:', errorData);
+              throw new Error(errorData.error || 'Failed to create event');
+            }
 
+            // Refresh the events list
+            const refreshedData = await fetchFromDb();
+            setPledData(refreshedData);
             await fetchEvents();
             setShowCreateModal(false);
           } catch (error) {
             console.error('Error creating event:', error);
           }
         }}
-        procedureId={procedureId}
       />
     </div>
   );
