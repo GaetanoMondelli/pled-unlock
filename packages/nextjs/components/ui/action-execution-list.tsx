@@ -53,7 +53,7 @@ export const ActionExecutionList = ({
                   `}
                 >
                   <td className="px-4 py-2">
-                    {action.type || action.actionId}
+                    {action.type || action.name || action.actionId || 'Unknown Action'}
                   </td>
                   <td className="px-4 py-2">
                     {action.state}

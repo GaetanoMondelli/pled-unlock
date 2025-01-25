@@ -604,9 +604,11 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
       // Add initial state actions
       if (template.actions?.[currentState]) {
         expectedActions.push(...template.actions[currentState].map(action => ({
-          actionId: action.id,
+          actionId: action.id || `action_${Date.now()}`,
           state: currentState,
-          trigger: 'INIT'
+          trigger: 'INIT',
+          type: action.type || 'UNKNOWN',
+          timestamp: new Date().toISOString()
         })));
       }
 
@@ -622,9 +624,11 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
           // Add actions for the new state
           if (template.actions?.[currentState]) {
             expectedActions.push(...template.actions[currentState].map((action: any) => ({
-              actionId: action.id,
+              actionId: action.id || `action_${Date.now()}`,
               state: currentState,
-              trigger: message.type
+              trigger: message.type || 'INIT',
+              type: action.type || 'UNKNOWN',
+              name: action.type || 'UNKNOWN'
             })));
           }
         }
@@ -656,8 +660,9 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
           ...pendingActions.map(action => ({
             actionId: action.actionId,
             state: action.state, 
-            trigger: action.trigger,
-            type: action.type,
+            trigger: action.trigger || 'UNKNOWN',
+            type: action.type || 'UNKNOWN',
+            name: action.type || 'UNKNOWN',
             timestamp: new Date().toISOString()
           }))
         ];
