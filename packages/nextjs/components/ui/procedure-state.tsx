@@ -13,6 +13,8 @@ import { handleEventAndGenerateMessages } from "@/utils/stateAndMessageHandler"
 import { Card } from "@/components/ui/card"
 import MessageRules from './message-rules'
 import { useRouter } from 'next/navigation'
+import StateGraph from './state-graph'
+import { Play } from 'lucide-react'
 
 interface Message {
   id: string;
@@ -42,6 +44,9 @@ interface ProcedureStateProps {
         description?: string;
         actions?: string[];
       };
+    };
+    actions?: {
+      [key: string]: string[];
     };
   };
 }
@@ -75,7 +80,7 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
   const [events, setEvents] = useState<Event[]>([])
   const [messages, setMessages] = useState<Message[]>([])
   const [currentState, setCurrentState] = useState(() => 
-    calculateCurrentState(definition, messages)
+    calculateCurrentState(definition, messages, null, template)
   )
   const [selectedNode, setSelectedNode] = useState(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -88,6 +93,8 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null)
   const messageRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
+
+  console.log('Template being passed to StateGraph:', template); // Debug log
 
   // Load events and process them
   useEffect(() => {
@@ -107,21 +114,86 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
         const events = instance.history?.events || []
         setEvents(events)
 
-        // Process each event to generate messages and transitions
-        let currentState = 'idle'
-        const allMessages: Message[] = []
-        const allTransitions: StateTransition[] = []
+        console.log('Processing events for state calculation:', events)
 
+        let processedState = 'idle'
         const machine = createStateMachine(definition)
-        machine.go(currentState)
+        machine.go(processedState)
 
+        console.log('Starting state:', processedState)
+
+        // Process all events to get final state
         for (const event of events) {
-          const previousState = currentState
+          console.log('\nProcessing event:', {
+            id: event.id,
+            type: event.type,
+            currentState: processedState
+          })
+
           const result = handleEventAndGenerateMessages(
             event,
             template.messageRules || [],
             instance.variables || {},
-            currentState,
+            processedState,
+            definition
+          )
+
+          console.log('Event processing result:', {
+            messages: result.messages,
+            transitions: result.transitions
+          })
+
+          // Process state transition
+          const messageType = result.messages[0]?.type
+          if (messageType) {
+            console.log('Attempting transition with:', {
+              fromState: processedState,
+              messageType
+            })
+
+            const actionResult = machine.action(messageType)
+            if (actionResult) {
+              const newState = machine.state()
+              console.log('Transition successful:', {
+                from: processedState,
+                to: newState,
+                trigger: messageType
+              })
+              processedState = newState
+            } else {
+              console.log('Transition failed - no valid transition for:', {
+                state: processedState,
+                messageType
+              })
+            }
+          } else {
+            console.log('No message type found for transition')
+          }
+        }
+
+        console.log('\nFinal state calculation:', {
+          initialState: 'idle',
+          events: events.length,
+          finalState: processedState
+        })
+
+        setCurrentState(processedState)
+
+        // Process messages and transitions for history display
+        let allMessages = []
+        let allTransitions = []
+
+        // Reset machine for history processing
+        machine.go('idle')
+        processedState = 'idle'
+
+        for (const event of events) {
+          const previousState = processedState
+          const result = handleEventAndGenerateMessages(
+            event,
+            template.messageRules || [],
+            instance.variables || {},
+            processedState,
             definition
           )
 
@@ -129,50 +201,40 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
           if (messageType) {
             const actionResult = machine.action(messageType)
             if (actionResult) {
-              currentState = machine.state()
+              processedState = machine.state()
             }
           }
 
-          // Create a consistent message ID based on the event
-          const messageId = `msg_${event.id || Date.now()}`
+          // Create unique message ID using timestamp
+          const messageId = `msg_${event.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 
-          const processedMessages = result.messages.map(msg => ({
+          allMessages.push(...result.messages.map(msg => ({
             ...msg,
-            id: messageId,
+            id: messageId, // Unique ID for each message
             timestamp: msg.timestamp || event.timestamp || new Date().toISOString(),
             title: msg.type || 'Event',
             type: msg.type,
-            content: msg.content || `Transition from ${previousState} to ${currentState}`
-          }))
+            content: msg.content || `Transition from ${previousState} to ${processedState}`
+          })))
 
-          allMessages.push(...processedMessages)
-          
-          // Add transition to history with message type
           allTransitions.push({
-            id: messageId,
+            id: messageId, // Same unique ID for corresponding transition
             timestamp: event.timestamp || new Date().toISOString(),
             message: messageType || 'unknown',
             type: messageType,
             title: event.type || messageType || '',
             fromState: previousState,
-            toState: currentState,
+            toState: processedState,
             messageId: messageId
           })
         }
 
-        console.log('Generated results:', {
-          messages: allMessages,
-          transitions: allTransitions,
-          finalState: currentState
-        })
-
         setGeneratedMessages(allMessages)
         setStateHistory(allTransitions)
-        setCurrentState(currentState)
         setMessages(allMessages)
 
       } catch (error) {
-        console.error('Error loading and processing events:', error)
+        console.error('Error loading events:', error)
       }
     }
 
@@ -209,6 +271,7 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
     })
 
     console.log('States found:', Array.from(stateSet))
+    console.log('Template actions:', template?.actions)
     
     return Array.from(stateSet).map(state => ({
       id: state,
@@ -216,13 +279,13 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
       isInitial: state === 'idle',
       isFinal: finalStates.has(state),
       metadata: {
-        ...template?.states?.[state],
-        // Add actions if they exist in the template
-        actions: template?.states?.[state]?.actions || [],
-        // We don't need to add documents here as they're inferred from the documents section
+        actions: template?.actions?.[state] || [],
+        description: `State: ${state}${template?.actions?.[state] ? 
+          '\nActions: ' + template.actions[state].length : 
+          '\nNo actions'}`
       }
     }))
-  }, [definition, currentState, template])
+  }, [definition, currentState, template?.actions])
 
   const links = useMemo(() => {
     const transitionLinks: { source: string; target: string; label: string }[] = []
@@ -259,7 +322,7 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
     try {
       const newStateMachine = createStateMachine(newDefinition)
       setStateMachine(newStateMachine)
-      setCurrentState(calculateCurrentState(newDefinition, messages))
+      setCurrentState(calculateCurrentState(newDefinition, messages, null, template))
     } catch (error) {
       console.error("Invalid state machine definition", error)
     }
@@ -311,14 +374,22 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
   }
 
   const handleNodeClick = (node: any) => {
-    console.log('Clicked node:', node)
-    setSelectedNode(node)
-    setIsDialogOpen(true)
-    setFocusedState(node.id)
-    if (graphRef.current?.focusOnState) {
-      graphRef.current.focusOnState(node.id)
+    if (!node) {
+      console.error('No node data provided to handleNodeClick');
+      return;
     }
-  }
+
+    console.log('Clicked node:', node);
+    setSelectedNode(node);
+    setIsDialogOpen(true);
+    
+    if (node.id) {
+      setFocusedState(node.id);
+      if (graphRef.current?.focusOnState) {
+        graphRef.current.focusOnState(node.id);
+      }
+    }
+  };
 
   const handleFocusState = (state: string) => {
     setFocusedState(prev => prev === state ? null : state)
@@ -349,19 +420,235 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
     }, 100)
   }
 
+  const checkAndExecuteStateActions = async (
+    state: string, 
+    trigger: string, 
+    previousState: string,
+    updatedInstance: any,
+    template: any
+  ) => {
+    // Get actions for this state
+    const stateActions = template.actions?.[state] || [];
+    
+    console.log('Checking actions for state:', {
+      state,
+      trigger,
+      stateActionsRaw: template.actions?.[state], // Debug raw actions
+      availableActions: stateActions,
+      executedActions: updatedInstance.history.executedActions
+    });
+
+    // Find pending actions
+    const pendingActions = stateActions.filter((action: any) => {
+      console.log('Checking action:', action); // Debug each action
+
+      // Default to enabled if not specified
+      if (action.enabled === undefined) {
+        action.enabled = true;
+      }
+
+      const hasBeenExecuted = updatedInstance.history.executedActions.some(
+        (executed: any) => 
+          executed.actionId === action.id && 
+          executed.state === state &&
+          executed.trigger === trigger
+      );
+      
+      const shouldExecute = !hasBeenExecuted && action.enabled;
+      console.log('Action execution check:', {
+        actionId: action.id,
+        hasBeenExecuted,
+        enabled: action.enabled,
+        shouldExecute
+      });
+      
+      return shouldExecute;
+    });
+
+    console.log('Pending actions for state:', {
+      state,
+      pendingActionsCount: pendingActions.length,
+      pendingActions
+    });
+
+    // Execute pending actions
+    for (const action of pendingActions) {
+      try {
+        console.log('Executing action:', action);
+
+        const actionEvent = {
+          id: `evt_${Date.now()}`,
+          ...action.template.data,
+          timestamp: new Date().toISOString(),
+          source: action.id,
+          transition: {
+            from: previousState,
+            to: state,
+            trigger
+          }
+        };
+
+        console.log('Created action event:', actionEvent);
+
+        const response = await fetch('/api/events', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            event: actionEvent,
+            action: 'add',
+            procedureId
+          })
+        });
+
+        if (response.ok) {
+          // Record the execution
+          const executionRecord = {
+            actionId: action.id,
+            state,
+            trigger,
+            timestamp: new Date().toISOString(),
+            eventId: actionEvent.id
+          };
+
+          console.log('Recording action execution:', executionRecord);
+
+          updatedInstance.history.executedActions.push(executionRecord);
+
+          // Update instance
+          const updateResponse = await fetch('/api/procedures/' + procedureId, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              history: updatedInstance.history
+            })
+          });
+
+          if (!updateResponse.ok) {
+            console.error('Failed to update instance with execution record');
+          }
+        } else {
+          console.error('Failed to create action event');
+        }
+      } catch (error) {
+        console.error('Error executing action:', error);
+      }
+    }
+
+    return pendingActions.length > 0; // Return whether any actions were executed
+  };
+
+  const getActionsForState = (state: string, template: any) => {
+    const stateActions = template.actions?.[state] || [];
+    return stateActions.map((action: any) => ({
+      actionId: action.id,
+      state,
+      type: action.type,
+      enabled: action.enabled ?? true
+    }));
+  };
+
+  const handleRunMachine = async () => {
+    try {
+      const data = await fetchFromDb();
+      const instance = data.procedureInstances.find((p: any) => p.instanceId === procedureId);
+      const template = data.procedureTemplates?.find(
+        (t: any) => t.templateId === instance?.templateId
+      );
+
+      if (!instance || !template) {
+        console.error('Instance or template not found');
+        return;
+      }
+
+      // Initialize instance structure
+      const updatedInstance = {
+        ...instance,
+        history: {
+          ...instance.history,
+          executedActions: instance.history?.executedActions || []
+        }
+      };
+
+      // Calculate all actions that should have been executed
+      let expectedActions = [];
+      let currentState = 'idle';
+      const machine = createStateMachine(definition);
+      machine.go(currentState);
+
+      console.log('Starting action calculation from:', currentState);
+
+      // Add initial state actions
+      if (template.actions?.[currentState]) {
+        expectedActions.push(...template.actions[currentState].map(action => ({
+          actionId: action.id,
+          state: currentState,
+          trigger: 'INIT'
+        })));
+      }
+
+      // Process each event to track state changes and required actions
+      for (const event of instance.history.events) {
+        const previousState = currentState;
+        const actionResult = machine.action(event.type);
+        
+        if (actionResult) {
+          currentState = machine.state();
+          console.log(`State transition: ${previousState} -> ${currentState} (${event.type})`);
+
+          // Add actions for the new state
+          if (template.actions?.[currentState]) {
+            expectedActions.push(...template.actions[currentState].map(action => ({
+              actionId: action.id,
+              state: currentState,
+              trigger: event.type
+            })));
+          }
+        }
+      }
+
+      // Compare with executed actions
+      const executedActionKeys = new Set(
+        updatedInstance.history.executedActions.map(
+          (a: any) => `${a.actionId}_${a.state}_${a.trigger}`
+        )
+      );
+
+      const pendingActions = expectedActions.filter(action => {
+        const actionKey = `${action.actionId}_${action.state}_${action.trigger}`;
+        return !executedActionKeys.has(actionKey);
+      });
+
+      console.log('Action analysis:', {
+        currentState,
+        expectedActions,
+        executedActions: updatedInstance.history.executedActions,
+        pendingActions
+      });
+
+    } catch (error) {
+      console.error('Error analyzing actions:', error);
+    }
+  };
+
   return (
     <>
-      <div 
-        className="flex flex-col gap-6" 
-        onClick={handleContainerClick}
-        ref={containerRef}
-      >
-        <div className="flex justify-between items-center">
+      <div className="flex flex-col gap-6" onClick={handleContainerClick} ref={containerRef}>
+        <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-medium">State Machine Visualization</h3>
-          <FSMDefinitionModal 
-            definition={definition}
-            onChange={(value: string) => handleDefinitionChange({ target: { value } } as React.ChangeEvent<HTMLTextAreaElement>)}
-          />
+          <div className="flex gap-2">
+            <Button 
+              onClick={handleRunMachine}
+              variant="default"
+              className="bg-primary text-white hover:bg-primary/90"
+            >
+              <Play className="h-4 w-4 mr-2" />
+              Run Machine
+            </Button>
+            <FSMDefinitionModal 
+              definition={definition}
+              onChange={(value: string) => handleDefinitionChange({ target: { value } } as React.ChangeEvent<HTMLTextAreaElement>)}
+            />
+          </div>
         </div>
 
         <div className="w-full bg-white rounded-lg shadow-lg p-4">
@@ -375,12 +662,40 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
             width={800}
             height={500}
             direction="LR"
-            onNodeClick={handleNodeClick}
+            onNodeClick={(node: any) => {
+              console.log('Node clicked:', node); // Debug log
+              if (node && typeof handleNodeClick === 'function') {
+                handleNodeClick(node);
+              }
+            }}
             documents={template?.documents}
           />
+          
+          <div className="mt-4 p-4 bg-slate-100 rounded-lg">
+            <h3 className="font-medium mb-2">State Machine Debug</h3>
+            <div className="space-y-2">
+              <div>
+                <h4 className="text-sm font-medium">Template Actions:</h4>
+                <pre className="text-sm bg-white p-2 rounded overflow-auto max-h-40">
+                  {JSON.stringify(template?.actions, null, 2)}
+                </pre>
+              </div>
+              <div>
+                <h4 className="text-sm font-medium">Current State:</h4>
+                <pre className="text-sm bg-white p-2 rounded">
+                  {currentState}
+                </pre>
+              </div>
+              <div>
+                <h4 className="text-sm font-medium">FSM Definition:</h4>
+                <pre className="text-sm bg-white p-2 rounded overflow-auto max-h-40">
+                  {definition}
+                </pre>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Add Available Actions */}
         <div className="space-y-4">
           <h3 className="text-lg font-medium">Available Actions</h3>
           <div className="flex gap-2 flex-wrap">
@@ -398,7 +713,6 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
           </div>
         </div>
 
-        {/* Messages section using MessageRules component */}
         <MessageRules 
           procedureId={procedureId}
           messages={messages}
@@ -415,7 +729,6 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
             onMessageClick={scrollToMessage}
           />
         </div>
-
       </div>
 
       <NodeDetailsDialog

@@ -22,6 +22,24 @@ interface StateMachine {
   state: () => string;
 }
 
+interface ActionLog {
+  actionId: string;
+  state: string;
+  timestamp: string;
+  eventId: string;
+  transitionId: string;
+  previousState: string;
+  trigger: string;
+}
+
+interface ActionExecution {
+  actionId: string;
+  state: string;
+  trigger: string;  // The event that caused this state
+  timestamp: string;
+  eventId: string;
+}
+
 export function createStateMachine(definition: string): StateMachine {
   const transitions = new Map<string, Map<string, string>>();
   const states = new Set<string>();
@@ -78,13 +96,111 @@ export function createStateMachine(definition: string): StateMachine {
   };
 }
 
-export function calculateCurrentState(definition: string, messages: Array<any>): string {
+export const calculateCurrentState = async (
+  definition: string, 
+  messages: any[], 
+  instance: any,
+  template: any
+) => {
   const machine = createStateMachine(definition);
-  
-  messages.forEach(msg => {
-    machine.go(machine.state());
-    machine.action(msg.type);
-  });
+  let currentState = 'idle';
+  machine.go(currentState);
 
-  return machine.state();
-} 
+  if (!instance) {
+    console.log('No instance provided to calculateCurrentState');
+    return currentState;
+  }
+
+  // Initialize action tracking if it doesn't exist
+  if (!instance.history) {
+    instance.history = {};
+  }
+  if (!instance.history.executedActions) {
+    instance.history.executedActions = [];
+  }
+
+  let processedState = 'idle';
+  
+  for (const message of messages) {
+    if (message.type) {
+      const previousState = processedState;
+      const actionResult = machine.action(message.type);
+      
+      if (actionResult) {
+        processedState = machine.state();
+        
+        // Get actions that should be executed in this state
+        const stateActions = template?.actions?.[processedState] || [];
+        
+        // Find which actions haven't been executed for this state transition
+        const pendingActions = stateActions.filter(action => {
+          const hasBeenExecuted = instance.history.executedActions.some(
+            (executed: ActionExecution) => 
+              executed.actionId === action.id && 
+              executed.state === processedState &&
+              executed.trigger === message.type
+          );
+          return !hasBeenExecuted && action.enabled;
+        });
+
+        console.log('State transition:', {
+          from: previousState,
+          to: processedState,
+          trigger: message.type,
+          pendingActions: pendingActions.length
+        });
+
+        // Execute pending actions
+        for (const action of pendingActions) {
+          try {
+            const event = {
+              id: `evt_${Date.now()}`,
+              ...action.template.data,
+              timestamp: new Date().toISOString(),
+              source: action.id,
+              transition: {
+                from: previousState,
+                to: processedState,
+                trigger: message.type
+              }
+            };
+
+            const response = await fetch('/api/events', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                event,
+                action: 'add',
+                procedureId: instance.instanceId
+              })
+            });
+
+            if (response.ok) {
+              // Record the action execution
+              instance.history.executedActions.push({
+                actionId: action.id,
+                state: processedState,
+                trigger: message.type,
+                timestamp: new Date().toISOString(),
+                eventId: event.id
+              });
+
+              // Update instance in database
+              await fetch('/api/procedures/' + instance.instanceId, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  history: instance.history
+                })
+              });
+            }
+          } catch (error) {
+            console.error('Error executing action:', error);
+          }
+        }
+      }
+    }
+  }
+
+  return processedState;
+}; 

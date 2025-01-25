@@ -325,6 +325,69 @@
               "body": "Dear {{candidate.name}},\n\nThis is a reminder about your upcoming interview..."
             }
           }
+        ],
+        "idle": [
+          {
+            "id": "action_1737807923750",
+            "type": "CUSTOM_EVENT",
+            "template": {
+              "source": "action",
+              "data": {
+                "id": 123
+              },
+              "history": {
+                "triggerState": "idle",
+                "events": [
+                  {
+                    "id": "interview-request-1737640068838",
+                    "type": "EMAIL_RECEIVED",
+                    "timestamp": "2025-01-23T13:47:48.838Z",
+                    "data": {
+                      "from": "john@example.com",
+                      "to": "hr@company.com",
+                      "subject": "Interview request",
+                      "body": "I would like to schedule an interview",
+                      "time": "2024-01-17T10:00:00Z"
+                    },
+                    "transitions": [
+                      {
+                        "id": "interview-request-1737640068838",
+                        "timestamp": "2025-01-23T13:47:48.838Z",
+                        "message": "EMAIL_RECEIVED",
+                        "fromState": "idle",
+                        "toState": "processing"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "role-discuss-1737641538864",
+                    "type": "EMAIL_RECEIVED",
+                    "timestamp": "2025-01-23T14:12:18.864Z",
+                    "data": {
+                      "from": "john@example.com",
+                      "to": "hr@company.com",
+                      "subject": "Role discussion",
+                      "body": "I would like to discuss the role details",
+                      "time": "2024-01-17T11:00:00Z"
+                    }
+                  },
+                  {
+                    "id": "schedule-interview-1737641550376",
+                    "type": "CALENDAR_EVENT",
+                    "timestamp": "2025-01-23T14:12:30.376Z",
+                    "data": {
+                      "type": "schedule_interview",
+                      "candidateEmail": "john@example.com",
+                      "interviewerEmail": "hr@company.com",
+                      "proposedTime": "2024-01-20T10:00:00Z",
+                      "duration": "60"
+                    }
+                  }
+                ],
+                "messages": []
+              }
+            }
+          }
         ]
       }
     },
@@ -685,6 +748,23 @@
         }
       },
       "received": false
+    },
+    "email_received_1737767194591": {
+      "id": "email_received_1737767194591",
+      "name": "EMAIL_RECEIVED Event",
+      "description": "EMAIL_RECEIVED event created manually",
+      "type": "EMAIL_RECEIVED",
+      "template": {
+        "source": "manual",
+        "data": {
+          "from": "ccjohn@example.com",
+          "to": "hr@company.com",
+          "subject": "Interview request",
+          "body": "I would like to schedule an interview",
+          "time": "2025-01-25T01:04:04.931Z"
+        }
+      },
+      "received": false
     }
   },
   "procedureInstances": [
@@ -754,7 +834,7 @@
             }
           }
         ],
-        "completedActions": []
+        "executedActions": []
       },
       "startDate": "2024-03-20T10:00:00Z",
       "events": [
