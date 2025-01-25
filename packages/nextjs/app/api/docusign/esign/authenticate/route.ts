@@ -5,20 +5,15 @@ import jwt from 'jsonwebtoken';
 
 // Constants for API endpoints
 const AUTH_BASE_URL = 'https://account-d.docusign.com';
-// For demo/dev environment use api-d, for production use api
-const NAVIGATOR_BASE_URL = 'https://api-d.docusign.com/v1';
-const REDIRECT_URI = 'http://localhost:3000/api/docusign/navigator/callback';
+const ESIGN_BASE_URL = 'https://demo.docusign.net/restapi/v2.1';
+const REDIRECT_URI = 'http://localhost:3000/api/docusign/esign/callback';
 const PLAYGROUND_URL = 'http://localhost:3000/procedures/proc_123?tab=playground';
 
-// Navigator-specific scopes - exactly as documented
-const NAVIGATOR_SCOPES = [
+// eSignature-specific scopes
+const ESIGN_SCOPES = [
   'signature',
   'impersonation',
-  'adm_store_unified_repo_read',  // Required to read agreement data
-  'models_read',                  // For forward compatibility
-  'extended',
-  'click.manage',
-  'click.send',                      // For additional access
+  'extended'
 ];
 
 export async function POST(req: NextRequest) {
@@ -40,7 +35,7 @@ export async function POST(req: NextRequest) {
       aud: config.dsOauthServer.replace('https://', ''),
       iat: now,
       exp: now + 3600,
-      scope: NAVIGATOR_SCOPES.join(' ')
+      scope: ESIGN_SCOPES.join(' ')
     };
 
     const assertion = jwt.sign(jwtPayload, privateKey, { algorithm: 'RS256' });
@@ -57,20 +52,12 @@ export async function POST(req: NextRequest) {
 
     const tokenData = await tokenResponse.json();
 
-    console.log('[Navigator Auth] Token response:', {
-      type: tokenData.token_type,
-      scopes: tokenData.scope,
-      expires: tokenData.expires_in,
-      tokenStart: tokenData.access_token?.substring(0, 20) + '...'
-    });
-
     if (tokenData.error === 'consent_required') {
-      console.log('[Navigator Auth] Consent required, redirecting to consent flow');
+      console.log('[eSign Auth] Consent required, redirecting to consent flow');
       
-      // Build consent URL with all required scopes
       const consentUrl = `${config.dsOauthServer}/oauth/auth?` + new URLSearchParams({
         'response_type': 'code',
-        'scope': NAVIGATOR_SCOPES.join(' '),
+        'scope': ESIGN_SCOPES.join(' '),
         'client_id': config.dsJWTClientId,
         'redirect_uri': REDIRECT_URI,
         'state': PLAYGROUND_URL,
@@ -80,7 +67,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ 
         error: 'consent_required', 
         consentUrl,
-        message: 'User consent required for Navigator API access'
+        message: 'User consent required for eSignature API access'
       });
     }
 
@@ -106,14 +93,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       accessToken: tokenData.access_token,
       accountId,
-      baseUrl: NAVIGATOR_BASE_URL,
-      scopes: NAVIGATOR_SCOPES
+      baseUrl: ESIGN_BASE_URL,
+      scopes: ESIGN_SCOPES
     });
 
   } catch (error: any) {
-    console.error('[Navigator Auth] Error:', error);
+    console.error('[eSign Auth] Error:', error);
     return NextResponse.json(
-      { error: error.message || 'Navigator authentication failed' },
+      { error: error.message || 'eSignature authentication failed' },
       { status: 500 }
     );
   }

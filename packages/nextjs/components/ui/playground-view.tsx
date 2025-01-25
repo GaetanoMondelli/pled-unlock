@@ -15,9 +15,15 @@ import {
   List,
   Eye,
   EyeOff,
-  LogOut
+  LogOut,
+  ChevronRight
 } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./dialog"
+import {
+  Collapsible,
+  CollapsibleTrigger,
+  CollapsibleContent,
+} from "./collapsible"
 
 interface DocuSignConfig {
   integrationKey: string;
@@ -186,7 +192,7 @@ type AuthType = {
   accessToken: string;
   accountId: string;
   baseUrl: string;
-  type: 'navigator' | 'esignature';
+  type: 'navigator' | 'esignature' | 'click';
   scopes?: string[];
 };
 
@@ -431,12 +437,86 @@ export const PlaygroundView = () => {
           "Please check the console for more details."
         );
       }
+    },
+
+    authenticateClick: async () => {
+      try {
+        setStatus("🔄 Authenticating Click API...");
+        const response = await fetch('/api/docusign/click/authenticate', {
+          method: 'POST'
+        });
+        
+        if (!response.ok) {
+          const error = await response.json();
+          if (error.error === 'consent_required' && error.consentUrl) {
+            window.location.href = error.consentUrl;
+            return;
+          }
+          throw new Error(error.error || 'Authentication failed');
+        }
+
+        const authData = await response.json();
+        setAuth(authData);
+        setAuthenticated(true);
+        setStatus(
+          "✅ Click API Authentication Successful!\n\n" +
+          "Connected to DocuSign with:\n" +
+          `Account ID: ${authData.accountId}\n` +
+          `Scopes: ${authData.scopes?.join(', ') || 'signature, impersonation, click.manage, click.send'}\n\n` +
+          "You can now manage clickwraps."
+        );
+      } catch (error: any) {
+        setStatus(
+          "❌ Click API Authentication Failed\n\n" +
+          `Error: ${error.message}\n\n` +
+          "Please check your configuration and try again."
+        );
+      }
+    },
+
+    listClickwraps: async () => {
+      if (!auth || !authenticated) {
+        setStatus("Error: Please authenticate first");
+        return;
+      }
+      
+      try {
+        setStatus("🔄 Fetching clickwraps...");
+        const response = await fetch('/api/docusign/click/clickwraps', {
+          headers: {
+            'Authorization': `Bearer ${auth.accessToken}`,
+            'Account-Id': auth.accountId
+          }
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to list clickwraps');
+        }
+
+        const result = await response.json();
+        setStatus(
+          "✅ Clickwraps Retrieved:\n\n" +
+          result.clickwraps.map((cw: any) => 
+            `• ${cw.clickwrapName} (ID: ${cw.clickwrapId})\n` +
+            `  Status: ${cw.status}\n` +
+            `  Version: ${cw.versionNumber}\n`
+          ).join('\n')
+        );
+      } catch (error: any) {
+        setStatus(
+          "❌ Failed to List Clickwraps\n\n" +
+          `Error: ${error.message}\n\n` +
+          "Please check your authentication and try again."
+        );
+      }
     }
   };
 
   // Add state for Click API
   const [clickwrapId, setClickwrapId] = useState<string>('');
   const [clickwrapStatus, setClickwrapStatus] = useState<any>(null);
+  const [agreementId, setAgreementId] = useState<string>('');
 
   useEffect(() => {
     // Fetch initial configuration
@@ -1101,42 +1181,65 @@ export const PlaygroundView = () => {
   };
 
   // Add new test function
-  const testNavigatorAgreement = async (agreementId: string) => {
+  const testNavigatorAgreement = async (agreementId?: string) => {
     try {
-      console.log('[Navigator] Getting agreement details:', agreementId);
+      if (!auth?.accessToken || !auth?.accountId) {
+        throw new Error('Please authenticate first');
+      }
+
+      console.log('[Navigator] Getting agreements:', agreementId ? 'specific ID' : 'all');
       
+      const endpoint = agreementId 
+        ? `${auth.baseUrl}/accounts/${auth.accountId}/agreements/${agreementId}`
+        : `${auth.baseUrl}/accounts/${auth.accountId}/agreements`;
+
       const response = await fetch('/api/docusign/navigator/proxy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          url: `${auth?.baseUrl}/accounts/${auth?.accountId}/agreements/${agreementId}`,
+          url: endpoint,
           method: 'GET',
-          token: auth?.accessToken
+          token: auth.accessToken
         })
       });
 
       const data = await response.json();
       if (data.error) throw new Error(data.error);
 
-      console.log('Agreement details:', data);
+      console.log('Agreement response:', data);
       
-      // Format the details for display
-      setTestResult({
-        success: true,
-        message: `Agreement Details for: ${data.name || data.file_name}`,
-        details: {
-          id: data.id,
-          name: data.name,
-          fileName: data.file_name,
-          type: data.type,
-          category: data.category,
-          status: data.status,
-          created: data.created_date ? new Date(data.created_date).toLocaleString() : 'N/A',
-          modified: data.last_modified_date ? new Date(data.last_modified_date).toLocaleString() : 'N/A',
-          // Add any other fields you want to display
-          rawData: data // Include raw data at the bottom
-        }
-      });
+      if (agreementId) {
+        // Single agreement details
+        setTestResult({
+          success: true,
+          message: `Agreement Details for: ${data.name || data.file_name}`,
+          details: {
+            id: data.id,
+            name: data.name,
+            fileName: data.file_name,
+            type: data.type,
+            category: data.category,
+            status: data.status,
+            created: data.created_date ? new Date(data.created_date).toLocaleString() : 'N/A',
+            modified: data.last_modified_date ? new Date(data.last_modified_date).toLocaleString() : 'N/A',
+            rawData: data
+          }
+        });
+      } else {
+        // List of agreements
+        const agreements = data.data || data.agreements || [];
+        setTestResult({
+          success: true,
+          message: `Found ${agreements.length} agreements`,
+          details: {
+            id: 'multiple',
+            name: 'Agreement List',
+            type: 'List',
+            agreements: agreements,
+            rawData: data
+          }
+        });
+      }
 
     } catch (error: any) {
       console.error('Navigator API error:', error);
@@ -1145,6 +1248,68 @@ export const PlaygroundView = () => {
         message: `Failed to get agreement details: ${error.message}`,
         details: null
       });
+    }
+  };
+
+  // Add state for selected agreement details
+  const [selectedAgreement, setSelectedAgreement] = useState<any>(null);
+
+  // Add new function for complete authentication
+  const authenticateAll = async () => {
+    try {
+      setStatus("🔄 Authenticating with all scopes...");
+      const response = await fetch('/api/docusign/authenticate', {
+        method: 'POST'
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        if (error.error === 'consent_required' && error.consentUrl) {
+          window.location.href = error.consentUrl;
+          return;
+        }
+        throw new Error(error.error || 'Authentication failed');
+      }
+
+      const authData = await response.json();
+      console.log('Auth response:', authData);
+
+      // Validate required fields
+      if (!authData.accessToken || !authData.accountId || !authData.baseUrl || !authData.type) {
+        console.error('Invalid auth data:', authData);
+        throw new Error('Missing required authentication data');
+      }
+
+      // Ensure type is valid
+      if (!['esignature', 'navigator', 'click'].includes(authData.type)) {
+        console.error('Invalid auth type:', authData.type);
+        throw new Error('Invalid authentication type');
+      }
+
+      setAuth({
+        accessToken: authData.accessToken,
+        accountId: authData.accountId,
+        baseUrl: authData.baseUrl,
+        type: authData.type as 'esignature' | 'navigator' | 'click',
+        scopes: authData.scopes || ALL_SCOPES
+      });
+      
+      setAuthenticated(true);
+      setStatus(
+        "✅ Authentication Successful!\n\n" +
+        "Connected to DocuSign with:\n" +
+        `Account ID: ${authData.accountId}\n` +
+        `Type: ${authData.type}\n` +
+        `Scopes: ${authData.scopes?.join(', ') || ALL_SCOPES.join(', ')}\n\n` +
+        "You can now use all DocuSign features."
+      );
+    } catch (error: any) {
+      console.error('Authentication error:', error);
+      setStatus(
+        "❌ Authentication Failed\n\n" +
+        `Error: ${error.message}\n\n` +
+        "Please check your configuration and try again."
+      );
     }
   };
 
@@ -1235,32 +1400,42 @@ export const PlaygroundView = () => {
               </div>
             </TabsContent>
 
-            <TabsContent value="docusign" className="space-y-6">
+            <TabsContent value="docusign" className="space-y-4">
               <div className="grid gap-4">
-                <div className="grid grid-cols-3 gap-4">
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={operations.authenticate}
-                  >
-                    Authenticate (eSignature)
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={operations.authenticateNavigator}
-                  >
-                    Authenticate (Navigator)
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={handleLogout}
-                    disabled={!authenticated}
-                  >
-                    <LogOut className="h-4 w-4 mr-2" />
-                    Logout
-                  </Button>
+                <div className="p-4 border rounded-lg space-y-4">
+                  <h3 className="font-medium">Authentication</h3>
+                  <div className="grid gap-4">
+                    <Button
+                      variant="default"
+                      onClick={authenticateAll}
+                    >
+                      <LogOut className="h-4 w-4 mr-2" />
+                      Authenticate (All Scopes)
+                    </Button>
+                    <div className="grid grid-cols-3 gap-4">
+                      <Button
+                        variant="outline"
+                        onClick={operations.authenticate}
+                      >
+                        <LogOut className="h-4 w-4 mr-2" />
+                        Authenticate eSignature
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={operations.authenticateNavigator}
+                      >
+                        <LogOut className="h-4 w-4 mr-2" />
+                        Authenticate Navigator
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={clickOperations.authenticateClick}
+                      >
+                        <LogOut className="h-4 w-4 mr-2" />
+                        Authenticate Click
+                      </Button>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="p-4 border rounded-lg space-y-4">
@@ -1403,31 +1578,9 @@ export const PlaygroundView = () => {
                   </div>
                 </div>
 
-                <div className="p-4 border rounded-lg space-y-4">
-                  <h3 className="font-medium">Navigator API Testing</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <Button
-                      variant="outline"
-                      className="w-full"
-                      onClick={operations.testNavigator}
-                      disabled={!authenticated}
-                    >
-                      Test Navigator API
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="w-full"
-                      onClick={operations.testNavigatorMock}
-                    >
-                      Test Navigator API (Mock)
-                    </Button>
-                  </div>
-                </div>
-
                 <div className="grid grid-cols-2 gap-4">
                   <Button
                     variant="outline"
-                    className="w-full"
                     onClick={operations.createEnvelope}
                   >
                     <Upload className="h-4 w-4 mr-2" />
@@ -1435,7 +1588,6 @@ export const PlaygroundView = () => {
                   </Button>
                   <Button
                     variant="outline"
-                    className="w-full"
                     onClick={operations.sendEnvelope}
                   >
                     <Send className="h-4 w-4 mr-2" />
@@ -1443,7 +1595,6 @@ export const PlaygroundView = () => {
                   </Button>
                   <Button
                     variant="outline"
-                    className="w-full"
                     onClick={operations.getEnvelopes}
                   >
                     <List className="h-4 w-4 mr-2" />
@@ -1451,7 +1602,6 @@ export const PlaygroundView = () => {
                   </Button>
                   <Button
                     variant="outline"
-                    className="w-full"
                     onClick={operations.getEnvelopeStatus}
                   >
                     <Download className="h-4 w-4 mr-2" />
@@ -1459,7 +1609,6 @@ export const PlaygroundView = () => {
                   </Button>
                   <Button
                     variant="outline"
-                    className="w-full"
                     onClick={operations.openSigningView}
                     disabled={!envelopeId}
                   >
@@ -1487,6 +1636,17 @@ export const PlaygroundView = () => {
                         disabled={!authenticated || !selectedFile}
                       >
                         Create Clickwrap
+                      </Button>
+                    </div>
+
+                    <div className="p-4 border rounded-lg">
+                      <h4 className="font-medium mb-2">List Clickwraps</h4>
+                      <Button
+                        variant="outline"
+                        onClick={clickOperations.listClickwraps}
+                        disabled={!authenticated}
+                      >
+                        List All Clickwraps
                       </Button>
                     </div>
 
@@ -1531,7 +1691,7 @@ export const PlaygroundView = () => {
                   </div>
                 </div>
 
-                {/* Status Display */}
+                {/* Status Display for Clickwrap */}
                 {clickwrapStatus && (
                   <div className="p-4 bg-muted rounded-lg">
                     <h3 className="font-medium mb-2">Clickwrap Details</h3>
@@ -1541,85 +1701,209 @@ export const PlaygroundView = () => {
                   </div>
                 )}
 
-                {clickwrapStatus?.agreements && (
-                  <div className="p-4 bg-muted rounded-lg">
-                    <h3 className="font-medium mb-2">Clickwrap Agreements</h3>
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full table-auto">
-                        <thead>
-                          <tr>
-                            <th className="px-4 py-2">Status</th>
-                            <th className="px-4 py-2">Agreed On</th>
-                            <th className="px-4 py-2">User ID</th>
-                            <th className="px-4 py-2">Version</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {clickwrapStatus.agreements.map((agreement: any, index: number) => (
-                            <tr key={agreement.agreementId || index}>
-                              <td className="border px-4 py-2">{agreement.status}</td>
-                              <td className="border px-4 py-2">
-                                {new Date(agreement.agreedOn).toLocaleString()}
-                              </td>
-                              <td className="border px-4 py-2">{agreement.clientUserId}</td>
-                              <td className="border px-4 py-2">{agreement.version}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                {/* Navigator API Section */}
+                <div className="p-4 border rounded-lg space-y-4">
+                  <h3 className="font-medium">Navigator API Operations</h3>
+                  
+                  <div className="grid gap-4">
+                    <div className="p-4 border rounded-lg">
+                      <h4 className="font-medium mb-2">List Agreements</h4>
+                      <div className="space-y-2">
+                        <Button
+                          variant="outline"
+                          onClick={() => testNavigatorAgreement()}
+                          disabled={!authenticated}
+                        >
+                          List All Agreements
+                        </Button>
+                      </div>
                     </div>
-                    <p className="mt-2 text-sm">Total Agreements: {clickwrapStatus.totalAgreements}</p>
+
+                    {testResult && (
+                      <div className="p-4 bg-muted rounded-lg">
+                        <div className="flex items-center gap-2 mb-4">
+                          <h3 className="font-medium">Test Result</h3>
+                          {testResult.success ? (
+                            <span className="text-green-500">✓</span>
+                          ) : (
+                            <span className="text-red-500">✗</span>
+                          )}
+                        </div>
+                        <p className="mb-4">{testResult.message}</p>
+                        {testResult.details && testResult.details.agreements && (
+                          <div className="space-y-4">
+                            <div className="overflow-x-auto">
+                              <table className="min-w-full table-auto">
+                                <thead>
+                                  <tr>
+                                    <th className="px-4 py-2">Name</th>
+                                    <th className="px-4 py-2">Type</th>
+                                    <th className="px-4 py-2">Category</th>
+                                    <th className="px-4 py-2">Status</th>
+                                    <th className="px-4 py-2">Actions</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {testResult.details.agreements.map((agreement: any) => (
+                                    <tr key={agreement.id}>
+                                      <td className="border px-4 py-2">{agreement.fileName || agreement.name}</td>
+                                      <td className="border px-4 py-2">{agreement.type}</td>
+                                      <td className="border px-4 py-2">{agreement.category}</td>
+                                      <td className="border px-4 py-2">{agreement.status}</td>
+                                      <td className="border px-4 py-2">
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => testNavigatorAgreement(agreement.id)}
+                                        >
+                                          View Details
+                                        </Button>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+                        {testResult.details && !testResult.details.agreements && (
+                          <div className="space-y-4">
+                            {/* Basic Info */}
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <p className="font-medium">ID</p>
+                                <p className="text-sm font-mono">{testResult.details.id}</p>
+                              </div>
+                              <div>
+                                <p className="font-medium">File Name</p>
+                                <p className="text-sm">{testResult.details.fileName || testResult.details.file_name}</p>
+                              </div>
+                              <div>
+                                <p className="font-medium">Type</p>
+                                <p className="text-sm">{testResult.details.type}</p>
+                              </div>
+                              <div>
+                                <p className="font-medium">Category</p>
+                                <p className="text-sm">{testResult.details.category}</p>
+                              </div>
+                              <div>
+                                <p className="font-medium">Status</p>
+                                <p className="text-sm">{testResult.details.status}</p>
+                              </div>
+                              <div>
+                                <p className="font-medium">Languages</p>
+                                <p className="text-sm">{testResult.details.rawData.languages?.join(', ') || 'N/A'}</p>
+                              </div>
+                            </div>
+
+                            {/* Source Info */}
+                            <div className="border-t pt-4">
+                              <h4 className="font-medium mb-2">Source Information</h4>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <p className="font-medium text-sm">Source Name</p>
+                                  <p className="text-sm">{testResult.details.rawData.source_name || 'N/A'}</p>
+                                </div>
+                                <div>
+                                  <p className="font-medium text-sm">Source ID</p>
+                                  <p className="text-sm font-mono">{testResult.details.rawData.source_id || 'N/A'}</p>
+                                </div>
+                                <div>
+                                  <p className="font-medium text-sm">Source Account ID</p>
+                                  <p className="text-sm font-mono">{testResult.details.rawData.source_account_id || 'N/A'}</p>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Parties */}
+                            {testResult.details.rawData.parties && (
+                              <div className="border-t pt-4">
+                                <h4 className="font-medium mb-2">Parties</h4>
+                                <div className="space-y-2">
+                                  {testResult.details.rawData.parties.map((party: any) => (
+                                    <div key={party.id} className="bg-background p-3 rounded-lg">
+                                      <p className="text-sm font-mono mb-1">ID: {party.id}</p>
+                                      <p className="text-sm">Name: {party.name_in_agreement}</p>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Provisions */}
+                            {testResult.details.rawData.provisions && (
+                              <div className="border-t pt-4">
+                                <h4 className="font-medium mb-2">Provisions</h4>
+                                <div className="bg-background p-3 rounded-lg">
+                                  {Object.entries(testResult.details.rawData.provisions).map(([key, value]) => (
+                                    <div key={key} className="mb-2 last:mb-0">
+                                      <p className="text-sm">
+                                        <span className="font-medium">{key.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}:</span>
+                                        {' '}
+                                        {typeof value === 'boolean' ? (value ? 'Yes' : 'No') : value}
+                                      </p>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Timestamps */}
+                            <div className="border-t pt-4">
+                              <h4 className="font-medium mb-2">Timestamps</h4>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <p className="font-medium text-sm">Created At</p>
+                                  <p className="text-sm">
+                                    {testResult.details.rawData.metadata?.created_at 
+                                      ? new Date(testResult.details.rawData.metadata.created_at).toLocaleString()
+                                      : 'N/A'
+                                    }
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="font-medium text-sm">Modified At</p>
+                                  <p className="text-sm">
+                                    {testResult.details.rawData.metadata?.modified_at
+                                      ? new Date(testResult.details.rawData.metadata.modified_at).toLocaleString()
+                                      : 'N/A'
+                                    }
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Raw Data (Collapsible) */}
+                            <div className="border-t pt-4">
+                              <Collapsible>
+                                <CollapsibleTrigger asChild>
+                                  <Button variant="ghost" className="flex items-center gap-2 mb-2">
+                                    <ChevronRight className="h-4 w-4" />
+                                    <span className="font-medium">Raw Data</span>
+                                  </Button>
+                                </CollapsibleTrigger>
+                                <CollapsibleContent>
+                                  <pre className="text-xs bg-background p-4 rounded-lg overflow-x-auto">
+                                    {JSON.stringify(testResult.details.rawData, null, 2)}
+                                  </pre>
+                                </CollapsibleContent>
+                              </Collapsible>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
+
+                {/* Status Display */}
+                <div className="p-4 border rounded-lg">
+                  <h3 className="font-medium mb-4">Status</h3>
+                  <pre className="text-sm whitespace-pre-wrap bg-muted p-4 rounded-lg">
+                    {status || 'No status to display'}
+                  </pre>
+                </div>
               </div>
-
-              {status && (
-                <div className="p-4 bg-muted rounded-lg">
-                  <pre className="text-sm whitespace-pre-wrap">{status}</pre>
-                </div>
-              )}
-
-              {testResult && (
-                <div className="mt-4">
-                  <h3 className={testResult.success ? "text-green-500" : "text-red-500"}>
-                    {testResult.message}
-                  </h3>
-                  {testResult.details && (
-                    <div className="mt-4">
-                      {Array.isArray(testResult.details) ? (
-                        // Show list of agreements with buttons
-                        <table className="min-w-full">
-                          <thead>
-                            <tr>
-                              <th>File Name</th>
-                              <th>Type</th>
-                              <th>Category</th>
-                              <th>Status</th>
-                              <th>Action</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {testResult.details.map((agreement: any) => (
-                              <tr key={agreement.id}>
-                                <td>{agreement.fileName}</td>
-                                <td>{agreement.type}</td>
-                                <td>{agreement.category}</td>
-                                <td>{agreement.status}</td>
-                                <td>{agreement.action}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      ) : (
-                        // Show agreement details
-                        <pre className="bg-gray-100 p-4 rounded overflow-auto">
-                          {JSON.stringify(testResult.details, null, 2)}
-                        </pre>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
             </TabsContent>
           </Tabs>
         </ScrollArea>

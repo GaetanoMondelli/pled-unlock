@@ -127,4 +127,63 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+export async function GET(req: NextRequest) {
+  try {
+    // Get auth headers
+    const accessToken = req.headers.get('authorization')?.replace('Bearer ', '');
+    const accountId = req.headers.get('account-id');
+
+    if (!accessToken || !accountId) {
+      return NextResponse.json(
+        { error: 'Missing authentication headers' },
+        { status: 401 }
+      );
+    }
+
+    // Get all clickwraps
+    const response = await fetch(
+      `https://demo.docusign.net/clickapi/v1/accounts/${accountId}/clickwraps`,
+      {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`
+        }
+      }
+    );
+
+    // Get response text first
+    const responseText = await response.text();
+    console.log('Raw response:', responseText);
+
+    if (!response.ok) {
+      let error;
+      try {
+        error = responseText ? JSON.parse(responseText) : { message: 'Unknown error' };
+      } catch (e) {
+        error = { message: responseText || 'Failed to parse error response' };
+      }
+      console.error('DocuSign Click API error:', error);
+      throw new Error(error.message || 'Failed to list clickwraps');
+    }
+
+    let result;
+    try {
+      result = responseText ? JSON.parse(responseText) : { clickwraps: [] };
+    } catch (e) {
+      console.error('Failed to parse response:', e);
+      throw new Error('Invalid response from DocuSign Click API');
+    }
+
+    return NextResponse.json({
+      clickwraps: result.clickwraps || []
+    });
+
+  } catch (error: any) {
+    console.error('Error listing clickwraps:', error);
+    return NextResponse.json(
+      { error: error.message || 'Failed to list clickwraps' },
+      { status: 500 }
+    );
+  }
 } 

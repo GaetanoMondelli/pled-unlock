@@ -2,28 +2,31 @@ import { NextResponse } from 'next/server'
 import fs from 'fs'
 import path from 'path'
 
+// Default config values that can be overridden by environment variables
+const DEFAULT_CONFIG = {
+  integrationKey: process.env.DOCUSIGN_INTEGRATION_KEY || '',
+  accountId: process.env.DOCUSIGN_ACCOUNT_ID || '',
+  userId: process.env.DOCUSIGN_USER_ID || '',
+  privateKey: process.env.DOCUSIGN_PRIVATE_KEY || '',
+  oAuthServer: process.env.DOCUSIGN_OAUTH_SERVER || 'account-d.docusign.com',
+  redirectUri: process.env.DOCUSIGN_REDIRECT_URI || 'http://localhost:3000/callback'
+};
+
 export async function GET() {
   try {
-    // Read configuration from config folder
-    const configPath = path.join(process.cwd(), 'app/api/docusign/config/jwtConfig.json');
-    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-
-    // Read private key from config folder
-    const privateKeyPath = path.join(process.cwd(), 'app/api/docusign/config/private.key');
-    const privateKey = fs.readFileSync(privateKeyPath, 'utf8');
-
-    // Transform config to match UI expectations
+    // Return the config, preferring environment variables over defaults
     return NextResponse.json({
-      integrationKey: config.dsJWTClientId,
-      userId: config.impersonatedUserGuid,
-      accountId: "", // Will be populated after authentication
-      oAuthServer: config.dsOauthServer,
-      privateKey
+      integrationKey: DEFAULT_CONFIG.integrationKey,
+      accountId: DEFAULT_CONFIG.accountId,
+      userId: DEFAULT_CONFIG.userId,
+      privateKey: DEFAULT_CONFIG.privateKey,
+      oAuthServer: DEFAULT_CONFIG.oAuthServer,
+      redirectUri: DEFAULT_CONFIG.redirectUri
     });
-  } catch (error: any) {
-    console.error('Error reading configuration:', error);
+  } catch (error) {
+    console.error('Error getting DocuSign config:', error);
     return NextResponse.json(
-      { error: 'Failed to load configuration' },
+      { error: 'Failed to get DocuSign configuration' },
       { status: 500 }
     );
   }

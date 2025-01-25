@@ -55,9 +55,19 @@ const EVENT_TEMPLATES = {
   }
 };
 
+// Update type definitions for procedure data
+interface ProcedureData {
+  currentState?: string;
+  template?: {
+    stateMachine?: {
+      fsl: string;
+    };
+  };
+}
+
 const fetchProcedureState = async (procedureId: string) => {
   try {
-    const data = await getProcedureData(procedureId);
+    const data = await getProcedureData(procedureId) as ProcedureData;
     
     // Find the current state from the procedure data
     const currentState = data.currentState || 'idle';
@@ -96,17 +106,13 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
   const [expandedRules, setExpandedRules] = useState<string[]>([]);
 
   // Add state for DocuSign data
-  const [envelopes, setEnvelopes] = useState<Array<{id: string, status: string}>>([]);
+  const [envelopes, setEnvelopes] = useState<Array<{id: string, name: string, status: string, created: string}>>([]);
   const [isLoadingEnvelopes, setIsLoadingEnvelopes] = useState(false);
   const [statusResult, setStatusResult] = useState<any>(null);
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
 
-  // Initialize DocuSign service
-  const [docusignService] = useState(() => new DocuSignService());
-
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  // DocuSign authentication states
   const [isAuthenticating, setIsAuthenticating] = useState(false);
-
   const [templateRules, setTemplateRules] = useState<any[]>([]);
   const [instanceVariables, setInstanceVariables] = useState<any>({});
 
@@ -121,6 +127,18 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
 
   // Add state for Navigator API result
   const [navigatorResult, setNavigatorResult] = useState<any>(null);
+
+  // Add state for Navigator
+  const [navigatorAgreements, setNavigatorAgreements] = useState<Array<any>>([]);
+  const [selectedNavigatorAgreement, setSelectedNavigatorAgreement] = useState<string>("");
+  const [isLoadingNavigator, setIsLoadingNavigator] = useState(false);
+
+  // Add state for Click API
+  const [clickwraps, setClickwraps] = useState<Array<any>>([]);
+  const [selectedClickwrap, setSelectedClickwrap] = useState<string>("");
+  const [isLoadingClickwraps, setIsLoadingClickwraps] = useState(false);
+  const [isLoadingClickwrapStatus, setIsLoadingClickwrapStatus] = useState(false);
+  const [clickwrapResult, setClickwrapResult] = useState<any>(null);
 
   // Update event type handler to set template
   const handleEventTypeChange = (type: string) => {
@@ -286,29 +304,8 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
         }
       };
 
-      // Make direct API call to add event
-      const response = await fetch('/api/events', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          event: template,
-          action: 'add_template',
-          procedureId
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Error response:', errorData);
-        throw new Error(errorData.error || 'Failed to add event');
-      }
-
-      const result = await response.json();
-      
-      // Call onSave to trigger parent refresh
-      await onSave(result.event);
+      // Let parent handle the API call
+      await onSave(template);
       onClose();
     } catch (error) {
       console.error("Error creating event:", error);
@@ -325,18 +322,73 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
     console.log("Importing from Gmail");
   };
 
-  // Update handleTabChange to use proper authentication
+  // Update handleTabChange to handle separate auth flows correctly
   const handleTabChange = async (tab: string) => {
-    if (tab === 'docusign' && !isAuthenticated) {
+    if (tab === 'docusign') {
       setIsAuthenticating(true);
       try {
-        // First get the config
-        await docusignService.getConfig();
-        // Then authenticate
-        await docusignService.authenticate();
-        setIsAuthenticated(true);
-        // After authentication, fetch envelopes
-        await fetchEnvelopes();
+        // Try to use stored auth first
+        const storedAuth = localStorage.getItem('navigatorAuth');
+        if (storedAuth) {
+          const authData = JSON.parse(storedAuth);
+          console.log('Using stored auth:', {
+            baseUrl: authData.baseUrl,
+            accountId: authData.accountId,
+            tokenStart: authData.accessToken.substring(0, 20) + '...'
+          });
+
+          // Test the stored auth
+          let authResponse = await fetch('/api/docusign/navigator/proxy', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              url: `${authData.baseUrl}/accounts/${authData.accountId}/agreements`,
+              token: authData.accessToken
+            })
+          });
+
+          const data = await authResponse.json();
+
+          // If we need new consent, clear stored auth and redirect
+          if (authResponse.status === 401 && data.needsConsent) {
+            console.log('Need new consent, clearing stored auth...');
+            localStorage.removeItem('navigatorAuth');
+            localStorage.removeItem('navigatorConsent');
+            
+            // Redirect to get fresh auth
+            authResponse = await fetch('/api/docusign/navigator?useMock=false', {
+              method: 'POST'
+            });
+            const freshData = await authResponse.json();
+            
+            if (freshData.consentUrl) {
+              window.location.href = freshData.consentUrl;
+              return;
+            }
+          }
+
+          // If auth is valid, fetch data
+          if (authResponse.ok) {
+            await fetchEnvelopes();
+            await fetchNavigatorAgreements();
+            await fetchClickwraps();
+            return;
+          }
+        }
+
+        // No stored auth or invalid auth, get fresh auth
+        const response = await fetch('/api/docusign/navigator?useMock=false', {
+          method: 'POST'
+        });
+        const data = await response.json();
+        
+        if (data.consentUrl) {
+          window.location.href = data.consentUrl;
+          return;
+        }
+
       } catch (error) {
         console.error('Authentication failed:', error);
       } finally {
@@ -345,15 +397,31 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
     }
   };
 
-  // Update fetchEnvelopes to not handle authentication
+  // Update fetchEnvelopes to use the correct endpoint
   const fetchEnvelopes = async () => {
-    if (!isAuthenticated) return;
+    const storedAuth = localStorage.getItem('navigatorAuth');
+    if (!storedAuth) return;
     
     setIsLoadingEnvelopes(true);
     try {
-      const data = await docusignService.listEnvelopes();
+      const authData = JSON.parse(storedAuth);
+      const response = await fetch('/api/docusign/envelopes', {
+        headers: {
+          'Authorization': `Bearer ${authData.accessToken}`,
+          'Account-Id': authData.accountId
+        }
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to fetch envelopes');
+      }
+
+      const data = await response.json();
+      console.log('Envelopes response:', data);
       setEnvelopes(data.envelopes.map((env: any) => ({
         id: env.envelopeId,
+        name: env.emailSubject,
         status: env.status,
         created: env.createdDateTime
       })));
@@ -364,66 +432,54 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
     }
   };
 
-  // Update handleDocusignAction to use authenticated state
+  // Update handleDocusignAction for envelopes to use specific endpoint
   const handleDocusignAction = async () => {
-    if (!selectedEnvelope || !isAuthenticated) return;
+    const storedAuth = localStorage.getItem('navigatorAuth');
+    if (!selectedEnvelope || !storedAuth) return;
 
     setIsCheckingStatus(true);
     try {
-      const data = await docusignService.getEnvelope(selectedEnvelope);
+      const authData = JSON.parse(storedAuth);
+      const response = await fetch(`/api/docusign/envelopes/${selectedEnvelope}`, {
+        headers: {
+          'Authorization': `Bearer ${authData.accessToken}`,
+          'Account-Id': authData.accountId
+        }
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to get envelope status');
+      }
+      const data = await response.json();
       setStatusResult(data);
     } catch (error) {
-      console.error('Error checking status:', error);
+      console.error('Error checking envelope status:', error);
     } finally {
       setIsCheckingStatus(false);
     }
   };
 
   const addAsVerifiedEvent = async () => {
-    if (!statusResult || !procedureId) {
-      console.error('Missing required data:', { statusResult, procedureId });
-      return;
-    }
-
-    console.log('Current procedureId:', procedureId);
-
-    // Create a DocuSign event template using the API response data
-    const event = {
-      id: `docusign-${statusResult.envelopeId}`,
-      name: "DocuSign Status Update",
-      description: `DocuSign envelope ${statusResult.status}`,
-      type: "DOCUSIGN_EVENT",
-      procedureId,
-      template: {
-        source: "docusign",
-        data: statusResult
-      }
-    };
-
+    if (!statusResult || !procedureId) return;
+    
     try {
-      console.log('Creating DocuSign event:', event);
-      const response = await fetch('/api/events', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          event,
-          action: 'add_template',
-          procedureId
-        }),
-      });
+      const event = {
+        id: `docusign-${statusResult.envelopeId}`,
+        name: "DocuSign Status Update",
+        description: `DocuSign envelope ${statusResult.status}`,
+        type: "DOCUSIGN_EVENT",
+        procedureId,
+        template: {
+          source: "docusign",
+          data: statusResult
+        }
+      };
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Error response:', errorData);
-        throw new Error(errorData.error || 'Failed to add DocuSign event');
-      }
-
-      const result = await response.json();
-      await onSave(result.event);
-      setStatusResult(null);
+      // Let parent handle the API call
+      await onSave(event);
       onClose();
+      setStatusResult(null);
     } catch (error) {
       console.error('Error adding DocuSign event:', error);
     }
@@ -436,27 +492,182 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
     );
   };
 
-  const handleNavigatorAction = async () => {
-    if (!selectedEnvelope) return;
-    
+  // Update handleNavigatorAction for agreements to use specific endpoint
+  const handleNavigatorAction = async (agreementId: string) => {
+    const storedAuth = localStorage.getItem('navigatorAuth');
+    if (!storedAuth) return;
+
     setIsLoadingAgreement(true);
     try {
-      // Call the mock Navigator API endpoint
-      const response = await fetch(`/api/docusign/navigator?agreementId=${selectedEnvelope}`);
+      const authData = JSON.parse(storedAuth);
+      const endpoint = `${authData.baseUrl}/accounts/${authData.accountId}/agreements/${agreementId}`;
+
+      const response = await fetch('/api/docusign/navigator/proxy', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          url: endpoint,
+          method: 'GET',
+          token: authData.accessToken
+        })
+      });
+
       if (!response.ok) {
-        throw new Error('Failed to fetch agreement data');
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to get agreement details');
       }
-      
+
       const data = await response.json();
-      setNavigatorResult(data);
+      if (data.error) throw new Error(data.error);
+
+      console.log('Agreement response:', data);
+      setNavigatorResult({
+        id: data.id,
+        name: data.name,
+        fileName: data.file_name,
+        type: data.type,
+        category: data.category,
+        status: data.status,
+        created: data.created_date ? new Date(data.created_date).toLocaleString() : 'N/A',
+        modified: data.last_modified_date ? new Date(data.last_modified_date).toLocaleString() : 'N/A',
+        rawData: data
+      });
     } catch (error) {
-      console.error('Error calling Navigator API:', error);
+      console.error('Error getting agreement details:', error);
     } finally {
       setIsLoadingAgreement(false);
     }
   };
 
-  // Add handler for adding Navigator result as event
+  // Update fetchNavigatorAgreements to match playground formatting
+  const fetchNavigatorAgreements = async () => {
+    const storedAuth = localStorage.getItem('navigatorAuth');
+    if (!storedAuth) return;
+    
+    setIsLoadingNavigator(true);
+    try {
+      const authData = JSON.parse(storedAuth);
+      const response = await fetch('/api/docusign/navigator/proxy', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          url: `${authData.baseUrl}/accounts/${authData.accountId}/agreements`,
+          token: authData.accessToken
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch Navigator agreements');
+      }
+
+      const responseData = await response.json();
+      console.log('Raw Navigator response:', responseData);
+      
+      // Use agreements from the top level instead of data
+      const agreements = responseData.agreements || [];
+      console.log('Agreements to display:', agreements);
+      
+      setNavigatorAgreements(agreements);
+    } catch (error) {
+      console.error('Error fetching Navigator agreements:', error);
+    } finally {
+      setIsLoadingNavigator(false);
+    }
+  };
+
+  // Update fetchClickwraps to use the correct endpoint
+  const fetchClickwraps = async () => {
+    const storedAuth = localStorage.getItem('navigatorAuth');
+    if (!storedAuth) return;
+    
+    setIsLoadingClickwraps(true);
+    try {
+      const authData = JSON.parse(storedAuth);
+      const response = await fetch('/api/docusign/click/clickwraps', {
+        headers: {
+          'Authorization': `Bearer ${authData.accessToken}`,
+          'Account-Id': authData.accountId
+        }
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to list clickwraps');
+      }
+
+      const data = await response.json();
+      console.log('Clickwraps response:', data);
+      setClickwraps(data.clickwraps.map((cw: any) => ({
+        clickwrapId: cw.clickwrapId,
+        clickwrapName: cw.clickwrapName,
+        versionNumber: cw.versionNumber,
+        status: cw.status,
+        accountId: cw.accountId,
+        createdTime: cw.createdTime
+      })));
+    } catch (error) {
+      console.error('Error fetching clickwraps:', error);
+    } finally {
+      setIsLoadingClickwraps(false);
+    }
+  };
+
+  // Update handleClickwrapAction for clickwraps to use specific endpoint
+  const handleClickwrapAction = async () => {
+    const storedAuth = localStorage.getItem('navigatorAuth');
+    if (!selectedClickwrap || !storedAuth) return;
+    
+    setIsLoadingClickwrapStatus(true);
+    try {
+      const authData = JSON.parse(storedAuth);
+      const response = await fetch(`/api/docusign/click/clickwraps/${selectedClickwrap}`, {
+        headers: {
+          'Authorization': `Bearer ${authData.accessToken}`,
+          'Account-Id': authData.accountId
+        }
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to get clickwrap status');
+      }
+      const data = await response.json();
+      setClickwrapResult(data);
+    } catch (error) {
+      console.error('Error getting clickwrap status:', error);
+    } finally {
+      setIsLoadingClickwrapStatus(false);
+    }
+  };
+
+  const addClickwrapResultAsEvent = async () => {
+    if (!clickwrapResult) return;
+    
+    try {
+      const event = {
+        id: `click_${Date.now()}`,
+        type: 'DOCUSIGN_CLICK_STATUS',
+        name: "DocuSign Click Status",
+        description: "Clickwrap status from DocuSign Click API",
+        template: {
+          source: "docusign-click",
+          data: clickwrapResult
+        }
+      };
+
+      // Let parent handle the API call
+      await onSave(event);
+      onClose();
+      setClickwrapResult(null);
+    } catch (error) {
+      console.error('Error adding Click result as event:', error);
+    }
+  };
+
   const addNavigatorResultAsEvent = async () => {
     if (!navigatorResult) return;
     
@@ -470,35 +681,35 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
           source: "docusign-navigator",
           data: {
             accountId: '{{docusign.accountId}}',
-            agreementId: selectedEnvelope,
+            agreementId: selectedNavigatorAgreement,
             result: navigatorResult
           }
         }
       };
 
-      const response = await fetch('/api/events', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          event,
-          action: 'add_template',
-          procedureId
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Error response:', errorData);
-        throw new Error(errorData.error || 'Failed to add Navigator event');
-      }
-
-      const result = await response.json();
-      await onSave(result.event);
-      setNavigatorResult(null);
+      // Let parent handle the API call
+      await onSave(event);
       onClose();
+      setNavigatorResult(null);
     } catch (error) {
       console.error('Error adding Navigator result as event:', error);
     }
+  };
+
+  // Add type annotations for handleFileChange
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>, filePath: string): void => {
+    // ... existing code ...
+  };
+
+  // Add type annotations for handleConditionChange
+  const handleConditionChange = (_: React.ChangeEvent<HTMLInputElement>, path: string): void => {
+    // ... existing code ...
+  };
+
+  // Add type annotations for pattern replace callback
+  const handlePatternReplace = (match: string, path: string): string => {
+    return path.split('.')
+      .reduce((obj: any, key: string) => obj?.[key], instanceVariables) ?? '(undefined)';
   };
 
   return (
@@ -681,7 +892,7 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                 <div className="text-center py-4">
                   <p className="text-sm text-muted-foreground">Authenticating with DocuSign...</p>
                 </div>
-              ) : !isAuthenticated ? (
+              ) : !localStorage.getItem('navigatorAuth') ? (
                 <div className="text-center py-4">
                   <p className="text-sm text-muted-foreground mb-2">Not authenticated with DocuSign</p>
                   <Button onClick={() => handleTabChange('docusign')}>
@@ -689,78 +900,247 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                   </Button>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label>Select Envelope</Label>
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={fetchEnvelopes}
-                        disabled={isLoadingEnvelopes}
-                      >
-                        Refresh
-                      </Button>
-                    </div>
-                    <Select 
-                      value={selectedEnvelope} 
-                      onValueChange={setSelectedEnvelope}
-                      disabled={isLoadingEnvelopes}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder={isLoadingEnvelopes ? "Loading..." : "Select envelope"} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {envelopes.map((env: any) => (
-                          <SelectItem key={env.id} value={env.id}>
-                            <div className="flex flex-col">
-                              <span>{env.id}</span>
-                              <span className="text-xs text-muted-foreground">
-                                {env.status} - {new Date(env.created || Date.now()).toLocaleDateString()}
-                              </span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <Button 
-                      onClick={handleDocusignAction}
-                      disabled={!selectedEnvelope || isCheckingStatus}
-                    >
-                      {isCheckingStatus ? "Checking..." : "Check Status"}
-                    </Button>
-                    <Button 
-                      onClick={handleNavigatorAction}
-                      disabled={!selectedEnvelope || isLoadingAgreement}
-                      variant="outline"
-                    >
-                      {isLoadingAgreement ? "Loading..." : "Get Agreement Insight (Navigator)"}
-                    </Button>
-                  </div>
-
-                  {(statusResult || navigatorResult) && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <h4 className="text-sm font-medium">API Result</h4>
-                        <Button 
-                          size="sm" 
-                          onClick={statusResult ? addAsVerifiedEvent : addNavigatorResultAsEvent}
+                <div className="space-y-6">
+                  {/* Envelopes Section */}
+                  <div className="space-y-4">
+                    <h4 className="text-sm font-medium">Envelope Status</h4>
+                    <Card className="p-4">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label>Select Envelope</Label>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={fetchEnvelopes}
+                            disabled={isLoadingEnvelopes}
+                          >
+                            Refresh
+                          </Button>
+                        </div>
+                        <Select 
+                          value={selectedEnvelope} 
+                          onValueChange={setSelectedEnvelope}
+                          disabled={isLoadingEnvelopes}
                         >
-                          Add as Event
+                          <SelectTrigger>
+                            <SelectValue placeholder={isLoadingEnvelopes ? "Loading..." : "Select envelope"} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {envelopes.map((env: any) => (
+                              <SelectItem key={env.id} value={env.id}>
+                                <div className="flex flex-col">
+                                  <span>{env.name}</span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {env.status} - {new Date(env.created || Date.now()).toLocaleDateString()}
+                                  </span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+
+                        <Button 
+                          onClick={handleDocusignAction}
+                          disabled={!selectedEnvelope || isCheckingStatus}
+                          className="w-full"
+                        >
+                          {isCheckingStatus ? "Checking..." : "Check Status"}
                         </Button>
                       </div>
-                      <Card className="bg-muted">
-                        <ScrollArea className="h-[200px] w-[500px]">
-                          <pre className="p-4 text-xs whitespace-pre-wrap break-all">
-                            {JSON.stringify(statusResult || navigatorResult, null, 2)}
-                          </pre>
-                        </ScrollArea>
-                      </Card>
-                    </div>
-                  )}
+
+                      {statusResult && (
+                        <div className="mt-4 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <h4 className="text-sm font-medium">Envelope Status</h4>
+                            <Button 
+                              size="sm" 
+                              onClick={async () => {
+                                try {
+                                  await addAsVerifiedEvent();
+                                } catch (error) {
+                                  console.error('Error adding event:', error);
+                                }
+                              }}
+                            >
+                              Add as Event
+                            </Button>
+                          </div>
+                          <Card className="bg-muted">
+                            <ScrollArea className="h-[200px]">
+                              <pre className="p-4 text-xs whitespace-pre-wrap break-all">
+                                {JSON.stringify(statusResult, null, 2)}
+                              </pre>
+                            </ScrollArea>
+                          </Card>
+                        </div>
+                      )}
+                    </Card>
+                  </div>
+
+                  {/* Navigator Section */}
+                  <div className="space-y-4">
+                    <h4 className="text-sm font-medium">Navigator Agreements</h4>
+                    <Card className="p-4">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label>Select Agreement</Label>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={fetchNavigatorAgreements}
+                            disabled={isLoadingNavigator}
+                          >
+                            Refresh
+                          </Button>
+                        </div>
+                        <Select 
+                          value={selectedNavigatorAgreement} 
+                          onValueChange={setSelectedNavigatorAgreement}
+                          disabled={isLoadingNavigator}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder={isLoadingNavigator ? "Loading..." : "Select agreement"} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <ScrollArea className="h-[200px]">
+                              {navigatorAgreements.map((agreement) => (
+                                <SelectItem 
+                                  key={agreement.id} 
+                                  value={agreement.id}
+                                  className="flex flex-col py-2 cursor-pointer"
+                                >
+                                  <span className="font-medium">{agreement.fileName}</span>
+                                  <span className="text-xs text-muted-foreground">
+                                    Status: {agreement.status}
+                                  </span>
+                                </SelectItem>
+                              ))}
+                            </ScrollArea>
+                          </SelectContent>
+                        </Select>
+
+                        <Button 
+                          onClick={() => handleNavigatorAction(selectedNavigatorAgreement)}
+                          disabled={!selectedNavigatorAgreement || isLoadingAgreement}
+                          className="w-full mt-2"
+                        >
+                          {isLoadingAgreement ? "Loading..." : "Get Agreement Details"}
+                        </Button>
+
+                        {navigatorResult && (
+                          <div className="mt-4 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <h4 className="text-sm font-medium">Agreement Details</h4>
+                              <Button 
+                                size="sm" 
+                                onClick={async () => {
+                                  try {
+                                    await addNavigatorResultAsEvent();
+                                  } catch (error) {
+                                    console.error('Error adding event:', error);
+                                  }
+                                }}
+                              >
+                                Add as Event
+                              </Button>
+                            </div>
+                            <Card className="bg-muted">
+                              <ScrollArea className="h-[200px]">
+                                <div className="p-4">
+                                  <pre className="text-xs whitespace-pre-wrap break-all">
+                                    {JSON.stringify(navigatorResult, null, 2)}
+                                  </pre>
+                                </div>
+                              </ScrollArea>
+                            </Card>
+                          </div>
+                        )}
+                      </div>
+                    </Card>
+                  </div>
+
+                  {/* Click API Section */}
+                  <div className="space-y-4">
+                    <h4 className="text-sm font-medium">Click API Agreements</h4>
+                    <Card className="p-4">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label>Select Clickwrap</Label>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={fetchClickwraps}
+                            disabled={isLoadingClickwraps}
+                          >
+                            Refresh
+                          </Button>
+                        </div>
+                        <Select 
+                          value={selectedClickwrap} 
+                          onValueChange={setSelectedClickwrap}
+                          disabled={isLoadingClickwraps}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder={isLoadingClickwraps ? "Loading..." : "Select clickwrap"} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <ScrollArea className="h-[200px]">
+                              {clickwraps.map((clickwrap: any) => (
+                                <SelectItem 
+                                  key={clickwrap.clickwrapId} 
+                                  value={clickwrap.clickwrapId}
+                                >
+                                  <div className="flex flex-col py-1">
+                                    <span className="font-medium text-sm">{clickwrap.clickwrapName || 'Untitled Clickwrap'}</span>
+                                    <span className="text-xs text-muted-foreground mt-0.5">
+                                      Version: {clickwrap.versionNumber || '1'} - Status: {clickwrap.status || 'Unknown'}
+                                    </span>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </ScrollArea>
+                          </SelectContent>
+                        </Select>
+
+                        <Button 
+                          onClick={handleClickwrapAction}
+                          disabled={!selectedClickwrap || isLoadingClickwrapStatus}
+                          className="w-full mt-2"
+                        >
+                          {isLoadingClickwrapStatus ? "Loading..." : "Check Consent Status"}
+                        </Button>
+
+                        {clickwrapResult && (
+                          <div className="mt-4 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <h4 className="text-sm font-medium">Clickwrap Status</h4>
+                              <Button 
+                                size="sm" 
+                                onClick={async () => {
+                                  try {
+                                    await addClickwrapResultAsEvent();
+                                  } catch (error) {
+                                    console.error('Error adding event:', error);
+                                  }
+                                }}
+                              >
+                                Add as Event
+                              </Button>
+                            </div>
+                            <Card className="bg-muted">
+                              <ScrollArea className="h-[200px]">
+                                <div className="p-4">
+                                  <pre className="text-xs whitespace-pre-wrap break-all">
+                                    {JSON.stringify(clickwrapResult, null, 2)}
+                                  </pre>
+                                </div>
+                              </ScrollArea>
+                            </Card>
+                          </div>
+                        )}
+                      </div>
+                    </Card>
+                  </div>
                 </div>
               )}
             </Card>
@@ -834,10 +1214,7 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                                                      
                                   // Get the interpolated value for templates
                                   const expectedValue = isTemplate ? 
-                                    pattern.replace(/\{\{([^}]+)\}\}/g, (_, path) => {
-                                      return path.split('.')
-                                        .reduce((obj: any, key: string) => obj?.[key], instanceVariables) ?? '(undefined)';
-                                    }) :
+                                    pattern.replace(/\{\{([^}]+)\}\}/g, handlePatternReplace) :
                                     isContains ? pattern.replace('(contains)', '').trim() :
                                     isLlmPrompt ? pattern.replace('(llm-prompt)', '').trim() :
                                     pattern;

@@ -1,170 +1,86 @@
 export class DocuSignService {
-  private accessToken: string | null = null;
-  private accountId: string | null = null;
   private config: any = null;
+  private auth: any = null;
+
+  get isAuthenticated() {
+    return !!(this.auth?.accessToken && this.auth?.accountId);
+  }
+
+  setAuth(auth: any) {
+    this.auth = auth;
+  }
+
+  getHeaders() {
+    if (!this.isAuthenticated) {
+      throw new Error('Not authenticated for DocuSign API');
+    }
+    return {
+      'Authorization': `Bearer ${this.auth.accessToken}`,
+      'Account-Id': this.auth.accountId,
+      'Content-Type': 'application/json'
+    };
+  }
 
   async getConfig() {
-    try {
+    if (!this.config) {
       const response = await fetch('/api/docusign/config');
       this.config = await response.json();
-      return this.config;
-    } catch (error) {
-      console.error('Failed to get DocuSign config:', error);
-      throw error;
     }
-  }
-
-  getAuthUrl() {
-    if (!this.config) {
-      throw new Error('Config not loaded. Call getConfig() first.');
-    }
-
-    const params = new URLSearchParams({
-      response_type: 'code',
-      scope: this.config.scopes.join(' '),
-      client_id: this.config.clientId,
-      redirect_uri: this.config.redirectUri
-    });
-
-    return `${this.config.authServer}/oauth/auth?${params.toString()}`;
-  }
-
-  async handleAuthCallback(code: string) {
-    // Handle the auth callback and set tokens
-    // This should match the playground implementation
-    const response = await fetch('/api/docusign/auth', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code })
-    });
-
-    if (!response.ok) {
-      throw new Error('Auth failed');
-    }
-
-    const { access_token, account_id } = await response.json();
-    this.accessToken = access_token;
-    this.accountId = account_id;
-  }
-
-  async createAndSendEnvelope(params: {
-    signerEmail: string;
-    signerName: string;
-    documents: Array<{
-      name: string;
-      fileBuffer: ArrayBuffer;
-      fileExtension: string;
-    }>;
-  }) {
-    if (!this.accessToken || !this.accountId) {
-      throw new Error('Not authenticated. Call authenticate() first.');
-    }
-
-    try {
-      const formData = new FormData();
-      formData.append('signerEmail', params.signerEmail);
-      formData.append('signerName', params.signerName);
-      
-      params.documents.forEach((doc, i) => {
-        const blob = new Blob([doc.fileBuffer], { type: 'application/octet-stream' });
-        formData.append(`document${i}`, blob, doc.name);
-      });
-
-      const response = await fetch('/api/docusign/envelope', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.accessToken}`
-        },
-        body: formData
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to create envelope');
-      }
-
-      return response.json();
-    } catch (error: any) {
-      console.error('Create envelope error:', error);
-      throw new Error(error.message || 'Failed to create envelope');
-    }
-  }
-
-  async listEnvelopes() {
-    if (!this.accessToken || !this.accountId) {
-      throw new Error('Not authenticated. Call authenticate() first.');
-    }
-
-    try {
-      const response = await fetch('/api/docusign/envelopes', {
-        headers: {
-          'Authorization': `Bearer ${this.accessToken}`,
-          'Account-Id': this.accountId
-        }
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to list envelopes');
-      }
-
-      return response.json();
-    } catch (error: any) {
-      console.error('List envelopes error:', error);
-      throw error;
-    }
-  }
-
-  async getEnvelope(envelopeId: string) {
-    if (!this.accessToken || !this.accountId) {
-      throw new Error('Not authenticated. Call authenticate() first.');
-    }
-
-    try {
-      const response = await fetch(`/api/docusign/envelopes/${envelopeId}`, {
-        headers: {
-          'Authorization': `Bearer ${this.accessToken}`,
-          'Account-Id': this.accountId
-        }
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to get envelope status');
-      }
-
-      return response.json();
-    } catch (error: any) {
-      console.error('Get envelope status error:', error);
-      throw error;
-    }
+    return this.config;
   }
 
   async authenticate() {
-    try {
-      console.log('Starting authentication...');
-      const response = await fetch('/api/docusign/authenticate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Authentication failed');
-      }
-
-      const data = await response.json();
-      // Store the tokens properly
-      this.accessToken = data.accessToken;
-      this.accountId = data.accountId;
-
-      console.log('Authentication successful');
-      return data;
-    } catch (error: any) {
-      console.error('Authentication error:', error);
-      throw error;
+    const response = await fetch('/api/docusign/authenticate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const data = await response.json();
+    if (data.error === 'consent_required' && data.consentUrl) {
+      window.location.href = data.consentUrl;
+      return null;
     }
+    return data;
+  }
+
+  async listEnvelopes() {
+    const response = await fetch('/api/docusign/envelope', {
+      headers: this.getHeaders()
+    });
+    return await response.json();
+  }
+
+  async getEnvelope(envelopeId: string) {
+    const response = await fetch(`/api/docusign/envelope/${envelopeId}`, {
+      headers: this.getHeaders()
+    });
+    return await response.json();
+  }
+
+  async listNavigatorAgreements() {
+    const response = await fetch('/api/docusign/navigator/agreements', {
+      headers: this.getHeaders()
+    });
+    return await response.json();
+  }
+
+  async getNavigatorAgreement(agreementId: string) {
+    const response = await fetch(`/api/docusign/navigator/agreements/${agreementId}`, {
+      headers: this.getHeaders()
+    });
+    return await response.json();
+  }
+
+  async listClickwraps() {
+    const response = await fetch('/api/docusign/click/clickwraps', {
+      headers: this.getHeaders()
+    });
+    return await response.json();
+  }
+
+  async getClickwrap(clickwrapId: string) {
+    const response = await fetch(`/api/docusign/click/clickwraps/${clickwrapId}`, {
+      headers: this.getHeaders()
+    });
+    return await response.json();
   }
 } 

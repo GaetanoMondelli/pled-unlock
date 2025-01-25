@@ -1,62 +1,49 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from "next/server";
 
-const BASE_URL = 'https://demo.docusign.net/restapi/v2.1';
-
-export async function GET(
-  request: Request,
-  { params }: { params?: { id?: string } }
-) {
+export async function GET(req: NextRequest) {
   try {
-    const accessToken = request.headers.get('Authorization')?.replace('Bearer ', '');
-    const accountId = request.headers.get('Account-Id');
+    const authHeader = req.headers.get('authorization');
+    const accountId = req.headers.get('account-id');
 
-    if (!accessToken || !accountId) {
+    if (!authHeader || !accountId) {
       return NextResponse.json(
-        { error: 'Missing authentication' },
+        { error: 'Missing authorization header or account ID' },
         { status: 401 }
       );
     }
 
-    // If we have an ID, get specific envelope
-    if (params?.id) {
-      const response = await fetch(
-        `${BASE_URL}/accounts/${accountId}/envelopes/${params.id}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`
-          }
-        }
-      );
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to get envelope status');
-      }
-
-      return NextResponse.json(await response.json());
-    }
-
-    // Otherwise, list envelopes
-    const fromDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
     const response = await fetch(
-      `${BASE_URL}/accounts/${accountId}/envelopes?from_date=${fromDate}`,
+      `https://demo.docusign.net/restapi/v2.1/accounts/${accountId}/envelopes?from_date=2024-01-01`, 
       {
         headers: {
-          'Authorization': `Bearer ${accessToken}`
+          'Authorization': authHeader
         }
       }
     );
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.message || 'Failed to list envelopes');
+      return NextResponse.json(
+        { error: error.message || 'Failed to list envelopes' },
+        { status: response.status }
+      );
     }
 
-    return NextResponse.json(await response.json());
+    const data = await response.json();
+    return NextResponse.json({
+      envelopes: data.envelopes.map((env: any) => ({
+        envelopeId: env.envelopeId,
+        status: env.status,
+        emailSubject: env.emailSubject,
+        sentDateTime: env.sentDateTime,
+        completedDateTime: env.completedDateTime
+      }))
+    });
+
   } catch (error: any) {
-    console.error('Envelopes error:', error);
+    console.error('Error listing envelopes:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to process envelope request' },
+      { error: error.message || 'Failed to list envelopes' },
       { status: 500 }
     );
   }
