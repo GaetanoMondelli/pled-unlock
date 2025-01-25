@@ -20,6 +20,7 @@ import { fetchFromDb } from "~~/utils/api";
 import { TemplateVariable } from "./template-variable";
 import { Textarea } from "./textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./select";
+import { TabPosition } from "./playground-view";
 
 // Define action type icons mapping
 const actionIcons: Record<string, any> = {
@@ -32,6 +33,23 @@ const actionIcons: Record<string, any> = {
 
 const defaultActionIcon = ChevronRight;
 
+// Update the DocuSign action type
+type DocuSignAction = {
+  type: 'DOCUSIGN_SEND';
+  template: {
+    source: 'action';
+    data: {
+      type: 'DOCUSIGN_SEND';
+      file: {
+        name: string;
+        content: string; // base64 encoded file content
+      };
+      recipients: string[];
+      tabPositions: TabPosition[];
+    }
+  }
+}
+
 interface ActionListProps {
   procedureId: string;
 }
@@ -43,6 +61,12 @@ export const ActionList = ({ procedureId }: ActionListProps) => {
   const [newAction, setNewAction] = useState({ state: '', eventData: '{}' });
   const [expandedActions, setExpandedActions] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [actionType, setActionType] = useState<'raw' | 'docusign'>('raw');
+  const [docuSignData, setDocuSignData] = useState({
+    file: null as File | null,
+    recipients: '',
+    tabPositions: [] as TabPosition[]
+  });
 
   // Single data fetch on mount or procedureId change
   useEffect(() => {
@@ -110,24 +134,54 @@ export const ActionList = ({ procedureId }: ActionListProps) => {
 
   const handleSaveAction = async () => {
     try {
-      let eventData;
-      try {
-        eventData = JSON.parse(newAction.eventData);
-      } catch (e) {
-        console.error('Invalid JSON');
-        return;
-      }
+      let actionTemplate;
 
-      // Simplified action template
-      const actionTemplate = {
-        id: `action_${Date.now()}`,
-        type: eventData.type || 'CUSTOM_EVENT',
-        enabled: true, // Add enabled flag
-        template: {
-          source: "action",
-          data: eventData
+      if (actionType === 'docusign') {
+        if (!docuSignData.file) {
+          throw new Error('Please select a document');
         }
-      };
+
+        // Convert file to base64
+        const fileBuffer = await docuSignData.file.arrayBuffer();
+        const base64File = Buffer.from(fileBuffer).toString('base64');
+
+        // Create DocuSign action template
+        actionTemplate = {
+          id: `action_${Date.now()}`,
+          type: 'DOCUSIGN_SEND',
+          enabled: true,
+          template: {
+            source: "action",
+            data: {
+              type: 'DOCUSIGN_SEND',
+              file: {
+                name: docuSignData.file.name,
+                content: base64File
+              },
+              recipients: docuSignData.recipients.split('\n').filter(r => r.trim()),
+              tabPositions: docuSignData.tabPositions
+            }
+          }
+        };
+      } else {
+        // Existing raw action handling
+        let eventData;
+        try {
+          eventData = JSON.parse(newAction.eventData);
+        } catch (e) {
+          console.error('Invalid JSON');
+          return;
+        }
+        actionTemplate = {
+          id: `action_${Date.now()}`,
+          type: eventData.type || 'CUSTOM_EVENT',
+          enabled: true,
+          template: {
+            source: "action",
+            data: eventData
+          }
+        };
+      }
 
       const response = await fetch('/api/actions', {
         method: 'POST',
@@ -243,6 +297,22 @@ export const ActionList = ({ procedureId }: ActionListProps) => {
           </DialogHeader>
           <div className="space-y-4">
             <div>
+              <Label>Action Type</Label>
+              <Select
+                value={actionType}
+                onValueChange={(value: 'raw' | 'docusign') => setActionType(value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select action type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="raw">Raw Action</SelectItem>
+                  <SelectItem value="docusign">DocuSign Send</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
               <Label>Trigger State</Label>
               <Select 
                 value={newAction.state}
@@ -263,15 +333,133 @@ export const ActionList = ({ procedureId }: ActionListProps) => {
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label>Event Data (JSON)</Label>
-              <Textarea 
-                value={newAction.eventData}
-                onChange={(e) => setNewAction(prev => ({ ...prev, eventData: e.target.value }))}
-                placeholder="{ 'type': 'CUSTOM_EVENT', ... }"
-                rows={10}
-              />
-            </div>
+
+            {actionType === 'docusign' ? (
+              <div className="space-y-4">
+                <div>
+                  <Label>Document</Label>
+                  <Input
+                    type="file"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        setDocuSignData(prev => ({
+                          ...prev,
+                          file: e.target.files![0]
+                        }));
+                      }
+                    }}
+                    accept=".pdf,.doc,.docx"
+                  />
+                </div>
+                
+                <div>
+                  <Label>Recipients (one per line)</Label>
+                  <Textarea
+                    value={docuSignData.recipients}
+                    onChange={(e) => setDocuSignData(prev => ({
+                      ...prev,
+                      recipients: e.target.value
+                    }))}
+                    placeholder="Enter recipient emails"
+                    rows={3}
+                  />
+                </div>
+
+                <div>
+                  <Label>Signature Positions</Label>
+                  <div className="space-y-2">
+                    {docuSignData.tabPositions.map((pos, index) => (
+                      <div key={index} className="flex gap-2">
+                        <Input
+                          placeholder="Page"
+                          value={pos.pageNumber}
+                          onChange={(e) => {
+                            const newPositions = [...docuSignData.tabPositions];
+                            newPositions[index].pageNumber = e.target.value;
+                            setDocuSignData(prev => ({
+                              ...prev,
+                              tabPositions: newPositions
+                            }));
+                          }}
+                          className="w-20"
+                        />
+                        <Input
+                          placeholder="X"
+                          value={pos.xPosition}
+                          onChange={(e) => {
+                            const newPositions = [...docuSignData.tabPositions];
+                            newPositions[index].xPosition = e.target.value;
+                            setDocuSignData(prev => ({
+                              ...prev,
+                              tabPositions: newPositions
+                            }));
+                          }}
+                          className="w-20"
+                        />
+                        <Input
+                          placeholder="Y"
+                          value={pos.yPosition}
+                          onChange={(e) => {
+                            const newPositions = [...docuSignData.tabPositions];
+                            newPositions[index].yPosition = e.target.value;
+                            setDocuSignData(prev => ({
+                              ...prev,
+                              tabPositions: newPositions
+                            }));
+                          }}
+                          className="w-20"
+                        />
+                        <Button
+                          variant="destructive"
+                          onClick={() => {
+                            setDocuSignData(prev => ({
+                              ...prev,
+                              tabPositions: prev.tabPositions.filter((_, i) => i !== index)
+                            }));
+                          }}
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    ))}
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setDocuSignData(prev => ({
+                          ...prev,
+                          tabPositions: [
+                            ...prev.tabPositions,
+                            {
+                              pageNumber: '1',
+                              xPosition: '100',
+                              yPosition: '100',
+                              name: `SignHere_${prev.tabPositions.length + 1}`,
+                              tabLabel: `SignHere_${prev.tabPositions.length + 1}`
+                            }
+                          ]
+                        }));
+                      }}
+                    >
+                      Add Signature Position
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <Label>Event Data (JSON)</Label>
+                <Textarea 
+                  value={newAction.eventData}
+                  onChange={(e) => setNewAction(prev => ({ 
+                    ...prev, 
+                    eventData: e.target.value 
+                  }))}
+                  placeholder="{ 'type': 'CUSTOM_EVENT', ... }"
+                  rows={10}
+                />
+              </div>
+            )}
+
             <Button onClick={handleSaveAction}>Save Action</Button>
           </div>
         </DialogContent>

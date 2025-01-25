@@ -1,3 +1,4 @@
+
 const getBaseUrl = () => {
   if (typeof window === 'undefined') {
     // Server-side
@@ -19,22 +20,42 @@ export async function fetchFromDb() {
   return response.json();
 }
 
-export async function updateDb(data: any) {
-  const baseUrl = getBaseUrl();
-  const response = await fetch(`${baseUrl}/api/db`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      action: 'update',
-      data: data
-    }),
-  });
-  if (!response.ok) {
-    throw new Error('Failed to update data');
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 1000; // 1 second
+
+export async function updateDb(data: any, retryCount = 0) {
+  try {
+    const baseUrl = getBaseUrl();
+    const response = await fetch(`${baseUrl}/api/db`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'update',
+        data: data
+      }),
+    });
+
+    if (!response.ok) {
+      // If we get a 429 (rate limit), wait and retry
+      if (response.status === 429 && retryCount < MAX_RETRIES) {
+        console.log(`Rate limited, retrying in ${RETRY_DELAY}ms... (attempt ${retryCount + 1}/${MAX_RETRIES})`);
+        await sleep(RETRY_DELAY * (retryCount + 1)); // Exponential backoff
+        return updateDb(data, retryCount + 1);
+      }
+      throw new Error('Failed to update data');
+    }
+
+    return response.json();
+  } catch (error) {
+    if (retryCount < MAX_RETRIES) {
+      console.log(`Error updating DB, retrying in ${RETRY_DELAY}ms... (attempt ${retryCount + 1}/${MAX_RETRIES})`);
+      await sleep(RETRY_DELAY * (retryCount + 1)); // Exponential backoff
+      return updateDb(data, retryCount + 1);
+    }
+    throw error;
   }
-  return response.json();
 }
 
 // Helper function to get procedure data from the main DB
@@ -52,4 +73,9 @@ export async function getProcedureData(id: string) {
   }
 
   return { instance, template };
+}
+
+// Add helper function for sleep
+function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
 } 

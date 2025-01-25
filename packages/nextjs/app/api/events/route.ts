@@ -19,7 +19,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const { event, action, procedureId } = await request.json();
-    console.log('Received request:', { action, event, procedureId });
+    console.log('Creating event:', { type: event.type, procedureId });
 
     const data = await fetchFromDb();
     console.log('Current DB data:', data);

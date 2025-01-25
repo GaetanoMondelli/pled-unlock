@@ -59,6 +59,28 @@ interface StateTransition {
   fromState: string;
   toState: string;
   messageId?: string;
+  type?: string;
+  title?: string;
+}
+
+interface DocuSignAction {
+  id: string;
+  actionId: string;
+  state: string;
+  type: string;
+  trigger: string;
+  file: {
+    name: string;
+    content: string;
+  };
+  recipients: string[];
+  tabPositions: Array<{
+    pageNumber: string;
+    xPosition: string;
+    yPosition: string;
+    name: string;
+    tabLabel: string;
+  }>;
 }
 
 export const ProcedureState: React.FC<ProcedureStateProps> = ({ 
@@ -106,7 +128,6 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
     pendingActions: []
   });
 
-  console.log('Template being passed to StateGraph:', template); // Debug log
 
   // Load events and process them
   useEffect(() => {
@@ -553,6 +574,45 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
         } else {
           console.error('Failed to create action event');
         }
+
+        // Mark action as executed
+        await fetch('/api/actions', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            procedureId,
+            state: action.state,
+            actionId: action.id || action.actionId,
+            updates: { 
+              executed: true,
+              executedAt: new Date().toISOString(),
+              type: action.type,
+              trigger: action.trigger || 'INIT'
+            }
+          })
+        });
+
+        // Also update the instance history
+        await fetch(`/api/procedures/${procedureId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            history: {
+              ...updatedInstance.history,
+              executedActions: [
+                ...updatedInstance.history.executedActions,
+                {
+                  actionId: action.id || action.actionId,
+                  state: action.state,
+                  type: action.type,
+                  trigger: action.trigger || 'INIT',
+                  timestamp: new Date().toISOString()
+                }
+              ]
+            }
+          })
+        });
+
       } catch (error) {
         console.error('Error executing action:', error);
       }
@@ -564,15 +624,38 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
   const getActionsForState = (state: string, template: any) => {
     const stateActions = template.actions?.[state] || [];
     return stateActions.map((action: any) => ({
-      actionId: action.id,
+      ...action, // Keep all original action data
+      actionId: action.id || `action_${Date.now()}`,
       state,
-      type: action.type,
+      type: action.type || 'CUSTOM_EVENT',
+      name: action.name || 'Custom Event',
+      description: action.description || 'Custom event from action',
+      data: {}, // Initialize empty data object
       enabled: action.enabled ?? true
     }));
   };
 
   const handleRunMachine = async () => {
     try {
+      // First authenticate with DocuSign if not already authenticated
+      if (!localStorage.getItem('navigatorAuth')) {
+        const authResponse = await fetch('/api/docusign/authenticate', {
+          method: 'POST'
+        });
+
+        if (!authResponse.ok) {
+          const error = await authResponse.json();
+          if (error.error === 'consent_required' && error.consentUrl) {
+            window.location.href = error.consentUrl;
+            return;
+          }
+          throw new Error('Failed to authenticate with DocuSign');
+        }
+
+        const authData = await authResponse.json();
+        localStorage.setItem('navigatorAuth', JSON.stringify(authData));
+      }
+
       const data = await fetchFromDb();
       const instance = data.procedureInstances.find((p: any) => p.instanceId === procedureId);
       const template = data.procedureTemplates?.find(
@@ -604,11 +687,13 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
       // Add initial state actions
       if (template.actions?.[currentState]) {
         expectedActions.push(...template.actions[currentState].map((action: any) => ({
+          ...action,
           actionId: action.id || `action_${Date.now()}`,
           state: currentState,
           trigger: 'INIT',
           type: action.type || 'UNKNOWN',
-          timestamp: new Date().toISOString()
+          name: action.name || action.type || 'UNKNOWN',
+          data: action.template?.data || {}
         })));
       }
 
@@ -624,11 +709,13 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
           // Add actions for the new state
           if (template.actions?.[currentState]) {
             expectedActions.push(...template.actions[currentState].map((action: any) => ({
+              ...action,
               actionId: action.id || `action_${Date.now()}`,
               state: currentState,
               trigger: message.type || 'INIT',
               type: action.type || 'UNKNOWN',
-              name: action.type || 'UNKNOWN'
+              name: action.name || action.type || 'UNKNOWN',
+              data: action.template?.data || {}
             })));
           }
         }
@@ -654,6 +741,217 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
       });
 
       if (pendingActions.length > 0) {
+        // Handle pending actions
+        for (const action of pendingActions) {
+          console.log("action", action.type);
+          if (action.type === 'DOCUSIGN_SEND') {
+            const storedAuth = localStorage.getItem('navigatorAuth');
+            if (!storedAuth) {
+              throw new Error('DocuSign authentication required');
+            }
+
+            const authData = JSON.parse(storedAuth);
+            const actionData = template.actions?.[action.state]?.find(
+              (a: any) => a.id === action.actionId
+            );
+
+            if (!actionData?.template?.data) {
+              throw new Error('DocuSign action data not found');
+            }
+
+            // Create envelope with stored auth
+            const formData = new FormData();
+            formData.append('file', 
+              new Blob(
+                [Buffer.from(actionData.template.data.file.content, 'base64')], 
+                { type: 'application/pdf' }
+              ),
+              actionData.template.data.file.name
+            );
+            formData.append('recipients', JSON.stringify(actionData.template.data.recipients));
+            formData.append('tabPositions', JSON.stringify(actionData.template.data.tabPositions));
+
+            const sendResponse = await fetch('/api/docusign/envelope', {
+              method: 'POST',
+              headers: {
+                'Authorization': authData.accessToken,
+                'Account-Id': authData.accountId,
+                'Base-Url': authData.baseUrl
+              },
+              body: formData
+            });
+
+            if (!sendResponse.ok) {
+              const error = await sendResponse.json();
+              console.error('Envelope error:', error); // Debug log
+              throw new Error(error.error || 'Failed to send DocuSign envelope');
+            }
+
+            const { envelopeId } = await sendResponse.json();
+            console.log("calling /api/procedures/events")
+            // Single update for both event and action
+            await fetch(`/api/procedures/${procedureId}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                event: {
+                  id: `evt_${Date.now()}`,
+                  type: 'DOCUSIGN_SENT',
+                  name: 'DocuSign Envelope Sent',
+                  description: `Envelope ${envelopeId} has been sent to recipients`,
+                  template: {
+                    data: {
+                      envelopeId,
+                      status: 'sent',
+                      timestamp: new Date().toISOString(),
+                      actionId: action.actionId
+                    }
+                  }
+                },
+                action: {
+                  actionId: action.id || action.actionId,
+                  state: action.state,
+                  type: action.type,
+                  trigger: action.trigger || 'INIT'
+                }
+              })
+            });
+
+            // Check status and update in single call
+            const statusResponse = await fetch(`/api/docusign/envelopes/${envelopeId}`, {
+              headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': authData.accessToken,
+                'Account-Id': authData.accountId,
+                'Base-Url': authData.baseUrl
+              }
+            });
+
+            if (!statusResponse.ok) {
+              throw new Error('Failed to check envelope status');
+            }
+
+            const statusResult = await statusResponse.json();
+
+            console.log('=== DOCUSIGN STATUS DEBUG ===');
+            // Single update for custom event
+            await fetch(`/api/procedures/${procedureId}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                event: {
+                  id: `evt_${Date.now()}`,
+                  type: 'DOCUSIGN_STATUS',
+                  name: 'DocuSign Status Update',
+                  description: `Envelope ${envelopeId} status is now: ${statusResult.status}`,
+                  template: {
+                    data: {
+                      envelopeId,
+                      status: statusResult.status,
+                      timestamp: new Date().toISOString(),
+                      actionId: action.actionId
+                    }
+                  }
+                },
+                action: {
+                  actionId: action.id || action.actionId,
+                  state: action.state,
+                  type: action.type,
+                  trigger: action.trigger || 'INIT',
+                  status: statusResult.status
+                }
+              })
+            });
+
+          } else if (action.type === 'CUSTOM_EVENT') {
+            const eventData = {
+              event: {
+                id: `evt_${Date.now()}`,
+                type: action.type,
+                name: action.name || 'Custom Event',
+                description: action.description || 'Custom event from action',
+                template: {
+                  data: {
+                    actionId: action.id || action.actionId,
+                    timestamp: new Date().toISOString(),
+                    state: action.state,
+                    trigger: action.trigger || 'INIT'
+                  }
+                }
+              },
+              procedureId
+            };
+
+            console.log('Sending CUSTOM_EVENT:', eventData);
+
+            // Single update for custom event
+            await fetch(`/api/procedures/${procedureId}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                event: {
+                  id: `evt_${Date.now()}`,
+                  type: action.type,
+                  name: action.name || 'Custom Event',
+                  description: action.description || 'Custom event from action',
+                  template: {
+                    data: {
+                      actionId: action.id || action.actionId,
+                      timestamp: new Date().toISOString(),
+                      state: action.state,
+                      trigger: action.trigger || 'INIT'
+                    }
+                  }
+                },
+                action: {
+                  actionId: action.id || action.actionId,
+                  state: action.state,
+                  type: action.type,
+                  trigger: action.trigger || 'INIT'
+                }
+              })
+            });
+          }
+
+          // Mark action as executed
+          await fetch('/api/actions', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              procedureId,
+              state: action.state,
+              actionId: action.id || action.actionId,
+              updates: { 
+                executed: true,
+                executedAt: new Date().toISOString(),
+                type: action.type,
+                trigger: action.trigger || 'INIT'
+              }
+            })
+          });
+
+          // Also update the instance history
+          await fetch(`/api/procedures/${procedureId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              history: {
+                ...updatedInstance.history,
+                executedActions: [
+                  ...updatedInstance.history.executedActions,
+                  {
+                    actionId: action.id || action.actionId,
+                    state: action.state,
+                    type: action.type,
+                    trigger: action.trigger || 'INIT',
+                    timestamp: new Date().toISOString()
+                  }
+                ]
+              }
+            })
+          });
+        }
+
         // Store actions in DB
         const updatedActions = [
           ...updatedInstance.history.executedActions,
@@ -692,7 +990,7 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
       });
 
     } catch (error) {
-      console.error('Error analyzing actions:', error);
+      console.error('Error running machine:', error);
     }
   };
 

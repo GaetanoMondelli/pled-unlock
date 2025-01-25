@@ -1,94 +1,78 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
 const BASE_URL = 'https://demo.docusign.net/restapi/v2.1';
 
-export async function POST(request: Request) {
+export async function POST(req: NextRequest) {
   try {
-    const formData = await request.formData();
-    const accessToken = request.headers.get('Authorization')?.replace('Bearer ', '');
-    const accountId = request.headers.get('Account-Id');
-
-    if (!accessToken || !accountId) {
+    const formData = await req.formData();
+    console.log("we got inside the post");
+    
+    // Get file from form data
+    const file = formData.get('file') as File;
+    if (!file) {
       return NextResponse.json(
-        { error: 'Missing authentication' },
-        { status: 401 }
-      );
-    }
-
-    const signerEmail = formData.get('signerEmail') as string;
-    const signerName = formData.get('signerName') as string;
-    const documentFile = formData.get('document') as File;
-    const tabsData = formData.get('tabs') as string;
-    const templateData = formData.get('templateData') as string;
-
-    if (!documentFile) {
-      return NextResponse.json(
-        { error: 'No document provided' },
+        { error: 'No file provided' },
         { status: 400 }
       );
     }
 
-    console.log('Creating envelope with:', {
-      signerEmail,
-      signerName,
-      fileName: documentFile.name,
-      tabsData,
-      templateData
+    // Get other data
+    const recipients = JSON.parse(formData.get('recipients') as string);
+    const tabPositions = JSON.parse(formData.get('tabPositions') as string);
+
+    // Add debug logs
+    console.log('Headers:', {
+      auth: req.headers.get('Authorization'),
+      accountId: req.headers.get('Account-Id')
     });
 
-    // Convert document to base64
-    const documentBuffer = Buffer.from(await documentFile.arrayBuffer());
-    const documentBase64 = documentBuffer.toString('base64');
+    // Get auth headers - don't try to parse Bearer prefix
+    const accessToken = req.headers.get('Authorization');
+    const accountId = req.headers.get('Account-Id');
+    const baseUrl = req.headers.get('Base-Url');
 
-    // Parse tabs and template data
-    const tabs = tabsData ? JSON.parse(tabsData) : {};
-    const templateVariables = templateData ? JSON.parse(templateData) : {};
+    if (!accessToken || !accountId) {
+      console.log('Missing auth:', { accessToken, accountId, baseUrl }); // Debug log
+      return NextResponse.json(
+        { error: 'Missing authentication headers', headers: Object.fromEntries(req.headers) },
+        { status: 403 }
+      );
+    }
+
+    // Convert file to base64 for DocuSign
+    const arrayBuffer = await file.arrayBuffer();
+    const fileBase64 = Buffer.from(arrayBuffer).toString('base64');
 
     // Create envelope definition
     const envelope = {
       emailSubject: 'Please sign this document',
       emailBlurb: 'Please review and sign this document at your earliest convenience.',
       documents: [{
-        documentBase64,
-        name: documentFile.name,
-        fileExtension: documentFile.name.split('.').pop(),
+        documentBase64: fileBase64,
+        name: file.name,
+        fileExtension: file.name.split('.').pop(),
         documentId: '1',
         transformPdfFields: true
       }],
       recipients: {
-        signers: [{
-          email: signerEmail,
-          name: signerName,
-          recipientId: '1',
-          routingOrder: '1',
+        signers: recipients.map((email: string, index: number) => ({
+          email,
+          name: `Recipient ${index + 1}`,
+          recipientId: (index + 1).toString(),
+          routingOrder: (index + 1).toString(),
           tabs: {
-            signHereTabs: [
-              {
-                documentId: '1',
-                pageNumber: '1',
-                xPosition: '100',
-                yPosition: '100',
-                optional: false,
-                recipientId: '1',
-                name: 'SignHere_1',
-                tabLabel: 'SignHere_1'
-              }
-            ],
-            ...tabs
+            signHereTabs: tabPositions.map((tab: any) => ({
+              ...tab,
+              documentId: '1',
+              recipientId: (index + 1).toString()
+            }))
           }
-        }]
+        }))
       },
-      status: 'created'
+      status: 'sent'
     };
 
-    console.log('Envelope request:', {
-      ...envelope,
-      documents: [{
-        ...envelope.documents[0],
-        documentBase64: '[REDACTED]'
-      }]
-    });
-
+    // Call DocuSign API directly
     const response = await fetch(`${BASE_URL}/accounts/${accountId}/envelopes`, {
       method: 'POST',
       headers: {
@@ -99,28 +83,17 @@ export async function POST(request: Request) {
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Create envelope error:', {
-        status: response.status,
-        statusText: response.statusText,
-        body: errorText
-      });
-      try {
-        const error = JSON.parse(errorText);
-        throw new Error(error.message || 'Failed to create envelope');
-      } catch (e) {
-        throw new Error(`Failed to create envelope: ${response.status} ${response.statusText}\n${errorText}`);
-      }
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to create envelope');
     }
 
     const result = await response.json();
-    console.log('Envelope created:', result);
-
     return NextResponse.json({
       envelopeId: result.envelopeId,
       status: result.status,
       message: 'Envelope created successfully'
     });
+
   } catch (error: any) {
     console.error('Create envelope error:', error);
     return NextResponse.json(
