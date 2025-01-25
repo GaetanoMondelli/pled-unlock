@@ -149,6 +149,12 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
   const { openConnectModal } = useConnectModal();
   const { signMessageAsync } = useSignMessage();
 
+  // Replace single currentRuleCheckData with section-specific ones
+  const [envelopeRuleCheckData, setEnvelopeRuleCheckData] = useState<any>(null);
+  const [navigatorRuleCheckData, setNavigatorRuleCheckData] = useState<any>(null);
+  const [clickwrapRuleCheckData, setClickwrapRuleCheckData] = useState<any>(null);
+  const [web3RuleCheckData, setWeb3RuleCheckData] = useState<any>(null);
+
   // Update event type handler to set template
   const handleEventTypeChange = (type: string) => {
     setEventType(type);
@@ -199,15 +205,55 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
     }
   };
 
-  // Update the rule matching check
-  const checkRuleMatching = (data: any) => {
+  // Add effects to watch all response states
+  useEffect(() => {
+    if (statusResult) {
+      checkRuleMatching({
+        type: "DOCUSIGN_EVENT",
+        data: statusResult
+      });
+    }
+  }, [statusResult]);
+
+  useEffect(() => {
+    if (navigatorResult) {
+      checkRuleMatching({
+        type: "DOCUSIGN_NAVIGATOR_GET_AGREEMENT",
+        data: navigatorResult
+      });
+    }
+  }, [navigatorResult]);
+
+  useEffect(() => {
+    if (clickwrapResult) {
+      checkRuleMatching({
+        type: "DOCUSIGN_CLICK_STATUS",
+        data: clickwrapResult
+      });
+    }
+  }, [clickwrapResult]);
+
+  useEffect(() => {
+    if (signedMessage && messageToSign) {
+      checkRuleMatching({
+        type: "WEB3_SIGNED_MESSAGE",
+        data: {
+          message: messageToSign,
+          signature: signedMessage,
+          signer: address
+        }
+      });
+    }
+  }, [signedMessage, messageToSign, address]);
+
+  // Update checkRuleMatching to take type as parameter
+  const checkRuleMatching = (event: { type: string, data: any }) => {
     try {
-      const event = { type: eventType, data };
       const matching = [];
       const nonMatching = [];
 
       for (const rule of templateRules) {
-        if (rule.matches.type === eventType) {
+        if (rule.matches.type === event.type) {
           try {
             const matches = matchEventToRule(
               event,
@@ -220,17 +266,13 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
             } else {
               // Add detailed condition comparison with interpolated values
               const conditionDetails = Object.entries(rule.matches.conditions || {}).map(([field, condition]: [string, any]) => {
-                // Get actual value from event data
-                const actualValue = field.split('.').reduce((obj, key) => obj?.[key], data);
-                
-                // Interpolate the expected value template
+                const actualValue = field.split('.').reduce((obj, key) => obj?.[key], event.data);
                 let expectedTemplate = condition.toString();
                 const interpolated = expectedTemplate.replace(/\{\{([^}]+)\}\}/g, (match: string, path: string) => {
                   return path.split('.')
                     .reduce((obj: any, key: string) => obj?.[key], instanceVariables) || match;
                 });
 
-                // Parse the condition
                 const operatorMatch = interpolated.match(/^\((.*?)\)\s*(.*)/);
                 const operator = operatorMatch ? operatorMatch[1] : 'equals';
                 const expectedValue = operatorMatch ? operatorMatch[2] : interpolated;
@@ -267,7 +309,7 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
               field: 'type',
               operator: 'equals',
               expected: rule.matches.type,
-              actual: eventType,
+              actual: event.type,
               template: rule.matches.type,
               matches: false
             }]
@@ -284,11 +326,14 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
     }
   };
 
-  // Update the effect to be more defensive
+  // Update the raw event effect to use new format
   useEffect(() => {
     try {
       const parsedData = JSON.parse(eventData);
-      checkRuleMatching(parsedData);
+      checkRuleMatching({
+        type: eventType,
+        data: parsedData
+      });
     } catch (error) {
       console.error("Invalid JSON:", error);
       setMatchingRules([]);
@@ -761,6 +806,170 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
       .reduce((obj: any, key: string) => obj?.[key], instanceVariables) ?? '(undefined)';
   };
 
+  // Update the checkRulesAgainstData function to take a setter
+  const checkRulesAgainstData = (data: any, type: string, setRuleCheckData: (data: any) => void) => {
+    try {
+      const event = { type, data };
+      const matching = [];
+      const nonMatching = [];
+
+      for (const rule of templateRules) {
+        if (rule.matches.type === type) {
+          try {
+            const matches = matchEventToRule(
+              event,
+              { type: rule.matches.type, conditions: rule.matches.conditions },
+              instanceVariables
+            );
+
+            if (matches) {
+              matching.push(rule);
+            } else {
+              const conditionDetails = Object.entries(rule.matches.conditions || {}).map(([field, condition]: [string, any]) => {
+                const actualValue = field.split('.').reduce((obj, key) => obj?.[key], data);
+                let expectedTemplate = condition.toString();
+                const interpolated = expectedTemplate.replace(/\{\{([^}]+)\}\}/g, (match: string, path: string) => {
+                  return path.split('.')
+                    .reduce((obj: any, key: string) => obj?.[key], instanceVariables) || match;
+                });
+
+                const operatorMatch = interpolated.match(/^\((.*?)\)\s*(.*)/);
+                const operator = operatorMatch ? operatorMatch[1] : 'equals';
+                const expectedValue = operatorMatch ? operatorMatch[2] : interpolated;
+
+                return {
+                  field,
+                  operator,
+                  expected: expectedValue,
+                  actual: actualValue || 'undefined',
+                  template: condition.toString(),
+                  matches: false
+                };
+              });
+
+              nonMatching.push({
+                rule,
+                reason: "Conditions do not match",
+                details: conditionDetails
+              });
+            }
+          } catch (error) {
+            console.error("Error matching rule:", error);
+            nonMatching.push({
+              rule,
+              reason: "Error matching rule",
+              details: []
+            });
+          }
+        } else {
+          nonMatching.push({
+            rule,
+            reason: `Wrong type: expected ${rule.matches.type}`,
+            details: [{
+              field: 'type',
+              operator: 'equals',
+              expected: rule.matches.type,
+              actual: type,
+              template: rule.matches.type,
+              matches: false
+            }]
+          });
+        }
+      }
+
+      setRuleCheckData({ matching, nonMatching });
+    } catch (error) {
+      console.error("Error in checkRulesAgainstData:", error);
+      setRuleCheckData(null);
+    }
+  };
+
+  // Add RuleMatchingDisplay component
+  const RuleMatchingDisplay = ({ data }: { data: { matching: any[], nonMatching: any[] } }) => (
+    <div className="mt-4 space-y-4 border-t pt-4">
+      <h4 className="text-sm font-medium">Rule Matching Results</h4>
+      
+      {data.matching.length > 0 && (
+        <div className="space-y-2">
+          <h5 className="text-sm font-medium text-green-600">Matching Rules:</h5>
+          <div className="space-y-1">
+            {data.matching.map(rule => (
+              <div key={rule.id} className="text-xs bg-green-50 text-green-700 p-2 rounded">
+                {rule.id}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {data.nonMatching.length > 0 && (
+        <div className="space-y-2">
+          <h5 className="text-sm font-medium text-yellow-600">Non-Matching Rules:</h5>
+          <div className="space-y-1">
+            {data.nonMatching.map(({ rule, reason, details }) => (
+              <div 
+                key={rule.id} 
+                className="text-xs bg-yellow-50 text-yellow-700 rounded overflow-hidden"
+              >
+                <div 
+                  className="p-2 flex items-center justify-between cursor-pointer hover:bg-yellow-100"
+                  onClick={() => toggleRuleExpand(rule.id)}
+                >
+                  <div>
+                    <span className="font-medium">{rule.id}</span>
+                    <span className="ml-2">{reason}</span>
+                  </div>
+                  {expandedRules.includes(rule.id) ? (
+                    <ChevronUp className="h-4 w-4" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4" />
+                  )}
+                </div>
+                
+                {expandedRules.includes(rule.id) && details.length > 0 && (
+                  <div className="border-t border-yellow-200 bg-yellow-50/50 p-2">
+                    <table className="w-full text-left">
+                      <thead>
+                        <tr className="text-yellow-800">
+                          <th className="p-1">Field</th>
+                          <th className="p-1">Operator</th>
+                          <th className="p-1">Expected</th>
+                          <th className="p-1">Actual</th>
+                          <th className="p-1">Template</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {details.map((detail: any, i: number) => (
+                          <tr key={i} className="border-t border-yellow-200/50">
+                            <td className="p-1 font-medium">{detail.field}</td>
+                            <td className="p-1 italic">{detail.operator}</td>
+                            <td className="p-1">{detail.expected}</td>
+                            <td className="p-1">{detail.actual}</td>
+                            <td className="p-1 text-gray-500">{detail.template}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  // Clear rule check data when closing modal
+  useEffect(() => {
+    if (!open) {
+      setEnvelopeRuleCheckData(null);
+      setNavigatorRuleCheckData(null);
+      setClickwrapRuleCheckData(null);
+      setWeb3RuleCheckData(null);
+    }
+  }, [open]);
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl">
@@ -1002,19 +1211,29 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                         <div className="mt-4 space-y-2">
                           <div className="flex items-center justify-between">
                             <h4 className="text-sm font-medium">Envelope Status</h4>
-                            <Button 
-                              size="sm" 
-                              onClick={async () => {
-                                try {
-                                  await addAsVerifiedEvent();
-                                } catch (error) {
-                                  console.error('Error adding event:', error);
-                                }
-                              }}
-                            >
-                              Add as Event
-                            </Button>
+                            <div className="space-x-2">
+                              <Button 
+                                size="sm"
+                                variant="outline" 
+                                onClick={() => checkRulesAgainstData(statusResult, "DOCUSIGN_EVENT", setEnvelopeRuleCheckData)}
+                              >
+                                Check Rules
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                onClick={async () => {
+                                  try {
+                                    await addAsVerifiedEvent();
+                                  } catch (error) {
+                                    console.error('Error adding event:', error);
+                                  }
+                                }}
+                              >
+                                Add as Event
+                              </Button>
+                            </div>
                           </div>
+                          {envelopeRuleCheckData && <RuleMatchingDisplay data={envelopeRuleCheckData} />}
                           <Card className="bg-muted">
                             <ScrollArea className="h-[200px]">
                               <div className="p-4 w-[500px]">
@@ -1083,19 +1302,29 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                           <div className="mt-4 space-y-2">
                             <div className="flex items-center justify-between">
                               <h4 className="text-sm font-medium">Agreement Details</h4>
-                              <Button 
-                                size="sm" 
-                                onClick={async () => {
-                                  try {
-                                    await addNavigatorResultAsEvent();
-                                  } catch (error) {
-                                    console.error('Error adding event:', error);
-                                  }
-                                }}
-                              >
-                                Add as Event
-                              </Button>
+                              <div className="space-x-2">
+                                <Button 
+                                  size="sm"
+                                  variant="outline" 
+                                  onClick={() => checkRulesAgainstData(navigatorResult, "DOCUSIGN_NAVIGATOR_GET_AGREEMENT", setNavigatorRuleCheckData)}
+                                >
+                                  Check Rules
+                                </Button>
+                                <Button 
+                                  size="sm" 
+                                  onClick={async () => {
+                                    try {
+                                      await addNavigatorResultAsEvent();
+                                    } catch (error) {
+                                      console.error('Error adding event:', error);
+                                    }
+                                  }}
+                                >
+                                  Add as Event
+                                </Button>
+                              </div>
                             </div>
+                            {navigatorRuleCheckData && <RuleMatchingDisplay data={navigatorRuleCheckData} />}
                             <Card className="bg-muted">
                               <ScrollArea className="h-[200px]">
                                 <div className="p-4">
@@ -1166,19 +1395,29 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                           <div className="mt-4 space-y-2">
                             <div className="flex items-center justify-between">
                               <h4 className="text-sm font-medium">Clickwrap Status</h4>
-                              <Button 
-                                size="sm" 
-                                onClick={async () => {
-                                  try {
-                                    await addClickwrapResultAsEvent();
-                                  } catch (error) {
-                                    console.error('Error adding event:', error);
-                                  }
-                                }}
-                              >
-                                Add as Event
-                              </Button>
+                              <div className="space-x-2">
+                                <Button 
+                                  size="sm"
+                                  variant="outline" 
+                                  onClick={() => checkRulesAgainstData(clickwrapResult, "DOCUSIGN_CLICK_STATUS", setClickwrapRuleCheckData)}
+                                >
+                                  Check Rules
+                                </Button>
+                                <Button 
+                                  size="sm" 
+                                  onClick={async () => {
+                                    try {
+                                      await addClickwrapResultAsEvent();
+                                    } catch (error) {
+                                      console.error('Error adding event:', error);
+                                    }
+                                  }}
+                                >
+                                  Add as Event
+                                </Button>
+                              </div>
                             </div>
+                            {clickwrapRuleCheckData && <RuleMatchingDisplay data={clickwrapRuleCheckData} />}
                             <Card className="bg-muted">
                               <ScrollArea className="h-[200px]">
                                 <div className="p-4">
@@ -1233,13 +1472,27 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                       <div className="mt-4 space-y-2">
                         <div className="flex items-center justify-between">
                           <h4 className="text-sm font-medium">Signature</h4>
-                          <Button 
-                            size="sm" 
-                            onClick={addSignedMessageAsEvent}
-                          >
-                            Add as Event
-                          </Button>
+                          <div className="space-x-2">
+                            <Button 
+                              size="sm"
+                              variant="outline" 
+                              onClick={() => checkRulesAgainstData({
+                                message: messageToSign,
+                                signature: signedMessage,
+                                signer: address
+                              }, "WEB3_SIGNED_MESSAGE", setWeb3RuleCheckData)}
+                            >
+                              Check Rules
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              onClick={addSignedMessageAsEvent}
+                            >
+                              Add as Event
+                            </Button>
+                          </div>
                         </div>
+                        {web3RuleCheckData && <RuleMatchingDisplay data={web3RuleCheckData} />}
                         <Card className="bg-muted">
                           <ScrollArea className="h-[200px]">
                             <div className="p-4">
