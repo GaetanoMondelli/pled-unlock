@@ -17,6 +17,8 @@ import { getProcedureData, fetchFromDb } from "~~/utils/api";
 import { getNotMatchingReason } from "../../utils/message-rules";
 import { handleEventAndGenerateMessages } from "../../utils/stateAndMessageHandler";
 import { useSearchParams, usePathname } from 'next/navigation';
+import { useAccount, useSignMessage } from 'wagmi';
+import { useConnectModal } from "@rainbow-me/rainbowkit";
 
 interface CreateEventModalProps {
   open: boolean;
@@ -139,6 +141,13 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
   const [isLoadingClickwraps, setIsLoadingClickwraps] = useState(false);
   const [isLoadingClickwrapStatus, setIsLoadingClickwrapStatus] = useState(false);
   const [clickwrapResult, setClickwrapResult] = useState<any>(null);
+
+  // Update Web3 state to use scaffold-eth hooks
+  const [messageToSign, setMessageToSign] = useState<string>("");
+  const [signedMessage, setSignedMessage] = useState<string | null>(null);
+  const { address, isConnected } = useAccount();
+  const { openConnectModal } = useConnectModal();
+  const { signMessageAsync } = useSignMessage();
 
   // Update event type handler to set template
   const handleEventTypeChange = (type: string) => {
@@ -696,6 +705,46 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
     }
   };
 
+  // Add Web3 signing handler
+  const handleSignMessage = async () => {
+    try {
+      if (!messageToSign) return;
+      const signature = await signMessageAsync({ message: messageToSign });
+      setSignedMessage(signature);
+    } catch (error) {
+      console.error('Error signing message:', error);
+    }
+  };
+
+  // Add Web3 event creation handler
+  const addSignedMessageAsEvent = async () => {
+    if (!signedMessage || !messageToSign) return;
+    
+    try {
+      const event = {
+        id: `web3_${Date.now()}`,
+        type: 'WEB3_SIGNED_MESSAGE',
+        name: "Web3 Signed Message",
+        description: "Message signed with Web3 wallet",
+        template: {
+          source: "web3",
+          data: {
+            message: messageToSign,
+            signature: signedMessage,
+            signer: address
+          }
+        }
+      };
+
+      await onSave(event);
+      onClose();
+      setSignedMessage(null);
+      setMessageToSign("");
+    } catch (error) {
+      console.error('Error adding Web3 event:', error);
+    }
+  };
+
   // Add type annotations for handleFileChange
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>, filePath: string): void => {
     // ... existing code ...
@@ -725,6 +774,7 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
             <TabsTrigger value="api">API Execution</TabsTrigger>
             <TabsTrigger value="gmail">Gmail Import</TabsTrigger>
             <TabsTrigger value="docusign">DocuSign Actions</TabsTrigger>
+            <TabsTrigger value="web3">Web3 Sign</TabsTrigger>
           </TabsList>
 
           <TabsContent value="raw">
@@ -967,9 +1017,11 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                           </div>
                           <Card className="bg-muted">
                             <ScrollArea className="h-[200px]">
-                              <pre className="p-4 text-xs whitespace-pre-wrap break-all">
-                                {JSON.stringify(statusResult, null, 2)}
-                              </pre>
+                              <div className="p-4 w-[500px]">
+                                <pre className="text-xs whitespace-pre-wrap font-mono max-w-full overflow-x-auto">
+                                  {JSON.stringify(statusResult, null, 2)}
+                                </pre>
+                              </div>
                             </ScrollArea>
                           </Card>
                         </div>
@@ -1047,7 +1099,7 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                             <Card className="bg-muted">
                               <ScrollArea className="h-[200px]">
                                 <div className="p-4">
-                                  <pre className="text-xs whitespace-pre-wrap break-all">
+                                  <pre className="text-xs whitespace-pre-wrap font-mono max-w-full overflow-x-auto">
                                     {JSON.stringify(navigatorResult, null, 2)}
                                   </pre>
                                 </div>
@@ -1130,7 +1182,7 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                             <Card className="bg-muted">
                               <ScrollArea className="h-[200px]">
                                 <div className="p-4">
-                                  <pre className="text-xs whitespace-pre-wrap break-all">
+                                  <pre className="text-xs whitespace-pre-wrap font-mono max-w-full overflow-x-auto">
                                     {JSON.stringify(clickwrapResult, null, 2)}
                                   </pre>
                                 </div>
@@ -1143,6 +1195,76 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                   </div>
                 </div>
               )}
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="web3">
+            <Card className="p-4">
+              <h3 className="text-sm font-medium mb-2">Sign Message with Web3</h3>
+              <div className="space-y-4">
+                {!isConnected ? (
+                  <div className="text-center py-4">
+                    <p className="text-sm text-muted-foreground mb-2">Connect your wallet to sign messages</p>
+                    <Button onClick={openConnectModal}>
+                      Connect Wallet
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <div>
+                      <Label>Message to Sign</Label>
+                      <Textarea
+                        value={messageToSign}
+                        onChange={(e) => setMessageToSign(e.target.value)}
+                        placeholder="Enter a message to sign..."
+                        className="mt-1"
+                      />
+                    </div>
+
+                    <Button
+                      onClick={handleSignMessage}
+                      disabled={!messageToSign}
+                      className="w-full"
+                    >
+                      Sign Message
+                    </Button>
+
+                    {signedMessage && (
+                      <div className="mt-4 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-sm font-medium">Signature</h4>
+                          <Button 
+                            size="sm" 
+                            onClick={addSignedMessageAsEvent}
+                          >
+                            Add as Event
+                          </Button>
+                        </div>
+                        <Card className="bg-muted">
+                          <ScrollArea className="h-[200px]">
+                            <div className="p-4">
+                              <div className="space-y-2">
+                                <div>
+                                  <span className="text-sm font-medium">Message:</span>
+                                  <pre className="text-xs mt-1 bg-slate-100 p-2 rounded max-w-full overflow-x-auto">{messageToSign}</pre>
+                                </div>
+                                <div>
+                                  <span className="text-sm font-medium">Signature:</span>
+                                  <pre className="text-xs mt-1 bg-slate-100 p-2 rounded max-w-full overflow-x-auto whitespace-pre-wrap break-all">{signedMessage}</pre>
+                                </div>
+                                <div>
+                                  <span className="text-sm font-medium">Signer:</span>
+                                  <pre className="text-xs mt-1 bg-slate-100 p-2 rounded max-w-full overflow-x-auto">{address}</pre>
+                                </div>
+                              </div>
+                            </div>
+                          </ScrollArea>
+                        </Card>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             </Card>
           </TabsContent>
         </Tabs>
