@@ -96,12 +96,32 @@ export function createStateMachine(definition: string): StateMachine {
   };
 }
 
-export const calculateCurrentState = async (
+export const calculateCurrentState = (
+  definition: string,
+  messages: Message[]
+): string => {
+  const machine = createStateMachine(definition);
+  let processedState = 'idle';
+  machine.go(processedState);
+
+  for (const message of messages) {
+    if (message.type) {
+      const actionResult = machine.action(message.type);
+      if (actionResult) {
+        processedState = machine.state();
+      }
+    }
+  }
+
+  return processedState;
+};
+
+export const calculateStateAndExecuteActions = async (
   definition: string, 
-  messages: any[], 
+  messages: Message[], 
   instance: any,
   template: any
-) => {
+): Promise<string> => {
   const machine = createStateMachine(definition);
   let currentState = 'idle';
   machine.go(currentState);
@@ -133,7 +153,7 @@ export const calculateCurrentState = async (
         const stateActions = template?.actions?.[processedState] || [];
         
         // Find which actions haven't been executed for this state transition
-        const pendingActions = stateActions.filter(action => {
+        const pendingActions = stateActions.filter((action: any) => {
           const hasBeenExecuted = instance.history.executedActions.some(
             (executed: ActionExecution) => 
               executed.actionId === action.id && 

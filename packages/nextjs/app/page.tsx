@@ -111,15 +111,6 @@ export default function Home() {
     }
   };
 
-  const formatTimestamp = (timestamp: string) => {
-    try {
-      return `Updated ${formatDistanceToNow(new Date(timestamp))} ago`;
-    } catch (error) {
-      console.error('Error formatting date:', error);
-      return 'Date error';
-    }
-  };
-
   return (
     <div className="flex flex-col items-center gap-8 py-8 px-4">
       <div className="flex gap-4">

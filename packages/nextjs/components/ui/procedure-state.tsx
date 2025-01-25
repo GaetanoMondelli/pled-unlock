@@ -81,7 +81,7 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
   const [events, setEvents] = useState<Event[]>([])
   const [messages, setMessages] = useState<Message[]>([])
   const [currentState, setCurrentState] = useState(() => 
-    calculateCurrentState(definition, messages, null, template)
+    calculateCurrentState(definition, messages)
   )
   const [selectedNode, setSelectedNode] = useState(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -346,7 +346,7 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
     try {
       const newStateMachine = createStateMachine(newDefinition)
       setStateMachine(newStateMachine)
-      setCurrentState(calculateCurrentState(newDefinition, messages, null, template))
+      setCurrentState(calculateCurrentState(newDefinition, messages))
     } catch (error) {
       console.error("Invalid state machine definition", error)
     }
@@ -603,7 +603,7 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
 
       // Add initial state actions
       if (template.actions?.[currentState]) {
-        expectedActions.push(...template.actions[currentState].map(action => ({
+        expectedActions.push(...template.actions[currentState].map((action: any) => ({
           actionId: action.id || `action_${Date.now()}`,
           state: currentState,
           trigger: 'INIT',
