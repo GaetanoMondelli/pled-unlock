@@ -653,7 +653,7 @@ export const D3Graph = React.forwardRef<any, D3GraphProps>(({
         <svg ref={svgRef} className="w-full h-full" />
       </div>
       
-      <div className="p-4 border rounded-lg bg-gray-50 text-sm">
+      {/* <div className="p-4 border rounded-lg bg-gray-50 text-sm">
         <div className="grid grid-cols-2 gap-4">
           <div>
             <h3 className="font-medium mb-2">States with Actions:</h3>
@@ -676,7 +676,7 @@ export const D3Graph = React.forwardRef<any, D3GraphProps>(({
             </ul>
           </div>
         </div>
-      </div>
+      </div> */}
     </div>
   );
 });

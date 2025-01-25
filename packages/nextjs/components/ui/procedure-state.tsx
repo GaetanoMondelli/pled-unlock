@@ -15,6 +15,7 @@ import MessageRules from './message-rules'
 import { useRouter } from 'next/navigation'
 import StateGraph from './state-graph'
 import { Play } from 'lucide-react'
+import { ActionExecutionList } from './action-execution-list'
 
 interface Message {
   id: string;
@@ -94,6 +95,17 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
   const messageRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
 
+  // Add state for action status
+  const [actionStatus, setActionStatus] = useState<{
+    expectedActions: any[];
+    executedActions: any[];
+    pendingActions: any[];
+  }>({
+    expectedActions: [],
+    executedActions: [],
+    pendingActions: []
+  });
+
   console.log('Template being passed to StateGraph:', template); // Debug log
 
   // Load events and process them
@@ -110,6 +122,18 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
           console.error('Instance or template not found')
           return
         }
+
+        // Load executed actions from DB
+        const executedActions = instance.history?.executedActions || []
+        console.log('Loading executed actions from DB:', executedActions)
+
+        // Update action status with DB data
+        setActionStatus(prev => ({
+          ...prev,
+          expectedActions: executedActions,  // Show executed actions as expected
+          executedActions: executedActions,  // Store executed actions
+          pendingActions: []                 // No pending actions initially
+        }))
 
         const events = instance.history?.events || []
         setEvents(events)
@@ -587,20 +611,20 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
       }
 
       // Process each event to track state changes and required actions
-      for (const event of instance.history.events) {
+      for (const message of messages) {
         const previousState = currentState;
-        const actionResult = machine.action(event.type);
+        const actionResult = machine.action(message.type);
         
         if (actionResult) {
           currentState = machine.state();
-          console.log(`State transition: ${previousState} -> ${currentState} (${event.type})`);
+          console.log(`State transition: ${previousState} -> ${currentState} (${message.type})`);
 
           // Add actions for the new state
           if (template.actions?.[currentState]) {
-            expectedActions.push(...template.actions[currentState].map(action => ({
+            expectedActions.push(...template.actions[currentState].map((action: any) => ({
               actionId: action.id,
               state: currentState,
-              trigger: event.type
+              trigger: message.type
             })));
           }
         }
@@ -620,6 +644,42 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
 
       console.log('Action analysis:', {
         currentState,
+        expectedActions,
+        executedActions: updatedInstance.history.executedActions,
+        pendingActions
+      });
+
+      if (pendingActions.length > 0) {
+        // Store in DB
+        const updatedActions = [
+          ...updatedInstance.history.executedActions,
+          ...pendingActions.map(action => ({
+            actionId: action.actionId,
+            state: action.state, 
+            trigger: action.trigger,
+            type: action.type,
+            timestamp: new Date().toISOString()
+          }))
+        ];
+
+        const response = await fetch('/api/procedures/' + procedureId, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            history: {
+              ...instance.history,
+              executedActions: updatedActions
+            }
+          })
+        });
+
+        if (!response.ok) {
+          console.error('Failed to store actions');
+        }
+      }
+
+      // Update UI
+      setActionStatus({
         expectedActions,
         executedActions: updatedInstance.history.executedActions,
         pendingActions
@@ -671,54 +731,8 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
             documents={template?.documents}
           />
           
-          <div className="mt-4 p-4 bg-slate-100 rounded-lg">
-            <h3 className="font-medium mb-2">State Machine Debug</h3>
-            <div className="space-y-2">
-              <div>
-                <h4 className="text-sm font-medium">Template Actions:</h4>
-                <pre className="text-sm bg-white p-2 rounded overflow-auto max-h-40">
-                  {JSON.stringify(template?.actions, null, 2)}
-                </pre>
-              </div>
-              <div>
-                <h4 className="text-sm font-medium">Current State:</h4>
-                <pre className="text-sm bg-white p-2 rounded">
-                  {currentState}
-                </pre>
-              </div>
-              <div>
-                <h4 className="text-sm font-medium">FSM Definition:</h4>
-                <pre className="text-sm bg-white p-2 rounded overflow-auto max-h-40">
-                  {definition}
-                </pre>
-              </div>
-            </div>
-          </div>
         </div>
 
-        <div className="space-y-4">
-          <h3 className="text-lg font-medium">Available Actions</h3>
-          <div className="flex gap-2 flex-wrap">
-            {links
-              .filter(link => link.source === currentState)
-              .map(link => (
-                <Button
-                  key={link.label}
-                  onClick={() => handleSendMessage(link.label)}
-                  variant="outline"
-                >
-                  {link.label}
-                </Button>
-              ))}
-          </div>
-        </div>
-
-        <MessageRules 
-          procedureId={procedureId}
-          messages={messages}
-          selectedMessageId={selectedMessageId}
-          onMessageSelect={scrollToMessage}
-        />
 
         <div className="space-y-4">
           <h3 className="text-lg font-medium">State Transition History {procedureId}</h3>
@@ -729,6 +743,12 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
             onMessageClick={scrollToMessage}
           />
         </div>
+
+        <ActionExecutionList 
+          expectedActions={actionStatus.expectedActions}
+          executedActions={actionStatus.executedActions}
+          pendingActions={actionStatus.pendingActions}
+        />
       </div>
 
       <NodeDetailsDialog
