@@ -800,12 +800,19 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
                   name: 'DocuSign Envelope Sent',
                   description: `Envelope ${envelopeId} has been sent to recipients`,
                   template: {
+                    source: "action",
                     data: {
                       envelopeId,
                       status: 'sent',
                       timestamp: new Date().toISOString(),
                       actionId: action.actionId
                     }
+                  },
+                  data: {
+                    envelopeId,
+                    status: 'sent',
+                    timestamp: new Date().toISOString(),
+                    actionId: action.actionId
                   }
                 },
                 action: {
@@ -845,6 +852,7 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
                   name: 'DocuSign Status Update',
                   description: `Envelope ${envelopeId} status is now: ${statusResult.status}`,
                   template: {
+                    source: "docusign",
                     data: {
                       envelopeId,
                       status: statusResult.status,

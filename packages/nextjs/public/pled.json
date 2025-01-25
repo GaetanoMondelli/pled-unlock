@@ -232,6 +232,34 @@
             }
           },
           "transition": "offer_preparation"
+        },
+        {
+          "id": "docusign_sent_pattern",
+          "priority": 1,
+          "matches": {
+            "type": "DOCUSIGN_STATUS",
+            "conditions": {
+              "status": "sent"
+            }
+          },
+          "captures": {
+            "envelopeId": "{{event.data.envelopeId}}",
+            "sentTime": "{{event.data.timestamp}}",
+            "actionId": "{{event.data.actionId}}"
+          },
+          "generates": {
+            "type": "send_contract",
+            "template": {
+              "title": "Contract sent via DocuSign",
+              "content": "Employment contract has been sent via DocuSign (Envelope ID: {{captures.envelopeId}})",
+              "timestamp": "{{captures.sentTime}}",
+              "metadata": {
+                "actionId": "{{captures.actionId}}",
+                "envelopeId": "{{captures.envelopeId}}"
+              }
+            }
+          },
+          "transition": "contract_sent"
         }
       ],
       "stateMachine": {

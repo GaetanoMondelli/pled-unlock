@@ -27,25 +27,42 @@ export async function PATCH(
 
     // Handle both events and actions in one update
     if (updates.event) {
-      // Add new event
+      // Add new event with proper structure
       const newEvent = {
         id: `evt_${Date.now()}`,
+        name: updates.event.name,
+        description: updates.event.description,
         type: updates.event.type,
+        template: {
+          source: "action",
+          data: updates.event.template?.data || {}
+        },
+        data: updates.event.template?.data || {},
         timestamp: new Date().toISOString(),
-        event: updates.event
+        history: {
+          events: [...instance.history.events]
+        }
       };
-      instance.history.events.push(newEvent);
+
+      // Create new instance with updated history
+      instance.history = {
+        ...instance.history,
+        events: [...instance.history.events, newEvent]
+      };
     }
 
     if (updates.action) {
       // Add executed action
-      instance.history.executedActions.push({
-        actionId: updates.action.actionId,
-        state: updates.action.state,
-        type: updates.action.type,
-        trigger: updates.action.trigger || 'INIT',
-        timestamp: new Date().toISOString()
-      });
+      instance.history.executedActions = [
+        ...(instance.history.executedActions || []),
+        {
+          actionId: updates.action.actionId,
+          state: updates.action.state,
+          type: updates.action.type,
+          trigger: updates.action.trigger || 'INIT',
+          timestamp: new Date().toISOString()
+        }
+      ];
     }
 
     // Create new data object with updated instance
