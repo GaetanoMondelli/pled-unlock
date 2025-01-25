@@ -654,7 +654,7 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
       });
 
       if (pendingActions.length > 0) {
-        // Store in DB
+        // Store actions in DB
         const updatedActions = [
           ...updatedInstance.history.executedActions,
           ...pendingActions.map(action => ({
@@ -667,6 +667,7 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
           }))
         ];
 
+        // Store actions
         const response = await fetch('/api/procedures/' + procedureId, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -728,9 +729,12 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
             height={500}
             direction="LR"
             onNodeClick={(node: any) => {
-              console.log('Node clicked:', node); // Debug log
-              if (node && typeof handleNodeClick === 'function') {
+              console.log('Node clicked:', node);
+              if (node) {
                 handleNodeClick(node);
+              } else {
+                // Deselect when clicking empty space
+                setFocusedState(null);
               }
             }}
             documents={template?.documents}

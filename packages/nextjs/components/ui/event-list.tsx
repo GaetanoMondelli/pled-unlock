@@ -372,6 +372,32 @@ export default function EventList({ procedureId }: EventListProps) {
     }
   }, [highlightedEvent]);
 
+  // Add helper functions at top
+  const getSourceBadgeStyle = (source: string) => {
+    switch (source) {
+      case 'manual':
+        return 'bg-blue-100 text-blue-800';
+      case 'action':
+        return 'bg-purple-100 text-purple-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getSourceLabel = (event: any) => {
+    // For events in event templates/list
+    if (event.template?.source) return event.template.source;
+    
+    // For history events from actions
+    if (event.type === 'CUSTOM_EVENT') return 'action';
+    
+    // For manually added events in history
+    if (event.id?.startsWith('email_received_')) return 'manual';
+    
+    // Default case
+    return 'received';
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center p-4">
@@ -436,10 +462,53 @@ export default function EventList({ procedureId }: EventListProps) {
                       )}
                     </Button>
                     {expandedEvents.includes(event.id) && (
-                      <div className="mt-2">
-                        <pre className="text-xs whitespace-pre-wrap bg-gray-50 p-2 rounded">
-                          {JSON.stringify(event.data, null, 2)}
-                        </pre>
+                      <div className="mt-2 space-y-3">
+                        {/* Source Badge */}
+                        <div className="flex items-center">
+                          <span className="text-xs font-medium mr-2">Source:</span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${getSourceBadgeStyle(getSourceLabel(event))}`}>
+                            {getSourceLabel(event)}
+                          </span>
+                        </div>
+
+                        {/* Event Data */}
+                        <div>
+                          <span className="text-xs font-medium">Data:</span>
+                          <pre className="text-xs whitespace-pre-wrap bg-gray-50 p-2 rounded mt-1">
+                            {JSON.stringify(event.data, null, 2)}
+                          </pre>
+                        </div>
+
+                        {/* History for action events */}
+                        {event.template?.source === 'action' && event.template.history && (
+                          <div>
+                            <span className="text-xs font-medium">Event History:</span>
+                            <div className="mt-1 overflow-x-auto">
+                              <table className="w-full text-xs">
+                                <thead className="bg-gray-50">
+                                  <tr>
+                                    <th className="px-2 py-1 text-left">Time</th>
+                                    <th className="px-2 py-1 text-left">Type</th>
+                                    <th className="px-2 py-1 text-left">Details</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                  {event.template.history.events.map((historyEvent: any) => (
+                                    <tr key={historyEvent.id}>
+                                      <td className="px-2 py-1">
+                                        {new Date(historyEvent.timestamp).toLocaleString()}
+                                      </td>
+                                      <td className="px-2 py-1">{historyEvent.type}</td>
+                                      <td className="px-2 py-1">
+                                        {JSON.stringify(historyEvent.data)}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </TableCell>

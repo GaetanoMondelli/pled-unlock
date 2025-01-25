@@ -346,12 +346,11 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
       const parsedData = JSON.parse(eventData);
       
       // Create event template
-      const template = {
-        id: `${eventType.toLowerCase()}_${Date.now()}`,
+      const eventTemplate = {
+        id: `email_received_${Date.now()}`,
         name: `${eventType} Event`,
         description: `${eventType} event created manually`,
         type: eventType,
-        procedureId,
         template: {
           source: "manual",
           data: parsedData
@@ -359,7 +358,7 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
       };
 
       // Let parent handle the API call
-      await onSave(template);
+      await onSave(eventTemplate);
       onClose();
     } catch (error) {
       console.error("Error creating event:", error);
@@ -1219,30 +1218,64 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                               >
                                 Check Rules
                               </Button>
-                              <Button 
-                                size="sm" 
-                                onClick={async () => {
-                                  try {
-                                    await addAsVerifiedEvent();
-                                  } catch (error) {
-                                    console.error('Error adding event:', error);
-                                  }
-                                }}
-                              >
+                              <Button size="sm" onClick={addAsVerifiedEvent}>
                                 Add as Event
                               </Button>
                             </div>
                           </div>
+
+                          {/* Source Badge */}
+                          <div className="flex items-center">
+                            <span className="text-xs font-medium mr-2">Source:</span>
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-800">
+                              action
+                            </span>
+                          </div>
+
+                          {/* Event Data */}
+                          <div>
+                            <span className="text-xs font-medium">Data:</span>
+                            <Card className="bg-muted mt-1">
+                              <ScrollArea className="h-[200px]">
+                                <div className="p-4 w-[500px]">
+                                  <pre className="text-xs whitespace-pre-wrap font-mono">
+                                    {JSON.stringify(statusResult, null, 2)}
+                                  </pre>
+                                </div>
+                              </ScrollArea>
+                            </Card>
+                          </div>
+
+                          {/* History Section */}
+                          <div className="mt-4">
+                            <span className="text-xs font-medium">Event History:</span>
+                            <div className="mt-2 overflow-x-auto">
+                              <table className="w-full text-xs">
+                                <thead className="bg-gray-50">
+                                  <tr>
+                                    <th className="px-2 py-1 text-left">Time</th>
+                                    <th className="px-2 py-1 text-left">Type</th>
+                                    <th className="px-2 py-1 text-left">Details</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                  {instance?.history?.events.map((historyEvent: any) => (
+                                    <tr key={historyEvent.id} className="hover:bg-gray-50">
+                                      <td className="px-2 py-1">
+                                        {new Date(historyEvent.timestamp).toLocaleString()}
+                                      </td>
+                                      <td className="px-2 py-1">{historyEvent.type}</td>
+                                      <td className="px-2 py-1">
+                                        {JSON.stringify(historyEvent.data)}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+
                           {envelopeRuleCheckData && <RuleMatchingDisplay data={envelopeRuleCheckData} />}
-                          <Card className="bg-muted">
-                            <ScrollArea className="h-[200px]">
-                              <div className="p-4 w-[500px]">
-                                <pre className="text-xs whitespace-pre-wrap font-mono max-w-full overflow-x-auto">
-                                  {JSON.stringify(statusResult, null, 2)}
-                                </pre>
-                              </div>
-                            </ScrollArea>
-                          </Card>
                         </div>
                       )}
                     </Card>

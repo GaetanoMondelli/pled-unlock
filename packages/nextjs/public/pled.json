@@ -337,6 +337,57 @@
               "source": "action",
               "data": {
                 "id": 123
+              },
+              "history": {
+                "triggerState": "idle",
+                "events": [
+                  {
+                    "id": "interview-request-1737640068838",
+                    "type": "EMAIL_RECEIVED",
+                    "timestamp": "2025-01-23T13:47:48.838Z",
+                    "data": {
+                      "from": "john@example.com",
+                      "to": "hr@company.com",
+                      "subject": "Interview request",
+                      "body": "I would like to schedule an interview",
+                      "time": "2024-01-17T10:00:00Z"
+                    },
+                    "transitions": [
+                      {
+                        "id": "interview-request-1737640068838",
+                        "timestamp": "2025-01-23T13:47:48.838Z",
+                        "message": "EMAIL_RECEIVED",
+                        "fromState": "idle",
+                        "toState": "processing"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "role-discuss-1737641538864",
+                    "type": "EMAIL_RECEIVED",
+                    "timestamp": "2025-01-23T14:12:18.864Z",
+                    "data": {
+                      "from": "john@example.com",
+                      "to": "hr@company.com",
+                      "subject": "Role discussion",
+                      "body": "I would like to discuss the role details",
+                      "time": "2024-01-17T11:00:00Z"
+                    }
+                  },
+                  {
+                    "id": "schedule-interview-1737641550376",
+                    "type": "CALENDAR_EVENT",
+                    "timestamp": "2025-01-23T14:12:30.376Z",
+                    "data": {
+                      "type": "schedule_interview",
+                      "candidateEmail": "john@example.com",
+                      "interviewerEmail": "hr@company.com",
+                      "proposedTime": "2024-01-20T10:00:00Z",
+                      "duration": "60"
+                    }
+                  }
+                ],
+                "messages": []
               }
             }
           }
@@ -701,22 +752,22 @@
       },
       "received": false
     },
-    "email_received_1737767194591": {
-      "id": "email_received_1737767194591",
+    "email_received_1737822519240": {
+      "id": "email_received_1737822519240",
       "name": "EMAIL_RECEIVED Event",
       "description": "EMAIL_RECEIVED event created manually",
       "type": "EMAIL_RECEIVED",
       "template": {
         "source": "manual",
         "data": {
-          "from": "ccjohn@example.com",
+          "from": "john@example123.com",
           "to": "hr@company.com",
           "subject": "Interview request",
           "body": "I would like to schedule an interview",
-          "time": "2025-01-25T01:04:04.931Z"
+          "time": "2025-01-25T16:28:19.598Z"
         }
       },
-      "received": false
+      "received": true
     }
   },
   "procedureInstances": [
@@ -784,21 +835,31 @@
               "proposedTime": "2024-01-20T10:00:00Z",
               "duration": "60"
             }
+          },
+          {
+            "id": "email_received_1737822519240-1737822531335",
+            "type": "EMAIL_RECEIVED",
+            "timestamp": "2025-01-25T16:28:51.335Z",
+            "data": {
+              "from": "john@example123.com",
+              "to": "hr@company.com",
+              "subject": "Interview request",
+              "body": "I would like to schedule an interview",
+              "time": "2025-01-25T16:28:19.598Z"
+            }
+          },
+          {
+            "id": "evt_1737822547597_x9ds3h0hh",
+            "type": "CUSTOM_EVENT",
+            "timestamp": "2025-01-25T16:29:07.681Z",
+            "data": {
+              "actionId": "action_1737807923750",
+              "state": "idle",
+              "trigger": "INIT"
+            }
           }
         ],
         "executedActions": [
-          {
-            "actionId": "action_1737807923750",
-            "state": "idle",
-            "trigger": "INIT",
-            "timestamp": "2025-01-25T15:14:50.048Z"
-          },
-          {
-            "actionId": "action_12343534534",
-            "state": "interview_scheduled",
-            "trigger": "schedule_interview",
-            "timestamp": "2025-01-25T15:14:50.048Z"
-          }
         ]
       },
       "startDate": "2024-03-20T10:00:00Z",
