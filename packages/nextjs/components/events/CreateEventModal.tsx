@@ -161,6 +161,9 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
   const [clickwrapRuleCheckData, setClickwrapRuleCheckData] = useState<any>(null);
   const [web3RuleCheckData, setWeb3RuleCheckData] = useState<any>(null);
 
+  // Add new state for users consent
+  const [clickwrapUsers, setClickwrapUsers] = useState<any>(null);
+
   // Update event type handler to set template
   const handleEventTypeChange = (type: string) => {
     setEventType(type);
@@ -978,6 +981,49 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
     }
   }, [open]);
 
+  // Update the checkClickwrapUsers function to use the existing endpoint
+  const checkClickwrapUsers = async () => {
+    try {
+      const storedAuth = localStorage.getItem('navigatorAuth');
+      if (!storedAuth) return;
+      const authData = JSON.parse(storedAuth);
+
+      const response = await fetch(`/api/docusign/click/clickwraps/${selectedClickwrap}/agreements`, {
+        method: 'POST',  // Using POST to get users list as per the existing endpoint
+        headers: {
+          'Authorization': `Bearer ${authData.accessToken}`,
+          'Account-Id': authData.accountId
+        }
+      });
+
+      if (!response.ok) throw new Error('Failed to get users');
+      const data = await response.json();
+      setClickwrapUsers(data);
+    } catch (error) {
+      console.error('Error checking users:', error);
+    }
+  };
+
+  // Add new function to add users consent as event
+  const addUsersConsentAsEvent = async () => {
+    try {
+      const eventData = {
+        type: "DOCUSIGN_CLICK_USERS",
+        name: "DocuSign Click Users Consent",
+        description: "DocuSign clickwrap users consent check",
+        template: {
+          source: "manual",
+          data: clickwrapUsers
+        }
+      };
+
+      await onSave(eventData);
+      onClose();
+    } catch (error) {
+      console.error('Error adding event:', error);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl">
@@ -1363,91 +1409,131 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                   <div className="space-y-4">
                     <h4 className="text-sm font-medium">Click API Agreements</h4>
                     <Card className="p-4">
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <Label>Select Clickwrap</Label>
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={fetchClickwraps}
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <Label>Select Clickwrap</Label>
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={fetchClickwraps}
+                              disabled={isLoadingClickwraps}
+                            >
+                              Refresh
+                            </Button>
+                          </div>
+
+                          <Select
+                            value={selectedClickwrap}
+                            onValueChange={setSelectedClickwrap}
                             disabled={isLoadingClickwraps}
                           >
-                            Refresh
-                          </Button>
-                        </div>
-                        <Select 
-                          value={selectedClickwrap} 
-                          onValueChange={setSelectedClickwrap}
-                          disabled={isLoadingClickwraps}
-                        >
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder={isLoadingClickwraps ? "Loading..." : "Select clickwrap"} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <ScrollArea className="h-[200px]">
-                              {clickwraps.map((clickwrap: any) => (
-                                <SelectItem 
-                                  key={clickwrap.clickwrapId} 
-                                  value={clickwrap.clickwrapId}
-                                >
-                                  <div className="flex flex-col py-1">
-                                    <span className="font-medium text-sm">{clickwrap.clickwrapName || 'Untitled Clickwrap'}</span>
-                                    <span className="text-xs text-muted-foreground mt-0.5">
-                                      Version: {clickwrap.versionNumber || '1'} - Status: {clickwrap.status || 'Unknown'}
-                                    </span>
-                                  </div>
-                                </SelectItem>
-                              ))}
-                            </ScrollArea>
-                          </SelectContent>
-                        </Select>
-
-                        <Button 
-                          onClick={handleClickwrapAction}
-                          disabled={!selectedClickwrap || isLoadingClickwrapStatus}
-                          className="w-full mt-2"
-                        >
-                          {isLoadingClickwrapStatus ? "Loading..." : "Check Consent Status"}
-                        </Button>
-
-                        {clickwrapResult && (
-                          <div className="mt-4 space-y-2">
-                            <div className="flex items-center justify-between">
-                              <h4 className="text-sm font-medium">Clickwrap Status</h4>
-                              <div className="space-x-2">
-                                <Button 
-                                  size="sm"
-                                  variant="outline" 
-                                  onClick={() => checkRulesAgainstData(clickwrapResult, "DOCUSIGN_CLICK_STATUS", setClickwrapRuleCheckData)}
-                                >
-                                  Check Rules
-                                </Button>
-                                <Button 
-                                  size="sm" 
-                                  onClick={async () => {
-                                    try {
-                                      await addClickwrapResultAsEvent();
-                                    } catch (error) {
-                                      console.error('Error adding event:', error);
-                                    }
-                                  }}
-                                >
-                                  Add as Event
-                                </Button>
-                              </div>
-                            </div>
-                            {clickwrapRuleCheckData && <RuleMatchingDisplay data={clickwrapRuleCheckData} />}
-                            <Card className="bg-muted">
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder={isLoadingClickwraps ? "Loading..." : "Select clickwrap"} />
+                            </SelectTrigger>
+                            <SelectContent>
                               <ScrollArea className="h-[200px]">
-                                <div className="p-4">
-                                  <pre className="text-xs whitespace-pre-wrap font-mono max-w-full overflow-x-auto">
-                                    {JSON.stringify(clickwrapResult, null, 2)}
-                                  </pre>
-                                </div>
+                                {clickwraps.map((clickwrap: any) => (
+                                  <SelectItem 
+                                    key={clickwrap.clickwrapId} 
+                                    value={clickwrap.clickwrapId}
+                                  >
+                                    <div className="flex flex-col py-1">
+                                      <span className="font-medium text-sm">{clickwrap.clickwrapName || 'Untitled Clickwrap'}</span>
+                                      <span className="text-xs text-muted-foreground mt-0.5">
+                                        Version: {clickwrap.versionNumber || '1'} - Status: {clickwrap.status || 'Unknown'}
+                                      </span>
+                                    </div>
+                                  </SelectItem>
+                                ))}
                               </ScrollArea>
-                            </Card>
+                            </SelectContent>
+                          </Select>
+
+                          <Button 
+                            onClick={handleClickwrapAction}
+                            disabled={!selectedClickwrap || isLoadingClickwrapStatus}
+                            className="w-full mt-2"
+                          >
+                            {isLoadingClickwrapStatus ? "Loading..." : "Check Consent Status"}
+                          </Button>
+
+                          {clickwrapResult && (
+                            <div className="mt-4 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <h4 className="text-sm font-medium">Clickwrap Status</h4>
+                                <div className="space-x-2">
+                                  <Button 
+                                    size="sm"
+                                    variant="outline" 
+                                    onClick={() => checkRulesAgainstData(clickwrapResult, "DOCUSIGN_CLICK_STATUS", setClickwrapRuleCheckData)}
+                                  >
+                                    Check Rules
+                                  </Button>
+                                  <Button 
+                                    size="sm" 
+                                    onClick={async () => {
+                                      try {
+                                        await addClickwrapResultAsEvent();
+                                      } catch (error) {
+                                        console.error('Error adding event:', error);
+                                      }
+                                    }}
+                                  >
+                                    Add as Event
+                                  </Button>
+                                </div>
+                              </div>
+                              {clickwrapRuleCheckData && <RuleMatchingDisplay data={clickwrapRuleCheckData} />}
+                              <Card className="bg-muted">
+                                <ScrollArea className="h-[200px]">
+                                  <div className="p-4">
+                                    <pre className="text-xs whitespace-pre-wrap font-mono max-w-full overflow-x-auto">
+                                      {JSON.stringify(clickwrapResult, null, 2)}
+                                    </pre>
+                                  </div>
+                                </ScrollArea>
+                              </Card>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="border-t pt-4">
+                          <div className="flex items-center justify-between">
+                            <h4 className="text-sm font-medium">Users Consent</h4>
+                            <div className="space-x-2">
+                              <Button 
+                                size="sm"
+                                variant="outline" 
+                                onClick={checkClickwrapUsers}
+                                disabled={!selectedClickwrap}
+                              >
+                                Check Users
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                onClick={addUsersConsentAsEvent}
+                                disabled={!clickwrapUsers}
+                              >
+                                Add as Event
+                              </Button>
+                            </div>
                           </div>
-                        )}
+
+                          {clickwrapUsers && (
+                            <div className="mt-4">
+                              <Card className="bg-muted">
+                                <ScrollArea className="h-[200px]">
+                                  <div className="p-4">
+                                    <pre className="text-xs whitespace-pre-wrap font-mono max-w-full overflow-x-auto">
+                                      {JSON.stringify(clickwrapUsers, null, 2)}
+                                    </pre>
+                                  </div>
+                                </ScrollArea>
+                              </Card>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </Card>
                   </div>

@@ -288,6 +288,25 @@
             }
           },
           "transition": "contract_signed"
+        },
+        {
+          "id": "check_policy_pattern",
+          "priority": 1,
+          "matches": {
+            "type": "DOCUSIGN_CLICK_USERS"
+          },
+          "captures": {
+            "clickwrapId": "{{event.data.clickwrapId}}"
+          },
+          "generates": {
+            "type": "check_lifecycle",
+            "template": {
+              "title": "Check lifecycle policy",
+              "content": "Check policy on onboarding",
+              "type": "check_lifecycle"
+            }
+          },
+          "transition": "onboarding_started"
         }
       ],
       "stateMachine": {

@@ -510,6 +510,37 @@ export const PlaygroundView = () => {
           "Please check your authentication and try again."
         );
       }
+    },
+
+    checkUsers: async () => {
+      try {
+        setIsLoadingClickwraps(true);
+        const response = await fetch('/api/docusign/click/users', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': authData.accessToken,
+            'Account-Id': authData.accountId
+          },
+          body: JSON.stringify({
+            clickwrapId
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to get users');
+        }
+
+        const data = await response.json();
+        setClickwrapStatus(prev => ({
+          ...prev,
+          users: data
+        }));
+      } catch (error) {
+        console.error('Error checking users:', error);
+      } finally {
+        setIsLoadingClickwraps(false);
+      }
     }
   };
 
@@ -1686,6 +1717,17 @@ export const PlaygroundView = () => {
                         disabled={!authenticated || !clickwrapId}
                       >
                         Open Agreement
+                      </Button>
+                    </div>
+
+                    <div className="p-4 border rounded-lg">
+                      <h4 className="font-medium mb-2">Check Users Consent</h4>
+                      <Button
+                        variant="outline"
+                        onClick={clickOperations.checkUsers}
+                        disabled={!authenticated || !clickwrapId}
+                      >
+                        Check Users
                       </Button>
                     </div>
                   </div>
