@@ -1077,73 +1077,92 @@ export function CreateTemplateModal() {
 
         return (
           <div className="space-y-4">
-            <div className="flex justify-between items-center mb-4">
-              <Label>Review Template Configuration</Label>
-              <Button
-                onClick={handleSave}
-                className="gap-2"
-              >
-                Create Template
-              </Button>
-            </div>
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
               <p className="text-sm text-yellow-800">
                 Please review your template configuration carefully. Once created, you'll be able to use this template to create new procedures.
               </p>
             </div>
+
             <ScrollArea className="h-[400px]">
-              <div className="space-y-6 pr-4">
-                <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-6 pr-4 pb-20">
+                <div className="max-w-[600px] mx-auto space-y-6">
                   <div>
                     <h3 className="text-sm font-medium mb-2">Basic Information</h3>
-                    <JsonView data={{ name: templateName, description }} />
+                    <div className="border rounded-lg p-4 bg-slate-50">
+                      <JsonView data={{ name: templateName, description }} />
+                    </div>
                   </div>
+
                   <div>
                     <h3 className="text-sm font-medium mb-2">Variables</h3>
-                    <JsonView data={variables} />
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-medium mb-2">Event Types</h3>
-                  <JsonView data={eventTypes} />
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-medium mb-2">State Machine</h3>
-                  <div className="flex gap-4">
-                    <div className="flex-1">
-                      <JsonView data={{ fsl: fsmDefinition }} />
-                    </div>
-                    <div className="flex-1 border rounded-lg p-2">
-                      <D3Graph
-                        nodes={getNodesFromFsm(fsmDefinition)}
-                        links={getLinksFromFsm(fsmDefinition)}
-                        width={350}
-                        height={150}
-                        direction="LR"
-                      />
+                    <div className="border rounded-lg p-4 bg-slate-50">
+                      <JsonView data={variables} />
                     </div>
                   </div>
-                </div>
 
-                <div>
-                  <h3 className="text-sm font-medium mb-2">Message Rules</h3>
-                  <div className="space-y-2">
-                    {JSON.parse(messageRules).map((rule: any, index: number) => (
-                      <CollapsibleRule key={index} rule={rule} index={index} />
-                    ))}
-                  </div>
-                </div>
-
-                {documentText && (
                   <div>
-                    <h3 className="text-sm font-medium mb-2">Document</h3>
-                    <JsonView data={reviewData.documents} />
+                    <h3 className="text-sm font-medium mb-2">Event Types</h3>
+                    <div className="border rounded-lg p-4 bg-slate-50">
+                      <JsonView data={eventTypes} />
+                    </div>
                   </div>
-                )}
+
+                  <div>
+                    <h3 className="text-sm font-medium mb-2">State Machine</h3>
+                    <div className="space-y-4">
+                      <div className="border rounded-lg p-4 bg-slate-50">
+                        <JsonView data={{ fsl: fsmDefinition }} />
+                      </div>
+                      <div className="border rounded-lg p-2">
+                        <D3Graph
+                          nodes={getNodesFromFsm(fsmDefinition)}
+                          links={getLinksFromFsm(fsmDefinition)}
+                          width={600}
+                          height={200}
+                          direction="LR"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="text-sm font-medium mb-2">Message Rules</h3>
+                    <div className="space-y-2">
+                      {JSON.parse(messageRules).map((rule: any, index: number) => (
+                        <CollapsibleRule key={index} rule={rule} index={index} />
+                      ))}
+                    </div>
+                  </div>
+
+                  {documentText && (
+                    <div>
+                      <h3 className="text-sm font-medium mb-2">Document</h3>
+                      <div className="border rounded-lg p-4 bg-slate-50">
+                        <JsonView data={reviewData.documents} />
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </ScrollArea>
+
+            <div className="absolute bottom-0 right-0 p-4 bg-white border-t w-full flex justify-between">
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={() => setCurrentStep((prev) => Math.max(0, prev - 1))}
+                className="gap-2"
+              >
+                Back
+              </Button>
+              <Button
+                onClick={handleSave}
+                size="lg"
+                className="gap-2"
+              >
+                Create Template
+              </Button>
+            </div>
           </div>
         )
     }
