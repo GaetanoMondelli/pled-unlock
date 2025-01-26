@@ -32,3 +32,18 @@ app/api/config/jwtConfig.json
   "secret": ""
 }
 make sure the private key is in the same position as indicated in the jwtConfig.json 
+
+### Provide any libraries or APIs you used
+
+Docusign:
+- JWT authentication (with relevant scopes)
+- Envelope API (Sign)
+- Navigator API 
+- ClickWrap API
+
+OpenAI (sdk)  (models: GPT-4 Turbo, GPT-4, GPT-3.5 Turbo)
+- Completion API
+
+Firebase API(sdk) @/app/lib/firebase"  
+- Firestore API for strorage
+An example of the strcuture of the entire DB model is in a dump of the storage file (pled.json)
