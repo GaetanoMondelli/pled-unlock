@@ -350,6 +350,24 @@
             "expiryDays": 7
           }
         },
+        "docusign_click_send": {
+          "id": "docusign_click_send",
+          "name": "Send via DocuSign Click",
+          "type": "DOCUSIGN_CLICK_SEND",
+          "description": "Send policy through DocuSign Click for acceptance",
+          "template": {
+            "data": {
+              "clickwrapName": "Employment Policy",
+              "documents": [
+                {
+                  "documentName": "Employment Policy",
+                  "documentId": "policy_document",
+                  "order": 0
+                }
+              ]
+            }
+          }
+        },
         "interview_requested": [
           {
             "type": "SEND_EMAIL",
@@ -418,22 +436,6 @@
             "executed": true,
             "executedAt": "2025-01-25T22:43:32.026Z",
             "trigger": "positive_feedback"
-          }
-        ],
-        "idle": [
-          {
-            "id": "action_1737840148991",
-            "type": "CUSTOM_EVENT",
-            "enabled": true,
-            "template": {
-              "source": "action",
-              "data": {
-                "id": 123
-              }
-            },
-            "executed": true,
-            "executedAt": "2025-01-25T22:43:24.180Z",
-            "trigger": "INIT"
           }
         ]
       }

@@ -54,6 +54,15 @@ interface ActionListProps {
   procedureId: string;
 }
 
+const ACTION_TYPES = [
+  { value: 'DOCUSIGN_SEND', label: 'Send via DocuSign' },
+  { value: 'DOCUSIGN_CLICK_SEND', label: 'Send via DocuSign Click' },
+  { value: 'CUSTOM_EVENT', label: 'Custom Event' },
+  { value: 'SEND_EMAIL', label: 'Send Email' },
+  { value: 'CREATE_CALENDAR_EVENT', label: 'Create Calendar Event' },
+  { value: 'SEND_REMINDER', label: 'Send Reminder' }
+];
+
 export const ActionList = ({ procedureId }: ActionListProps) => {
   const [instance, setInstance] = useState<any>(null);
   const [template, setTemplate] = useState<any>(null);
@@ -61,11 +70,15 @@ export const ActionList = ({ procedureId }: ActionListProps) => {
   const [newAction, setNewAction] = useState({ state: '', eventData: '{}' });
   const [expandedActions, setExpandedActions] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
-  const [actionType, setActionType] = useState<'raw' | 'docusign'>('raw');
+  const [actionType, setActionType] = useState<'raw' | 'docusign' | 'docusign_click'>('raw');
   const [docuSignData, setDocuSignData] = useState({
     file: null as File | null,
     recipients: '',
     tabPositions: [] as TabPosition[]
+  });
+  const [clickData, setClickData] = useState({
+    clickwrapName: '',
+    documents: [] as File[]
   });
 
   // Single data fetch on mount or procedureId change
@@ -136,7 +149,38 @@ export const ActionList = ({ procedureId }: ActionListProps) => {
     try {
       let actionTemplate;
 
-      if (actionType === 'docusign') {
+      if (actionType === 'docusign_click') {
+        if (clickData.documents.length === 0) {
+          throw new Error('Please select at least one document');
+        }
+
+        // Convert files to base64
+        const documentPromises = clickData.documents.map(async (file, index) => {
+          const fileBuffer = await file.arrayBuffer();
+          const base64File = Buffer.from(fileBuffer).toString('base64');
+          return {
+            documentBase64: base64File,
+            documentName: file.name,
+            fileExtension: file.name.split('.').pop(),
+            order: index
+          };
+        });
+
+        const documents = await Promise.all(documentPromises);
+
+        actionTemplate = {
+          id: `action_${Date.now()}`,
+          type: 'DOCUSIGN_CLICK_SEND',
+          enabled: true,
+          template: {
+            source: "action",
+            data: {
+              clickwrapName: clickData.clickwrapName,
+              documents
+            }
+          }
+        };
+      } else if (actionType === 'docusign') {
         if (!docuSignData.file) {
           throw new Error('Please select a document');
         }
@@ -300,7 +344,7 @@ export const ActionList = ({ procedureId }: ActionListProps) => {
               <Label>Action Type</Label>
               <Select
                 value={actionType}
-                onValueChange={(value: 'raw' | 'docusign') => setActionType(value)}
+                onValueChange={(value: 'raw' | 'docusign' | 'docusign_click') => setActionType(value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select action type" />
@@ -308,6 +352,7 @@ export const ActionList = ({ procedureId }: ActionListProps) => {
                 <SelectContent>
                   <SelectItem value="raw">Raw Action</SelectItem>
                   <SelectItem value="docusign">DocuSign Send</SelectItem>
+                  <SelectItem value="docusign_click">DocuSign Click Send</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -444,6 +489,59 @@ export const ActionList = ({ procedureId }: ActionListProps) => {
                     </Button>
                   </div>
                 </div>
+              </div>
+            ) : actionType === 'docusign_click' ? (
+              <div className="space-y-4">
+                <div>
+                  <Label>Clickwrap Name</Label>
+                  <Input
+                    value={clickData.clickwrapName}
+                    onChange={(e) => setClickData(prev => ({
+                      ...prev,
+                      clickwrapName: e.target.value
+                    }))}
+                    placeholder="Enter clickwrap name"
+                  />
+                </div>
+                
+                <div>
+                  <Label>Documents</Label>
+                  <Input
+                    type="file"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        setClickData(prev => ({
+                          ...prev,
+                          documents: [...prev.documents, e.target.files![0]]
+                        }));
+                      }
+                    }}
+                    accept=".pdf,.doc,.docx"
+                  />
+                </div>
+
+                {clickData.documents.length > 0 && (
+                  <div className="space-y-2">
+                    <Label>Selected Documents</Label>
+                    {clickData.documents.map((doc, index) => (
+                      <div key={index} className="flex items-center justify-between">
+                        <span>{doc.name}</span>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => {
+                            setClickData(prev => ({
+                              ...prev,
+                              documents: prev.documents.filter((_, i) => i !== index)
+                            }));
+                          }}
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             ) : (
               <div>

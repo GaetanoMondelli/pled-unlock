@@ -919,6 +919,68 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
                 }
               })
             });
+          } else if (action.type === 'DOCUSIGN_CLICK_SEND') {
+            try {
+              // Get auth data
+              const storedAuth = localStorage.getItem('navigatorAuth');
+              if (!storedAuth) {
+                throw new Error('DocuSign authentication required');
+              }
+              const authData = JSON.parse(storedAuth);
+
+              // Create clickwrap
+              const response = await fetch('/api/docusign/click/create', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': authData.accessToken,
+                  'Account-Id': authData.accountId
+                },
+                body: JSON.stringify(action.template.data)
+              });
+
+              if (!response.ok) {
+                throw new Error('Failed to create clickwrap');
+              }
+
+              const { clickwrapId, agreementUrl } = await response.json();
+
+              // Store result as event
+              await fetch(`/api/procedures/${procedureId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  event: {
+                    type: 'DOCUSIGN_CLICK_SENT',
+                    name: 'DocuSign Click Policy Sent',
+                    description: 'Policy has been sent via DocuSign Click',
+                    template: {
+                      source: "action",
+                      data: {
+                        clickwrapId,
+                        agreementUrl,
+                        status: 'sent',
+                        timestamp: new Date().toISOString(),
+                        actionId: action.id || action.actionId
+                      }
+                    }
+                  },
+                  action: {
+                    actionId: action.id || action.actionId,
+                    state: action.state,
+                    type: action.type,
+                    trigger: action.trigger || 'INIT'
+                  }
+                })
+              });
+
+              // Open agreement URL in new tab
+              window.open(agreementUrl, '_blank');
+
+            } catch (error) {
+              console.error('Error in DOCUSIGN_CLICK_SEND:', error);
+              throw error;
+            }
           }
 
           // Mark action as executed
