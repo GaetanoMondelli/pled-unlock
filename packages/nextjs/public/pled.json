@@ -421,7 +421,7 @@
               "body": "Dear {{candidate.name}},\n\nThis is a reminder about your upcoming interview..."
             },
             "executed": true,
-            "executedAt": "2025-01-25T22:43:25.538Z",
+            "executedAt": "2025-01-26T12:31:05.777Z",
             "trigger": "schedule_interview"
           }
         ],
@@ -833,6 +833,53 @@
         }
       },
       "received": false
+    },
+    "docusign_click_users_1737855939894": {
+      "id": "docusign_click_users_1737855939894",
+      "name": "DocuSign Click Users Consent",
+      "description": "DocuSign clickwrap users consent check",
+      "type": "DOCUSIGN_CLICK_USERS",
+      "template": {
+        "source": "manual",
+        "data": {
+          "hasAgreed": true,
+          "agreements": [
+            {
+              "accountId": "a8c0cf58-75d0-422a-a7cd-1f7a88f15dd6",
+              "clickwrapId": "ab259a48-23f0-4dc9-bd40-cdbd4b4b3f93",
+              "clientUserId": "1737852110501",
+              "agreementId": "f438c2a5-6a6d-4213-bf80-80f6ffbfd5d7",
+              "consumerDisclosureEnabled": false,
+              "createdOn": "2025-01-26T00:41:52.1858904Z",
+              "agreedOn": "2025-01-26T00:42:05.4958401Z",
+              "status": "agreed",
+              "versionId": "4a6caf0d-260d-4c1f-81c9-02860bf757f4",
+              "versionNumber": 1,
+              "settings": {
+                "displayName": "Policy",
+                "hasDeclineButton": false,
+                "actionButtonAlignment": "left",
+                "mustRead": true,
+                "mustView": false,
+                "requireAccept": true,
+                "downloadable": true,
+                "sendToEmail": false,
+                "consentButtonText": "I Agree",
+                "allowClientOnly": true,
+                "format": "modal",
+                "documentDisplay": "document",
+                "statementAlignment": "bottom"
+              },
+              "documentData": {},
+              "version": "1.0"
+            }
+          ],
+          "totalAgreements": 1,
+          "page": 0,
+          "pageSize": 40
+        }
+      },
+      "received": false
     }
   },
   "procedureInstances": [
@@ -927,8 +974,7 @@
             }
           }
         ],
-        "executedActions": [
-        ]
+        "executedActions": []
       },
       "startDate": "2024-03-20T10:00:00Z",
       "events": [
