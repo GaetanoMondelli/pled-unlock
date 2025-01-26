@@ -85,6 +85,14 @@ const fetchProcedureState = async (procedureId: string) => {
   }
 };
 
+// Update the type definition
+type Envelope = {
+  envelopeId: string;
+  emailSubject: string;
+  sentDateTime: string;
+  status: string;
+}
+
 export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProps) => {
   // Get procedureId from URL
   const pathname = usePathname();
@@ -95,10 +103,8 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
   const [selectedEnvelope, setSelectedEnvelope] = useState<string>("");
   
   // Raw event form state
-  const [eventType, setEventType] = useState("EMAIL_RECEIVED");
-  const [eventData, setEventData] = useState(() => 
-    JSON.stringify(EVENT_TEMPLATES["EMAIL_RECEIVED"], null, 2)
-  );
+  const [eventType, setEventType] = useState<string>("");
+  const [eventData, setEventData] = useState<string>("");
 
   // Add state for rule matching
   const [matchingRules, setMatchingRules] = useState<any[]>([]);
@@ -108,7 +114,7 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
   const [expandedRules, setExpandedRules] = useState<string[]>([]);
 
   // Add state for DocuSign data
-  const [envelopes, setEnvelopes] = useState<Array<{id: string, name: string, status: string, created: string}>>([]);
+  const [envelopes, setEnvelopes] = useState<Envelope[]>([]);
   const [isLoadingEnvelopes, setIsLoadingEnvelopes] = useState(false);
   const [statusResult, setStatusResult] = useState<any>(null);
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
@@ -473,10 +479,10 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
       const data = await response.json();
       console.log('Envelopes response:', data);
       setEnvelopes(data.envelopes.map((env: any) => ({
-        id: env.envelopeId,
-        name: env.emailSubject,
-        status: env.status,
-        created: env.createdDateTime
+        envelopeId: env.envelopeId,
+        emailSubject: env.emailSubject,
+        sentDateTime: env.sentDateTime,
+        status: env.status
       })));
     } catch (error) {
       console.error('Error fetching envelopes:', error);
@@ -517,24 +523,20 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
     if (!statusResult || !procedureId) return;
     
     try {
-      const event = {
-        id: `docusign-${statusResult.envelopeId}`,
-        name: "DocuSign Status Update",
-        description: `DocuSign envelope ${statusResult.status}`,
-        type: "DOCUSIGN_EVENT",
-        procedureId,
+      const eventData = {
+        type: "DOCUSIGN_STATUS",
+        name: "DocuSign Status Event",
+        description: "DocuSign envelope status check",
         template: {
-          source: "docusign",
+          source: "manual",
           data: statusResult
         }
       };
 
-      // Let parent handle the API call
-      await onSave(event);
+      await onSave(eventData);
       onClose();
-      setStatusResult(null);
     } catch (error) {
-      console.error('Error adding DocuSign event:', error);
+      console.error('Error adding event:', error);
     }
   };
 
@@ -806,14 +808,21 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
   };
 
   // Update the checkRulesAgainstData function to take a setter
-  const checkRulesAgainstData = (data: any, type: string, setRuleCheckData: (data: any) => void) => {
+  const checkRulesAgainstData = (data: any, eventType: string, setRuleCheckData: any) => {
     try {
-      const event = { type, data };
+      const event = {
+        type: "DOCUSIGN_STATUS",
+        data: data,
+        template: {
+          source: "manual",
+          data: data
+        }
+      };
       const matching = [];
       const nonMatching = [];
 
       for (const rule of templateRules) {
-        if (rule.matches.type === type) {
+        if (rule.matches.type === eventType) {
           try {
             const matches = matchEventToRule(
               event,
@@ -868,7 +877,7 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
               field: 'type',
               operator: 'equals',
               expected: rule.matches.type,
-              actual: type,
+              actual: eventType,
               template: rule.matches.type,
               matches: false
             }]
@@ -1175,25 +1184,31 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                             Refresh
                           </Button>
                         </div>
-                        <Select 
-                          value={selectedEnvelope} 
+                        <Select
+                          value={selectedEnvelope}
                           onValueChange={setSelectedEnvelope}
-                          disabled={isLoadingEnvelopes}
                         >
-                          <SelectTrigger>
-                            <SelectValue placeholder={isLoadingEnvelopes ? "Loading..." : "Select envelope"} />
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Select envelope" />
                           </SelectTrigger>
                           <SelectContent>
-                            {envelopes.map((env: any) => (
-                              <SelectItem key={env.id} value={env.id}>
-                                <div className="flex flex-col">
-                                  <span>{env.name}</span>
-                                  <span className="text-xs text-muted-foreground">
-                                    {env.status} - {new Date(env.created || Date.now()).toLocaleDateString()}
-                                  </span>
-                                </div>
-                              </SelectItem>
-                            ))}
+                            {envelopes
+                              .sort((a, b) => {
+                                // Handle undefined sentDateTime with empty string fallback
+                                const dateA = a.sentDateTime || '';
+                                const dateB = b.sentDateTime || '';
+                                return dateB.localeCompare(dateA);
+                              })
+                              .map((envelope) => (
+                                <SelectItem key={envelope.envelopeId} value={envelope.envelopeId}>
+                                  <div className="flex flex-col">
+                                    <span>{envelope.envelopeId}</span>
+                                    <span className="text-xs text-muted-foreground">
+                                      {envelope.sentDateTime || 'No date'}
+                                    </span>
+                                  </div>
+                                </SelectItem>
+                              ))}
                           </SelectContent>
                         </Select>
 
@@ -1214,7 +1229,7 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                               <Button 
                                 size="sm"
                                 variant="outline" 
-                                onClick={() => checkRulesAgainstData(statusResult, "DOCUSIGN_EVENT", setEnvelopeRuleCheckData)}
+                                onClick={() => checkRulesAgainstData(statusResult, "DOCUSIGN_STATUS", setEnvelopeRuleCheckData)}
                               >
                                 Check Rules
                               </Button>
@@ -1228,7 +1243,7 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                           <div className="flex items-center">
                             <span className="text-xs font-medium mr-2">Source:</span>
                             <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-800">
-                              action
+                              {selectedEndpoint === 'docusign' ? 'docusign' : 'manual'}
                             </span>
                           </div>
 
@@ -1244,35 +1259,6 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                                 </div>
                               </ScrollArea>
                             </Card>
-                          </div>
-
-                          {/* History Section */}
-                          <div className="mt-4">
-                            <span className="text-xs font-medium">Event History:</span>
-                            <div className="mt-2 overflow-x-auto">
-                              <table className="w-full text-xs">
-                                <thead className="bg-gray-50">
-                                  <tr>
-                                    <th className="px-2 py-1 text-left">Time</th>
-                                    <th className="px-2 py-1 text-left">Type</th>
-                                    <th className="px-2 py-1 text-left">Details</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100">
-                                  {instance?.history?.events.map((historyEvent: any) => (
-                                    <tr key={historyEvent.id} className="hover:bg-gray-50">
-                                      <td className="px-2 py-1">
-                                        {new Date(historyEvent.timestamp).toLocaleString()}
-                                      </td>
-                                      <td className="px-2 py-1">{historyEvent.type}</td>
-                                      <td className="px-2 py-1">
-                                        {JSON.stringify(historyEvent.data)}
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
                           </div>
 
                           {envelopeRuleCheckData && <RuleMatchingDisplay data={envelopeRuleCheckData} />}

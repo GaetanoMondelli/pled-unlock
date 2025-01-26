@@ -260,6 +260,34 @@
             }
           },
           "transition": "contract_sent"
+        },
+        {
+          "id": "docusign_signed_pattern",
+          "priority": 1,
+          "matches": {
+            "type": "DOCUSIGN_STATUS",
+            "conditions": {
+              "status": "completed"
+            }
+          },
+          "captures": {
+            "envelopeId": "{{event.data.envelopeId}}",
+            "sentTime": "{{event.data.timestamp}}",
+            "actionId": "{{event.data.actionId}}"
+          },
+          "generates": {
+            "type": "wait_for_signature",
+            "template": {
+              "title": "Contract signed",
+              "content": "Contract has been signed by the candidate",
+              "timestamp": "{{captures.sentTime}}",
+              "metadata": {
+                "actionId": "{{captures.actionId}}",
+                "envelopeId": "{{captures.envelopeId}}"
+              }
+            }
+          },
+          "transition": "contract_signed"
         }
       ],
       "stateMachine": {
