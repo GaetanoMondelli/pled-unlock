@@ -100,7 +100,7 @@ export async function POST(req: NextRequest) {
     });
 
     const userInfo = await userInfoResponse.json();
-    const accountId = userInfo.accounts?.find(acc => acc.is_default)?.account_id;
+    const accountId = userInfo.accounts?.find((acc: any) => acc.is_default)?.account_id;
 
     if (!accountId) {
       throw new Error("Could not get account ID from user info");
