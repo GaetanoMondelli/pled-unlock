@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
 
 // Remove hardcoded base URL since we'll get it from auth
 async function getNavigatorToken(origin: string | null) {
@@ -12,7 +11,7 @@ async function getNavigatorToken(origin: string | null) {
 
   // Handle consent required case
   if (data.error === "Consent required" && data.consentUrl) {
-    const error = new Error("consent_required");
+    const error = new Error("consent_required") as Error & { consentUrl?: string };
     error.consentUrl = data.consentUrl; // Pass the URL through
     throw error;
   }
