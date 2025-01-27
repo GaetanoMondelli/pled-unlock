@@ -1,19 +1,12 @@
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials"
 
-const allowedUsernamesPasswordsArray: readonly [string, string][] = [
-    ["mark", "0xwiggin"],
-    ["gmondelli", "0xwiggins"],
-    ["paola", "cmscms2024"],
-    ["andrea", "cmscms2024"],
-    ["steve", "fti2024"],
-    ["susana", "fti2024"],
-    ["emma", "fti2024"],
-    ["jeremy", "fti2024"],
-    ["gaetano", "Sannicandro2024!"],
-
+const allowedUsernamesPasswordsArray: readonly [string, string | undefined][] = [
+    ["devpost", process.env.AUTH_DEVPOST_PASSWORD],
+    ["docusign", process.env.AUTH_DOCUSIGN_PASSWORD],
+    ["gmondelli", process.env.AUTH_GMONDELLI_PASSWORD],
 ];
-const allowedUsernamesPasswords = new Map<string, string>(
+const allowedUsernamesPasswords = new Map<string, any>(
     allowedUsernamesPasswordsArray
 );
 const options : NextAuthOptions = {

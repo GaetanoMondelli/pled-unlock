@@ -12,7 +12,7 @@ const serviceAccount = JSON.parse(serviceAccountBuffer.toString('utf8'));
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
-    storageBucket: 'quantmondelli.appspot.com',
+    storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
   });
 }
 

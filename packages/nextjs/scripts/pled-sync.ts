@@ -10,7 +10,7 @@ try {
     const serviceAccount = JSON.parse(serviceAccountBuffer.toString('utf8'));
     initializeApp({
         credential: cert(serviceAccount),
-        storageBucket: 'quantmondelli.appspot.com',
+        storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
     });
 } catch (error) {
     console.error("❌ Failed to initialize Firebase Admin. Error details:", error);

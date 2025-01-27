@@ -16,11 +16,18 @@ NEXT_PUBLIC_ALCHEMY_API_KEY=
 NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID=
 NEXTAUTH_SECRET='RANDMON_STRING_SECRET'
 NEXTAUTH_URL=
-FIREBASE_SERVICE_ACCOUNT='
+FIREBASE_SERVICE_ACCOUNT=
+FIREBASE_STORAGE_BUCKET=
 DOCUSIGN_ACCOUNT_ID=
 OPENAI_API_KEY=
+NEXT_PUBLIC_LAZY_RULE_MATCHING
+NEXT_PUBLIC_ENABLE_LLM_RULES=
 
-and the the proper values from the following (extracted from the QuickStart-app for a particular integration key)
+*FIREBASE_STORAGE_BUCKET=Name of the Firebase bucket that will contain the pled.json (our full demo database)
+*NEXT_PUBLIC_LAZY_RULE_MATCHING If enabled, the system will stop evaluating rules as soon as the first match is found. Rules are prioritized based on their assigned priority value, with a maximum of 100 indicating the lowest priority. In the CreateEventModal debug tool, only the first matched rule will be displayed.
+*NEXT_PUBLIC_ENABLE_LLM_RULES This runs AI prompts for rule checking. Prompt caching is not yet implemented, so during the demo, an API call to OpenAI will be triggered each time an event fails to match a priority 1 rule.
+
+We also need the correct values extracted from the QuickStart app for the specific integration key being used. These values ensure accurate setup and seamless operation for the integration.
 
 app/api/config/jwtConfig.json
 
@@ -31,7 +38,11 @@ app/api/config/jwtConfig.json
   "dsOauthServer": ",
   "secret": ""
 }
-make sure the private key is in the same position as indicated in the jwtConfig.json 
+Make sure the private key is in the same position as indicated in the jwtConfig.json
+
+Once added the FIREBASE_SERVICE_ACCOUNT= we can use the
+`yarn pled:upload` to upload `packages/nextjs/public/pled.json`
+ into the right  storage bucket and make it availble
 
 ### Provide any libraries or APIs you used
 
