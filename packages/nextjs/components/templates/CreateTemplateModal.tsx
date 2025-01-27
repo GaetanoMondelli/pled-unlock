@@ -67,7 +67,6 @@ interface StateAction {
     // For email
     to?: string;
     subject?: string;
-    body?: string;
     // For API
     url?: string;
     method?: 'GET' | 'POST' | 'PUT' | 'DELETE';

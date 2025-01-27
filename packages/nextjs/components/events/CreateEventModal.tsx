@@ -256,7 +256,7 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
   }, [signedMessage, messageToSign, address]);
 
   // Update checkRuleMatching to take type as parameter
-  const checkRuleMatching = (event: { type: string, data: any }) => {
+  const checkRuleMatching = async (event: { type: string, data: any }) => {
     try {
       const matching = [];
       const nonMatching = [];
@@ -264,7 +264,7 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
       for (const rule of templateRules) {
         if (rule.matches.type === event.type) {
           try {
-            const matches = matchEventToRule(
+            const matches = await matchEventToRule(
               event,
               { type: rule.matches.type, conditions: rule.matches.conditions },
               instanceVariables
@@ -811,7 +811,7 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
   };
 
   // Update the checkRulesAgainstData function to take a setter
-  const checkRulesAgainstData = (data: any, eventType: string, setRuleCheckData: any) => {
+  const checkRulesAgainstData = async (data: any, eventType: string, setRuleCheckData: any) => {
     try {
       const event = {
         type: "DOCUSIGN_STATUS",
@@ -827,7 +827,7 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
       for (const rule of templateRules) {
         if (rule.matches.type === eventType) {
           try {
-            const matches = matchEventToRule(
+            const matches = await matchEventToRule(
               event,
               { type: rule.matches.type, conditions: rule.matches.conditions },
               instanceVariables
@@ -1641,7 +1641,7 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
           {showDebug && (
             <ScrollArea className="h-[400px]">
               <div className="space-y-2 pr-4">
-                {templateRules.map((rule: any) => {
+                {templateRules.map(async (rule: any) => {
                   try {
                     const eventObj = { 
                       type: eventType, 
@@ -1658,11 +1658,11 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-medium">Rule: {rule.id}</span>
                             <span className={`text-xs px-2 py-0.5 rounded-full ${
-                              matchEventToRule(eventObj, { type: rule.matches.type, conditions: rule.matches.conditions }, instanceVariables)
+                              await matchEventToRule(eventObj, { type: rule.matches.type, conditions: rule.matches.conditions }, instanceVariables)
                                 ? 'bg-green-100 text-green-800'
                                 : 'bg-red-100 text-red-800'
                             }`}>
-                              {matchEventToRule(eventObj, { type: rule.matches.type, conditions: rule.matches.conditions }, instanceVariables) ? 'Matches' : 'No Match'}
+                              {await matchEventToRule(eventObj, { type: rule.matches.type, conditions: rule.matches.conditions }, instanceVariables) ? 'Matches' : 'No Match'}
                             </span>
                           </div>
                           {expandedRuleDebug.includes(rule.id) ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}

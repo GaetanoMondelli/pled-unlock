@@ -54,11 +54,10 @@ const options: NextAuthOptions = {
         },
         async session({ session, token }) {
             if (session.user) {
-                session.user.id = token.id as string;
+                (session.user as any).id = token.id as string; // Type assertion to allow 'id' property
             }
             return session;
         }
     }
-};
-
+}
 export { options, allowedUsernamesPasswords };
