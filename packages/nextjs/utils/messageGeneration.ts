@@ -37,7 +37,7 @@ export function generateMessages(events: any[], rules: any[], variables: any) {
         // Capture outputs if specified
         if (rule.captures) {
           outputs[rule.generates.type] = Object.entries(rule.captures).reduce((acc, [key, value]) => {
-            acc[key] = formatTemplateContent(value, {
+            acc[key] = formatTemplateContent(value as string, {
               event,
               ...variables
             });

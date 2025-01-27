@@ -264,7 +264,7 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
       for (const rule of templateRules) {
         if (rule.matches.type === event.type) {
           try {
-            const matches = await matchEventToRule(
+            const matches = matchEventToRule(
               event,
               { type: rule.matches.type, conditions: rule.matches.conditions },
               instanceVariables
@@ -827,7 +827,7 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
       for (const rule of templateRules) {
         if (rule.matches.type === eventType) {
           try {
-            const matches = await matchEventToRule(
+            const matches = matchEventToRule(
               event,
               { type: rule.matches.type, conditions: rule.matches.conditions },
               instanceVariables
@@ -1658,11 +1658,11 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-medium">Rule: {rule.id}</span>
                             <span className={`text-xs px-2 py-0.5 rounded-full ${
-                              await matchEventToRule(eventObj, { type: rule.matches.type, conditions: rule.matches.conditions }, instanceVariables)
+                              matchEventToRule(eventObj, { type: rule.matches.type, conditions: rule.matches.conditions }, instanceVariables)
                                 ? 'bg-green-100 text-green-800'
                                 : 'bg-red-100 text-red-800'
                             }`}>
-                              {await matchEventToRule(eventObj, { type: rule.matches.type, conditions: rule.matches.conditions }, instanceVariables) ? 'Matches' : 'No Match'}
+                              {matchEventToRule(eventObj, { type: rule.matches.type, conditions: rule.matches.conditions }, instanceVariables) ? 'Matches' : 'No Match'}
                             </span>
                           </div>
                           {expandedRuleDebug.includes(rule.id) ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}

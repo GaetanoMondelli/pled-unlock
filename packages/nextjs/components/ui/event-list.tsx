@@ -23,7 +23,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useSearchParams } from 'next/navigation';
 import { Event } from "../../types/events";
 import { CreateEventModal } from "../events/CreateEventModal";
-import { matchEventToRule, getMatchingRules } from "../../utils/eventMatching";
+import { matchEventToRule } from "../../utils/eventMatching";
 import { getValueByPath } from "../../utils/eventMatching";
 import { fetchFromDb, updateDb } from "../../utils/api";
 
@@ -47,9 +47,8 @@ export default function EventList({ procedureId }: EventListProps) {
     stateTransitions: any[];
   }>();
   const searchParams = useSearchParams();
-  const highlightedEvent = searchParams.get('highlight');
+  const highlightedEvent = searchParams?.get('highlight');
   const [showTransferModal, setShowTransferModal] = useState(false);
-  const [matchingRules, setMatchingRules] = useState<any[]>([]);
 
   // Load data through DB API
   useEffect(() => {
@@ -209,13 +208,36 @@ export default function EventList({ procedureId }: EventListProps) {
     }
   };
 
-  const getRulesForEvent = async (event: any) => {
-    const template = pledData?.procedureTemplates?.find(
+  const getMatchingRules = (event: any) => {
+    const template = pledData.procedureTemplates.find(
       (t: any) => t.templateId === "hiring_process"
     );
-    const rules = template?.messageRules || [];
+
+    if (!template) return [];
+
+    // Get the instance variables
+    const instance = pledData.procedureInstances.find(
+      (p: any) => p.instanceId === procedureId
+    );
+
     const variables = instance?.variables || {};
-    return getMatchingRules(event, rules, variables);
+
+    // For available events, we need to convert the template to match event format
+    const eventToMatch = event.template ? {
+      type: event.type,
+      data: event.template.data
+    } : event;
+
+    return template.messageRules.filter((rule: any) => 
+      matchEventToRule(
+        eventToMatch,
+        {
+          type: rule.matches.type,
+          conditions: rule.matches.conditions
+        },
+        variables
+      )
+    );
   };
 
   const renderTransition = (transition: any) => {
@@ -415,7 +437,7 @@ export default function EventList({ procedureId }: EventListProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {processedEvents?.map(async (event: any) => (
+              {processedEvents?.map((event: any) => (
                 <TableRow 
                   key={event.id}
                   className={`${highlightedEvent === event.id ? 'bg-yellow-50' : ''}`}
@@ -492,7 +514,7 @@ export default function EventList({ procedureId }: EventListProps) {
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
-                      {(await getRulesForEvent(event)).map((rule: any) => (
+                      {getMatchingRules(event).map((rule: any) => (
                         <span 
                           key={rule.id} 
                           className="text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded"
@@ -536,7 +558,7 @@ export default function EventList({ procedureId }: EventListProps) {
               <div className="space-y-2 max-h-[400px] overflow-auto">
                 {Object.entries(availableEvents || {})
                   .filter(([_, event]) => !event.received)
-                  .map(async ([key, event]: [string, any]) => (
+                  .map(([key, event]: [string, any]) => (
                     <div key={key} className="border rounded">
                       <div 
                         className={`p-2 ${
@@ -580,11 +602,11 @@ export default function EventList({ procedureId }: EventListProps) {
                             </Button>
                           </div>
                         </div>
-                        {(await getRulesForEvent(event)).length > 0 && (
+                        {getMatchingRules(event).length > 0 && (
                           <div className="flex gap-1 mt-1">
                             <p className="text-xs font-medium">Matches:</p>
                             <div className="flex flex-wrap gap-1">
-                              {(await getRulesForEvent(event)).map((rule: any) => (
+                              {getMatchingRules(event).map((rule: any) => (
                                 <span 
                                   key={rule.id} 
                                   className="text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded"
@@ -637,7 +659,7 @@ export default function EventList({ procedureId }: EventListProps) {
                 </span>
               </div>
               <div className="space-y-2 max-h-[400px] overflow-auto">
-                {processedEvents?.map(async (event: any) => (
+                {processedEvents?.map((event: any) => (
                   <div key={event.id} className="border rounded">
                     <div 
                       className={`p-2 cursor-pointer ${
@@ -685,11 +707,11 @@ export default function EventList({ procedureId }: EventListProps) {
                     </div>
                     {expandedEvents.includes(event.id) && (
                       <div className="p-2 border-t bg-gray-50">
-                        {(await getRulesForEvent(event)).length > 0 && (
+                        {getMatchingRules(event).length > 0 && (
                           <div className="mb-2">
                             <p className="text-xs font-medium mb-1">Matching Rules:</p>
                             <div className="flex flex-wrap gap-1">
-                              {(await getRulesForEvent(event)).map((rule: any) => (
+                              {getMatchingRules(event).map((rule: any) => (
                                 <span 
                                   key={rule.id} 
                                   className="text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded"
