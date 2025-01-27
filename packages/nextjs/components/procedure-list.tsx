@@ -62,8 +62,8 @@ export default function ProcedureList() {
                 </TabsContent>
                 <TabsContent value="state">
                   <ProcedureState
+                    procedureId={selectedProcedure.id}
                     definitionProp={selectedProcedure.stateMachine.fsl}
-                    messagesProp={selectedProcedure.messages}
                     params={{
                       id: "",
                     }}
