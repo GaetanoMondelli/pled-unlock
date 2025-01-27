@@ -1,23 +1,16 @@
-"use client"
+"use client";
 
-import { Card } from "@/components/ui/card";
-import { ChevronDown, ChevronRight } from "lucide-react";
-import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { formatTemplateContent } from "@/components/ui/template-content";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { fetchFromDb } from "../../utils/api";
-import { generateMessages } from "../../utils/messageGeneration";
 import { matchEventToRule } from "../../utils/eventMatching";
-import { useSearchParams, useRouter } from 'next/navigation';
+import { generateMessages } from "../../utils/messageGeneration";
 import { ScrollArea } from "./scroll-area";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { formatTemplateContent } from "@/components/ui/template-content";
+import { ChevronDown, ChevronRight } from "lucide-react";
 
 interface Message {
   id: string;
@@ -35,11 +28,11 @@ interface MessageRulesProps {
   onMessageSelect?: (messageId: string) => void;
 }
 
-export const MessageRules: React.FC<MessageRulesProps> = ({ 
-  procedureId, 
+export const MessageRules: React.FC<MessageRulesProps> = ({
+  procedureId,
   messages = [],
   selectedMessageId,
-  onMessageSelect 
+  onMessageSelect,
 }) => {
   const [expandedRules, setExpandedRules] = useState<string[]>([]);
   const [instance, setInstance] = useState<any>(null);
@@ -49,23 +42,15 @@ export const MessageRules: React.FC<MessageRulesProps> = ({
   const [expandedEvents, setExpandedEvents] = useState<string[]>([]);
   const searchParams = useSearchParams();
   const router = useRouter();
-  const highlightedMessageId = searchParams.get('highlight');
+  const highlightedMessageId = searchParams.get("highlight");
   const [localSelectedMessageId, setLocalSelectedMessageId] = useState<string | null>(null);
 
   const toggleRule = (ruleId: string) => {
-    setExpandedRules(prev => 
-      prev.includes(ruleId) 
-        ? prev.filter(id => id !== ruleId)
-        : [...prev, ruleId]
-    );
+    setExpandedRules(prev => (prev.includes(ruleId) ? prev.filter(id => id !== ruleId) : [...prev, ruleId]));
   };
 
   const toggleEvent = (eventId: string) => {
-    setExpandedEvents(prev => 
-      prev.includes(eventId) 
-        ? prev.filter(id => id !== eventId)
-        : [...prev, eventId]
-    );
+    setExpandedEvents(prev => (prev.includes(eventId) ? prev.filter(id => id !== eventId) : [...prev, eventId]));
   };
 
   const highlightEvent = (eventId: string) => {
@@ -79,43 +64,45 @@ export const MessageRules: React.FC<MessageRulesProps> = ({
         const data = await fetchFromDb();
         const instance = data.procedureInstances?.find((p: any) => p.instanceId === procedureId);
         const template = data.procedureTemplates?.find((t: any) => t.templateId === instance?.templateId);
-        
+
         if (!instance || !template) {
-          throw new Error('Procedure not found');
+          throw new Error("Procedure not found");
         }
 
         setInstance(instance);
         setTemplate(template);
 
-        console.log('Debug Info:', {
+        console.log("Debug Info:", {
           events: instance.history?.events || [],
           rules: template.messageRules || [],
-          variables: instance.variables || {}
+          variables: instance.variables || {},
         });
 
         // Generate messages based on events
         const { messages, outputs } = generateMessages(
           instance.history?.events || [],
           template.messageRules || [],
-          instance.variables || {}
+          instance.variables || {},
         );
 
-        console.log('Generated Messages:', messages);
-        console.log('Generated Outputs:', outputs);
+        console.log("Generated Messages:", messages);
+        console.log("Generated Outputs:", outputs);
 
         setGeneratedMessages(messages);
         setOutputs(outputs);
 
-        console.log('Generated Messages Debug:', messages.map(msg => ({
-          id: msg.id,
-          timestamp: msg.timestamp,
-          eventTime: msg.event?.data?.time,
-          eventTimestamp: msg.event?.timestamp,
-          raw: msg
-        })));
-
+        console.log(
+          "Generated Messages Debug:",
+          messages.map(msg => ({
+            id: msg.id,
+            timestamp: msg.timestamp,
+            eventTime: msg.event?.data?.time,
+            eventTimestamp: msg.event?.timestamp,
+            raw: msg,
+          })),
+        );
       } catch (error) {
-        console.error('Error fetching data:', error);
+        console.error("Error fetching data:", error);
       }
     }
     fetchData();
@@ -124,20 +111,20 @@ export const MessageRules: React.FC<MessageRulesProps> = ({
   useEffect(() => {
     if (highlightedMessageId) {
       setLocalSelectedMessageId(highlightedMessageId);
-      
+
       // First scroll to the Generated Messages section
       setTimeout(() => {
-        const generatedMessagesSection = document.getElementById('generated-messages-section');
+        const generatedMessagesSection = document.getElementById("generated-messages-section");
         if (generatedMessagesSection) {
-          generatedMessagesSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          
+          generatedMessagesSection.scrollIntoView({ behavior: "smooth", block: "start" });
+
           // Then scroll to the specific message row after a short delay
           setTimeout(() => {
             const messageRow = document.getElementById(`generated-message-${highlightedMessageId}`);
             if (messageRow) {
-              messageRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
-              messageRow.classList.add('flash-highlight');
-              setTimeout(() => messageRow.classList.remove('flash-highlight'), 1000);
+              messageRow.scrollIntoView({ behavior: "smooth", block: "center" });
+              messageRow.classList.add("flash-highlight");
+              setTimeout(() => messageRow.classList.remove("flash-highlight"), 1000);
             }
           }, 500); // Wait for the section scroll to complete
         }
@@ -154,22 +141,22 @@ export const MessageRules: React.FC<MessageRulesProps> = ({
       // Normalize rule structure to match what works in messageGeneration
       const normalizedRule = {
         type: rule.matches.type,
-        conditions: rule.matches.conditions
+        conditions: rule.matches.conditions,
       };
-      
+
       const matches = matchEventToRule(event, normalizedRule, {});
       return {
         ruleId: rule.id,
         matches,
-        reason: !matches ? getNotMatchingReason(event, normalizedRule) : 'Matches!'
+        reason: !matches ? getNotMatchingReason(event, normalizedRule) : "Matches!",
       };
     });
   }
 
   function getNotMatchingReason(event: any, rule: any): string {
     // Normalize the rule structure
-    const ruleType = typeof rule.type === 'string' ? rule.type : rule.matches?.type;
-    
+    const ruleType = typeof rule.type === "string" ? rule.type : rule.matches?.type;
+
     if (ruleType !== event.type) {
       return `Event type '${event.type}' doesn't match rule type '${ruleType}'`;
     }
@@ -178,19 +165,18 @@ export const MessageRules: React.FC<MessageRulesProps> = ({
     const conditions = rule.conditions || rule.matches?.conditions;
 
     if (!conditions) {
-      return 'No conditions defined';
+      return "No conditions defined";
     }
 
     const failedConditions = Object.entries(conditions)
       .map(([path, expectedValue]) => {
-        const actualValue = path.split('.')
-          .reduce((obj: any, key: string) => obj?.[key], event.data);
-        
+        const actualValue = path.split(".").reduce((obj: any, key: string) => obj?.[key], event.data);
+
         if (actualValue === undefined) {
           return `Path '${path}' not found in event data`;
         }
 
-        if (typeof expectedValue === 'string' && expectedValue.includes('{{')) {
+        if (typeof expectedValue === "string" && expectedValue.includes("{{")) {
           return null; // Template variables always match if path exists
         }
 
@@ -202,7 +188,7 @@ export const MessageRules: React.FC<MessageRulesProps> = ({
       })
       .filter(Boolean);
 
-    return failedConditions.join(', ');
+    return failedConditions.join(", ");
   }
 
   return (
@@ -280,7 +266,7 @@ export const MessageRules: React.FC<MessageRulesProps> = ({
                   <ChevronRight className="h-4 w-4" />
                 )}
               </Button>
-              
+
               {expandedRules.includes(rule.id) && (
                 <div className="p-2 space-y-4">
                   {/* Rule Matching */}
@@ -306,11 +292,9 @@ export const MessageRules: React.FC<MessageRulesProps> = ({
                       <div className="space-y-1">
                         {Object.entries(rule.generates.template).map(([key, value]) => (
                           <pre key={key} className="text-xs">
-                            {key === 'timestamp' ? (
-                              formatTemplateContent(`${key}: {{event.data.time}}`, instance.variables)
-                            ) : (
-                              formatTemplateContent(`${key}: ${value}`, instance.variables)
-                            )}
+                            {key === "timestamp"
+                              ? formatTemplateContent(`${key}: {{event.data.time}}`, instance.variables)
+                              : formatTemplateContent(`${key}: ${value}`, instance.variables)}
                           </pre>
                         ))}
                       </div>
@@ -338,9 +322,7 @@ export const MessageRules: React.FC<MessageRulesProps> = ({
                         <p className="font-medium">{key}</p>
                         <p className="text-muted-foreground text-[10px]">Captured from event</p>
                       </div>
-                      <span className="text-primary font-mono">
-                        {JSON.stringify(value)}
-                      </span>
+                      <span className="text-primary font-mono">{JSON.stringify(value)}</span>
                     </div>
                   ))}
                 </div>
@@ -365,28 +347,22 @@ export const MessageRules: React.FC<MessageRulesProps> = ({
           </TableHeader>
           <TableBody>
             {generatedMessages?.map((message: any) => (
-              <TableRow 
+              <TableRow
                 key={message.id}
                 id={`generated-message-${message.id}`}
                 className={`transition-colors ${
-                  effectiveSelectedId === message.id ? 'bg-primary/5 ring-1 ring-primary' : ''
+                  effectiveSelectedId === message.id ? "bg-primary/5 ring-1 ring-primary" : ""
                 }`}
               >
                 <TableCell className="text-xs">
-                  {message.timestamp ? (
-                    new Date(message.timestamp).toLocaleString()
-                  ) : (
-                    message.event?.data?.time ? (
-                      new Date(message.event.data.time).toLocaleString()
-                    ) : (
-                      new Date(message.event?.timestamp).toLocaleString()
-                    )
-                  )}
+                  {message.timestamp
+                    ? new Date(message.timestamp).toLocaleString()
+                    : message.event?.data?.time
+                      ? new Date(message.event.data.time).toLocaleString()
+                      : new Date(message.event?.timestamp).toLocaleString()}
                 </TableCell>
                 <TableCell>
-                  <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
-                    {message.type}
-                  </span>
+                  <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">{message.type}</span>
                 </TableCell>
                 <TableCell>
                   <div>
@@ -395,8 +371,8 @@ export const MessageRules: React.FC<MessageRulesProps> = ({
                   </div>
                 </TableCell>
                 <TableCell className="text-xs">
-                  <Button 
-                    variant="link" 
+                  <Button
+                    variant="link"
                     className="p-0 h-auto font-normal"
                     onClick={() => highlightEvent(message.fromEvent)}
                   >
@@ -404,9 +380,7 @@ export const MessageRules: React.FC<MessageRulesProps> = ({
                   </Button>
                 </TableCell>
                 <TableCell>
-                  <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-                    {message.rule}
-                  </span>
+                  <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">{message.rule}</span>
                 </TableCell>
               </TableRow>
             ))}
@@ -419,12 +393,12 @@ export const MessageRules: React.FC<MessageRulesProps> = ({
         <div className="space-y-4">
           <h3 className="text-lg font-medium">Messages</h3>
           <div className="space-y-2">
-            {messages.map((message) => (
-              <Card 
-                key={message.id} 
+            {messages.map(message => (
+              <Card
+                key={message.id}
                 id={`message-${message.id}`}
                 className={`p-4 transition-colors ${
-                  effectiveSelectedId === message.id ? 'ring-2 ring-primary bg-primary/5' : ''
+                  effectiveSelectedId === message.id ? "ring-2 ring-primary bg-primary/5" : ""
                 }`}
                 onClick={() => onMessageSelect?.(message.id)}
               >
@@ -433,9 +407,7 @@ export const MessageRules: React.FC<MessageRulesProps> = ({
                     <h4 className="font-medium">{message.title}</h4>
                     <p className="text-sm text-gray-600">{message.content}</p>
                   </div>
-                  <span className="text-xs text-gray-500">
-                    {new Date(message.timestamp).toLocaleString()}
-                  </span>
+                  <span className="text-xs text-gray-500">{new Date(message.timestamp).toLocaleString()}</span>
                 </div>
               </Card>
             ))}
@@ -447,4 +419,3 @@ export const MessageRules: React.FC<MessageRulesProps> = ({
 };
 
 export default MessageRules;
-

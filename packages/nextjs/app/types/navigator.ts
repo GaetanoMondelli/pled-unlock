@@ -60,4 +60,4 @@ export interface NavigatorInsight {
       modified_at: string;
     };
   };
-} 
+}

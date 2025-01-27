@@ -1,29 +1,15 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { Card } from "./card"
-import { ScrollArea } from "./scroll-area"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./tabs"
-import { Button } from "./button"
-import { Input } from "./input"
-import { Textarea } from "./textarea"
-import {
-  Send,
-  FileSignature,
-  Download,
-  Upload,
-  List,
-  Eye,
-  EyeOff,
-  LogOut,
-  ChevronRight
-} from "lucide-react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./dialog"
-import {
-  Collapsible,
-  CollapsibleTrigger,
-  CollapsibleContent,
-} from "./collapsible"
+import { useEffect, useState } from "react";
+import { Button } from "./button";
+import { Card } from "./card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./collapsible";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./dialog";
+import { Input } from "./input";
+import { ScrollArea } from "./scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./tabs";
+import { Textarea } from "./textarea";
+import { ChevronRight, Download, Eye, EyeOff, FileSignature, List, LogOut, Send, Upload } from "lucide-react";
 
 interface DocuSignConfig {
   integrationKey: string;
@@ -53,138 +39,138 @@ const ENVELOPE_STATUSES: EnvelopeStatus = {
   created: {
     emoji: "📝",
     title: "Created",
-    description: "The envelope has been created and saved as a draft. Recipients have not been notified yet."
+    description: "The envelope has been created and saved as a draft. Recipients have not been notified yet.",
   },
   sent: {
     emoji: "📤",
     title: "Sent",
-    description: "The envelope has been sent to recipients. They will receive email notifications to sign."
+    description: "The envelope has been sent to recipients. They will receive email notifications to sign.",
   },
   delivered: {
     emoji: "📨",
     title: "Delivered",
-    description: "Recipients have received the envelope and can now view and sign the documents."
+    description: "Recipients have received the envelope and can now view and sign the documents.",
   },
   completed: {
     emoji: "✅",
     title: "Completed",
-    description: "All recipients have signed the document and the process is complete."
+    description: "All recipients have signed the document and the process is complete.",
   },
   declined: {
     emoji: "❌",
     title: "Declined",
-    description: "One or more recipients have declined to sign the document."
+    description: "One or more recipients have declined to sign the document.",
   },
   voided: {
     emoji: "🚫",
     title: "Voided",
-    description: "The envelope has been voided and can no longer be acted upon."
+    description: "The envelope has been voided and can no longer be acted upon.",
   },
   signed: {
     emoji: "✍️",
     title: "Signed",
-    description: "The document has been signed but may be waiting for additional signatures."
+    description: "The document has been signed but may be waiting for additional signatures.",
   },
   corrected: {
     emoji: "📝",
     title: "Corrected",
-    description: "The envelope has been corrected and resent to the recipients."
+    description: "The envelope has been corrected and resent to the recipients.",
   },
   processing: {
     emoji: "⚙️",
     title: "Processing",
-    description: "DocuSign is processing the envelope (temporary state)."
+    description: "DocuSign is processing the envelope (temporary state).",
   },
   template: {
     emoji: "📋",
     title: "Template",
-    description: "The envelope is saved as a template for future use."
+    description: "The envelope is saved as a template for future use.",
   },
   failed: {
     emoji: "💔",
     title: "Failed",
-    description: "The envelope processing has failed. Please check for errors and try again."
+    description: "The envelope processing has failed. Please check for errors and try again.",
   },
   contract_prepared: {
     emoji: "📋",
     title: "Contract Prepared",
-    description: "Employment contract has been prepared and is ready to be sent"
+    description: "Employment contract has been prepared and is ready to be sent",
   },
   contract_sent: {
     emoji: "📤",
     title: "Contract Sent",
-    description: "Employment contract has been sent to the candidate"
+    description: "Employment contract has been sent to the candidate",
   },
   contract_signed: {
     emoji: "✍️",
     title: "Contract Signed",
-    description: "Employment contract has been signed by the candidate"
+    description: "Employment contract has been signed by the candidate",
   },
   draft: {
     emoji: "📝",
     title: "Draft",
-    description: "The envelope is saved as a draft and can be modified before sending"
+    description: "The envelope is saved as a draft and can be modified before sending",
   },
   sent_api: {
     emoji: "🔄",
     title: "Sent via API",
-    description: "The envelope has been sent through the DocuSign API"
+    description: "The envelope has been sent through the DocuSign API",
   },
   delivered_api: {
     emoji: "📨",
     title: "Delivered via API",
-    description: "The envelope has been delivered through the DocuSign API"
+    description: "The envelope has been delivered through the DocuSign API",
   },
   authentication_failed: {
     emoji: "🔒",
     title: "Authentication Failed",
-    description: "Recipient authentication has failed. They may need to verify their identity"
+    description: "Recipient authentication has failed. They may need to verify their identity",
   },
   auto_responded: {
     emoji: "🤖",
     title: "Auto Responded",
-    description: "An automatic response has been received for this envelope"
+    description: "An automatic response has been received for this envelope",
   },
   expired: {
     emoji: "⏰",
     title: "Expired",
-    description: "The envelope has expired without being completed"
+    description: "The envelope has expired without being completed",
   },
   waiting_for_review: {
     emoji: "👀",
     title: "Waiting for Review",
-    description: "The envelope is waiting for review before proceeding"
+    description: "The envelope is waiting for review before proceeding",
   },
   waiting_for_others: {
     emoji: "⏳",
     title: "Waiting for Others",
-    description: "Waiting for other recipients to complete their actions"
+    description: "Waiting for other recipients to complete their actions",
   },
   out_for_signature: {
     emoji: "✒️",
     title: "Out for Signature",
-    description: "The envelope has been sent and is awaiting signatures"
+    description: "The envelope has been sent and is awaiting signatures",
   },
   viewed: {
     emoji: "👁️",
     title: "Viewed",
-    description: "The envelope has been viewed by the recipient but not yet signed"
+    description: "The envelope has been viewed by the recipient but not yet signed",
   },
   partially_signed: {
     emoji: "📑",
     title: "Partially Signed",
-    description: "Some but not all recipients have signed the document"
+    description: "Some but not all recipients have signed the document",
   },
   in_progress: {
     emoji: "🔄",
     title: "In Progress",
-    description: "The envelope is being processed by one or more recipients"
+    description: "The envelope is being processed by one or more recipients",
   },
   completed_api: {
     emoji: "✅",
     title: "Completed via API",
-    description: "The envelope has been completed through the DocuSign API"
-  }
+    description: "The envelope has been completed through the DocuSign API",
+  },
 };
 
 // Update AuthType to include scopes
@@ -192,7 +178,7 @@ type AuthType = {
   accessToken: string;
   accountId: string;
   baseUrl: string;
-  type: 'navigator' | 'esignature' | 'click';
+  type: "navigator" | "esignature" | "click";
   scopes?: string[];
 };
 
@@ -202,10 +188,10 @@ export const PlaygroundView = () => {
     accountId: "",
     userId: "",
     privateKey: "",
-    oAuthServer: ""
+    oAuthServer: "",
   });
   const [showPrivateKey, setShowPrivateKey] = useState(false);
-  const [privateKeyContent, setPrivateKeyContent] = useState('');
+  const [privateKeyContent, setPrivateKeyContent] = useState("");
   const [isEditing, setIsEditing] = useState(false);
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -238,12 +224,12 @@ export const PlaygroundView = () => {
         setStatus("🔄 Creating clickwrap...");
 
         if (!selectedFile) {
-          throw new Error('Please select a file');
+          throw new Error("Please select a file");
         }
 
         // Convert file to base64
         const fileBuffer = await selectedFile.arrayBuffer();
-        const base64File = Buffer.from(fileBuffer).toString('base64');
+        const base64File = Buffer.from(fileBuffer).toString("base64");
 
         // Create request body with more specific naming
         const requestBody = {
@@ -253,54 +239,55 @@ export const PlaygroundView = () => {
             format: "modal",
             mustRead: true,
             requireAccept: true,
-            documentDisplay: "document"
+            documentDisplay: "document",
           },
-          documents: [{
-            documentBase64: base64File,
-            documentName: selectedFile.name,
-            fileExtension: selectedFile.name.split('.').pop(),
-            order: 1
-          }]
+          documents: [
+            {
+              documentBase64: base64File,
+              documentName: selectedFile.name,
+              fileExtension: selectedFile.name.split(".").pop(),
+              order: 1,
+            },
+          ],
         };
 
-        console.log('Creating clickwrap with request:', {
+        console.log("Creating clickwrap with request:", {
           ...requestBody,
-          documents: [{
-            ...requestBody.documents[0],
-            documentBase64: '[BASE64_CONTENT]' // Don't log the full base64
-          }]
+          documents: [
+            {
+              ...requestBody.documents[0],
+              documentBase64: "[BASE64_CONTENT]", // Don't log the full base64
+            },
+          ],
         });
 
-        const response = await fetch('/api/docusign/click/clickwraps', {
-          method: 'POST',
+        const response = await fetch("/api/docusign/click/clickwraps", {
+          method: "POST",
           headers: {
-            'Authorization': `Bearer ${auth.accessToken}`,
-            'Account-Id': auth.accountId,
-            'Content-Type': 'application/json'
+            Authorization: `Bearer ${auth.accessToken}`,
+            "Account-Id": auth.accountId,
+            "Content-Type": "application/json",
           },
-          body: JSON.stringify(requestBody)
+          body: JSON.stringify(requestBody),
         });
 
         const data = await response.json();
 
         if (!response.ok) {
-          console.error('Error response:', data);
-          throw new Error(data.error || 'Failed to create clickwrap');
+          console.error("Error response:", data);
+          throw new Error(data.error || "Failed to create clickwrap");
         }
 
         setClickwrapId(data.clickwrapId); // Store the ID for later use
         setStatus(
-          "✅ Clickwrap Created Successfully!\n\n" +
-          `Clickwrap ID: ${data.clickwrapId}\n` +
-          `Status: ${data.status}`
+          "✅ Clickwrap Created Successfully!\n\n" + `Clickwrap ID: ${data.clickwrapId}\n` + `Status: ${data.status}`,
         );
-
       } catch (error: any) {
-        console.error('Error creating clickwrap:', error);
+        console.error("Error creating clickwrap:", error);
         setStatus(
           "❌ Failed to Create Clickwrap\n\n" +
-          `Error: ${error.message}\n\n` +
-          "Please check the console for more details."
+            `Error: ${error.message}\n\n` +
+            "Please check the console for more details.",
         );
       }
     },
@@ -316,26 +303,25 @@ export const PlaygroundView = () => {
 
         const response = await fetch(`/api/docusign/click/clickwraps/${clickwrapId}`, {
           headers: {
-            'Authorization': `Bearer ${auth.accessToken}`,
-            'Account-Id': auth.accountId
-          }
+            Authorization: `Bearer ${auth.accessToken}`,
+            "Account-Id": auth.accountId,
+          },
         });
 
         if (!response.ok) {
           const error = await response.json();
-          throw new Error(error.message || 'Failed to get clickwrap status');
+          throw new Error(error.message || "Failed to get clickwrap status");
         }
 
         const result = await response.json();
         setClickwrapStatus(result);
         setStatus("✅ Retrieved Clickwrap Status");
-
       } catch (error: any) {
-        console.error('Error getting clickwrap status:', error);
+        console.error("Error getting clickwrap status:", error);
         setStatus(
           "❌ Failed to Get Clickwrap Status\n\n" +
-          `Error: ${error.message}\n\n` +
-          "Please check the console for more details."
+            `Error: ${error.message}\n\n` +
+            "Please check the console for more details.",
         );
       }
     },
@@ -350,50 +336,52 @@ export const PlaygroundView = () => {
         setStatus("🔄 Getting all agreements...");
 
         const response = await fetch(`/api/docusign/click/clickwraps/${clickwrapId}/agreements`, {
-          method: 'POST',
+          method: "POST",
           headers: {
-            'Authorization': `Bearer ${auth.accessToken}`,
-            'Account-Id': auth.accountId,
-            'Content-Type': 'application/json'
+            Authorization: `Bearer ${auth.accessToken}`,
+            "Account-Id": auth.accountId,
+            "Content-Type": "application/json",
           },
-          body: JSON.stringify({}) // No userIdentifier, get all agreements
+          body: JSON.stringify({}), // No userIdentifier, get all agreements
         });
 
         if (!response.ok) {
           const error = await response.json();
-          throw new Error(error.message || 'Failed to get agreements');
+          throw new Error(error.message || "Failed to get agreements");
         }
 
         const result = await response.json();
-        
+
         if (result.agreements?.length > 0) {
           setStatus(
             "✅ Agreements Found!\n\n" +
-            `Total Agreements: ${result.totalAgreements}\n\n` +
-            "Agreement Details:\n" +
-            result.agreements.map((agreement: any) => 
-              `- Status: ${agreement.status}\n` +
-              `  Agreed On: ${new Date(agreement.agreedOn).toLocaleString()}\n` +
-              `  User ID: ${agreement.clientUserId}\n` +
-              `  Version: ${agreement.version}\n`
-            ).join('\n')
+              `Total Agreements: ${result.totalAgreements}\n\n` +
+              "Agreement Details:\n" +
+              result.agreements
+                .map(
+                  (agreement: any) =>
+                    `- Status: ${agreement.status}\n` +
+                    `  Agreed On: ${new Date(agreement.agreedOn).toLocaleString()}\n` +
+                    `  User ID: ${agreement.clientUserId}\n` +
+                    `  Version: ${agreement.version}\n`,
+                )
+                .join("\n"),
           );
 
           // Set clickwrap status to show the table
           setClickwrapStatus({
             agreements: result.agreements,
-            totalAgreements: result.totalAgreements
+            totalAgreements: result.totalAgreements,
           });
         } else {
           setStatus("⚠️ No agreements found for this clickwrap");
         }
-
       } catch (error: any) {
-        console.error('Error checking agreements:', error);
+        console.error("Error checking agreements:", error);
         setStatus(
           "❌ Failed to Get Agreements\n\n" +
-          `Error: ${error.message}\n\n` +
-          "Please check the console for more details."
+            `Error: ${error.message}\n\n` +
+            "Please check the console for more details.",
         );
       }
     },
@@ -409,32 +397,28 @@ export const PlaygroundView = () => {
 
         const response = await fetch(`/api/docusign/click/clickwraps/${clickwrapId}/agreements`, {
           headers: {
-            'Authorization': `Bearer ${auth.accessToken}`,
-            'Account-Id': auth.accountId
-          }
+            Authorization: `Bearer ${auth.accessToken}`,
+            "Account-Id": auth.accountId,
+          },
         });
 
         if (!response.ok) {
           const error = await response.json();
-          throw new Error(error.message || 'Failed to get agreement URL');
+          throw new Error(error.message || "Failed to get agreement URL");
         }
 
         const { agreementUrl } = await response.json();
-        
-        // Open the agreement URL in a new window
-        window.open(agreementUrl, '_blank');
-        
-        setStatus(
-          "✅ Agreement URL Generated\n\n" +
-          "The agreement page has been opened in a new window."
-        );
 
+        // Open the agreement URL in a new window
+        window.open(agreementUrl, "_blank");
+
+        setStatus("✅ Agreement URL Generated\n\n" + "The agreement page has been opened in a new window.");
       } catch (error: any) {
-        console.error('Error getting agreement URL:', error);
+        console.error("Error getting agreement URL:", error);
         setStatus(
           "❌ Failed to Get Agreement URL\n\n" +
-          `Error: ${error.message}\n\n` +
-          "Please check the console for more details."
+            `Error: ${error.message}\n\n` +
+            "Please check the console for more details.",
         );
       }
     },
@@ -442,17 +426,17 @@ export const PlaygroundView = () => {
     authenticateClick: async () => {
       try {
         setStatus("🔄 Authenticating Click API...");
-        const response = await fetch('/api/docusign/click/authenticate', {
-          method: 'POST'
+        const response = await fetch("/api/docusign/click/authenticate", {
+          method: "POST",
         });
-        
+
         if (!response.ok) {
           const error = await response.json();
-          if (error.error === 'consent_required' && error.consentUrl) {
+          if (error.error === "consent_required" && error.consentUrl) {
             window.location.href = error.consentUrl;
             return;
           }
-          throw new Error(error.error || 'Authentication failed');
+          throw new Error(error.error || "Authentication failed");
         }
 
         const authData = await response.json();
@@ -460,16 +444,16 @@ export const PlaygroundView = () => {
         setAuthenticated(true);
         setStatus(
           "✅ Click API Authentication Successful!\n\n" +
-          "Connected to DocuSign with:\n" +
-          `Account ID: ${authData.accountId}\n` +
-          `Scopes: ${authData.scopes?.join(', ') || 'signature, impersonation, click.manage, click.send'}\n\n` +
-          "You can now manage clickwraps."
+            "Connected to DocuSign with:\n" +
+            `Account ID: ${authData.accountId}\n` +
+            `Scopes: ${authData.scopes?.join(", ") || "signature, impersonation, click.manage, click.send"}\n\n` +
+            "You can now manage clickwraps.",
         );
       } catch (error: any) {
         setStatus(
           "❌ Click API Authentication Failed\n\n" +
-          `Error: ${error.message}\n\n` +
-          "Please check your configuration and try again."
+            `Error: ${error.message}\n\n` +
+            "Please check your configuration and try again.",
         );
       }
     },
@@ -479,35 +463,38 @@ export const PlaygroundView = () => {
         setStatus("Error: Please authenticate first");
         return;
       }
-      
+
       try {
         setStatus("🔄 Fetching clickwraps...");
-        const response = await fetch('/api/docusign/click/clickwraps', {
+        const response = await fetch("/api/docusign/click/clickwraps", {
           headers: {
-            'Authorization': `Bearer ${auth.accessToken}`,
-            'Account-Id': auth.accountId
-          }
+            Authorization: `Bearer ${auth.accessToken}`,
+            "Account-Id": auth.accountId,
+          },
         });
 
         if (!response.ok) {
           const error = await response.json();
-          throw new Error(error.error || 'Failed to list clickwraps');
+          throw new Error(error.error || "Failed to list clickwraps");
         }
 
         const result = await response.json();
         setStatus(
           "✅ Clickwraps Retrieved:\n\n" +
-          result.clickwraps.map((cw: any) => 
-            `• ${cw.clickwrapName} (ID: ${cw.clickwrapId})\n` +
-            `  Status: ${cw.status}\n` +
-            `  Version: ${cw.versionNumber}\n`
-          ).join('\n')
+            result.clickwraps
+              .map(
+                (cw: any) =>
+                  `• ${cw.clickwrapName} (ID: ${cw.clickwrapId})\n` +
+                  `  Status: ${cw.status}\n` +
+                  `  Version: ${cw.versionNumber}\n`,
+              )
+              .join("\n"),
         );
       } catch (error: any) {
         setStatus(
           "❌ Failed to List Clickwraps\n\n" +
-          `Error: ${error.message}\n\n` +
-          "Please check your authentication and try again."
+            `Error: ${error.message}\n\n` +
+            "Please check your authentication and try again.",
         );
       }
     },
@@ -515,51 +502,51 @@ export const PlaygroundView = () => {
     checkUsers: async () => {
       try {
         setIsLoadingClickwraps(true);
-        const response = await fetch('/api/docusign/click/users', {
-          method: 'POST',
+        const response = await fetch("/api/docusign/click/users", {
+          method: "POST",
           headers: {
-            'Content-Type': 'application/json',
-            'Authorization': authData.accessToken,
-            'Account-Id': authData.accountId
+            "Content-Type": "application/json",
+            Authorization: authData.accessToken,
+            "Account-Id": authData.accountId,
           },
           body: JSON.stringify({
-            clickwrapId
-          })
+            clickwrapId,
+          }),
         });
 
         if (!response.ok) {
-          throw new Error('Failed to get users');
+          throw new Error("Failed to get users");
         }
 
         const data = await response.json();
         setClickwrapStatus(prev => ({
           ...prev,
-          users: data
+          users: data,
         }));
       } catch (error) {
-        console.error('Error checking users:', error);
+        console.error("Error checking users:", error);
       } finally {
         setIsLoadingClickwraps(false);
       }
-    }
+    },
   };
 
   // Add state for Click API
-  const [clickwrapId, setClickwrapId] = useState<string>('');
+  const [clickwrapId, setClickwrapId] = useState<string>("");
   const [clickwrapStatus, setClickwrapStatus] = useState<any>(null);
-  const [agreementId, setAgreementId] = useState<string>('');
+  const [agreementId, setAgreementId] = useState<string>("");
 
   useEffect(() => {
     // Fetch initial configuration
-    fetch('/api/docusign/config')
+    fetch("/api/docusign/config")
       .then(res => res.json())
       .then(data => {
         setConfig(data);
         // Store the actual private key content
-        setPrivateKeyContent(data.privateKey || '');
+        setPrivateKeyContent(data.privateKey || "");
       })
       .catch(error => {
-        console.error('Error loading config:', error);
+        console.error("Error loading config:", error);
         setStatus(`Error: ${error.message}`);
       });
   }, []);
@@ -567,13 +554,13 @@ export const PlaygroundView = () => {
   const toggleEdit = () => {
     if (isEditing) {
       // Fetch config again to reset
-      fetch('/api/docusign/config')
+      fetch("/api/docusign/config")
         .then(res => res.json())
         .then(data => {
           setConfig(data);
         })
         .catch(error => {
-          console.error('Error resetting config:', error);
+          console.error("Error resetting config:", error);
         });
     }
     setIsEditing(!isEditing);
@@ -585,27 +572,23 @@ export const PlaygroundView = () => {
     }
   };
 
-  const handleConfigChange = (key: keyof DocuSignConfig) => (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
-    setConfig(prev => ({ ...prev, [key]: e.target.value }));
-  };
+  const handleConfigChange =
+    (key: keyof DocuSignConfig) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      setConfig(prev => ({ ...prev, [key]: e.target.value }));
+    };
 
   // DocuSign API operations
   const operations = {
     authenticate: async () => {
       try {
-        setStatus(
-          "🔄 Authenticating...\n" +
-          "Connecting to DocuSign and requesting JWT token..."
-        );
-        const response = await fetch('/api/docusign/authenticate', {
-          method: 'POST'
+        setStatus("🔄 Authenticating...\n" + "Connecting to DocuSign and requesting JWT token...");
+        const response = await fetch("/api/docusign/authenticate", {
+          method: "POST",
         });
-        
+
         if (!response.ok) {
           const error = await response.json();
-          throw new Error(error.error || 'Authentication failed');
+          throw new Error(error.error || "Authentication failed");
         }
 
         const authData = await response.json();
@@ -613,91 +596,85 @@ export const PlaygroundView = () => {
         setAuthenticated(true);
         setStatus(
           "✅ Authentication Successful!\n\n" +
-          "Connected to DocuSign with:\n" +
-          `Account ID: ${authData.accountId}\n` +
-          "Access Token: [Secured]\n\n" +
-          "You can now create and send envelopes."
+            "Connected to DocuSign with:\n" +
+            `Account ID: ${authData.accountId}\n` +
+            "Access Token: [Secured]\n\n" +
+            "You can now create and send envelopes.",
         );
       } catch (error: any) {
         setStatus(
           "❌ Authentication Failed\n\n" +
-          `Error: ${error.message}\n\n` +
-          "Please check your configuration and try again."
+            `Error: ${error.message}\n\n` +
+            "Please check your configuration and try again.",
         );
       }
     },
 
     createEnvelope: async () => {
       if (!auth || !authenticated) {
-        setStatus(
-          "❌ Not Authenticated\n\n" +
-          "Please authenticate with DocuSign first before creating an envelope."
-        );
+        setStatus("❌ Not Authenticated\n\n" + "Please authenticate with DocuSign first before creating an envelope.");
         return;
       }
       if (!selectedFile) {
-        setStatus(
-          "❌ No File Selected\n\n" +
-          "Please select a document to create an envelope."
-        );
+        setStatus("❌ No File Selected\n\n" + "Please select a document to create an envelope.");
         return;
       }
-      
+
       try {
         setStatus(
           "🔄 Creating Envelope...\n\n" +
-          "1. Uploading document\n" +
-          "2. Setting up recipients\n" +
-          "3. Configuring signature fields"
+            "1. Uploading document\n" +
+            "2. Setting up recipients\n" +
+            "3. Configuring signature fields",
         );
         const formData = new FormData();
-        formData.append('signerEmail', recipients.split('\n')[0].trim());
-        formData.append('signerName', 'Test Signer');
-        formData.append('document', selectedFile);
+        formData.append("signerEmail", recipients.split("\n")[0].trim());
+        formData.append("signerName", "Test Signer");
+        formData.append("document", selectedFile);
 
         // Add tab positions
         const tabs = {
           signHereTabs: tabPositions.map(pos => ({
             ...pos,
-            documentId: '1',
-            recipientId: '1'
-          }))
+            documentId: "1",
+            recipientId: "1",
+          })),
         };
-        formData.append('tabs', JSON.stringify(tabs));
+        formData.append("tabs", JSON.stringify(tabs));
 
         // Add template variables
-        formData.append('templateData', JSON.stringify(templateVariables));
+        formData.append("templateData", JSON.stringify(templateVariables));
 
-        const response = await fetch('/api/docusign/envelope', {
-          method: 'POST',
+        const response = await fetch("/api/docusign/envelope", {
+          method: "POST",
           headers: {
-            'Authorization': `Bearer ${auth.accessToken}`,
-            'Account-Id': auth.accountId
+            Authorization: `Bearer ${auth.accessToken}`,
+            "Account-Id": auth.accountId,
           },
-          body: formData
+          body: formData,
         });
 
         if (!response.ok) {
           const error = await response.json();
-          throw new Error(error.error || 'Failed to create envelope');
+          throw new Error(error.error || "Failed to create envelope");
         }
 
         const result = await response.json();
         setEnvelopeId(result.envelopeId);
         setStatus(
           "✅ Envelope Created Successfully!\n\n" +
-          `Envelope ID: ${result.envelopeId}\n` +
-          "Status: Draft\n\n" +
-          "You can now:\n" +
-          "• Send the envelope to recipients\n" +
-          "• Add more signature positions\n" +
-          "• Check envelope status"
+            `Envelope ID: ${result.envelopeId}\n` +
+            "Status: Draft\n\n" +
+            "You can now:\n" +
+            "• Send the envelope to recipients\n" +
+            "• Add more signature positions\n" +
+            "• Check envelope status",
         );
       } catch (error: any) {
         setStatus(
           "❌ Envelope Creation Failed\n\n" +
-          `Error: ${error.message}\n\n` +
-          "Please check your document and try again."
+            `Error: ${error.message}\n\n` +
+            "Please check your document and try again.",
         );
       }
     },
@@ -707,27 +684,27 @@ export const PlaygroundView = () => {
         setStatus("Error: Please authenticate first");
         return;
       }
-      
+
       try {
         setStatus("Fetching envelopes...");
-        const response = await fetch('/api/docusign/envelopes', {
+        const response = await fetch("/api/docusign/envelopes", {
           headers: {
-            'Authorization': `Bearer ${auth.accessToken}`,
-            'Account-Id': auth.accountId
-          }
+            Authorization: `Bearer ${auth.accessToken}`,
+            "Account-Id": auth.accountId,
+          },
         });
 
         if (!response.ok) {
           const error = await response.json();
-          throw new Error(error.error || 'Failed to list envelopes');
+          throw new Error(error.error || "Failed to list envelopes");
         }
 
         const result = await response.json();
-        setStatus(`Found ${result.envelopes.length} envelopes:\n${
-          result.envelopes.map((env: any) => 
-            `${env.envelopeId}: ${env.status} (${env.emailSubject})`
-          ).join('\n')
-        }`);
+        setStatus(
+          `Found ${result.envelopes.length} envelopes:\n${result.envelopes
+            .map((env: any) => `${env.envelopeId}: ${env.status} (${env.emailSubject})`)
+            .join("\n")}`,
+        );
       } catch (error: any) {
         setStatus(`Failed to fetch envelopes: ${error.message}`);
       }
@@ -735,35 +712,26 @@ export const PlaygroundView = () => {
 
     getEnvelopeStatus: async () => {
       if (!auth || !authenticated) {
-        setStatus(
-          "❌ Not Authenticated\n\n" +
-          "Please authenticate with DocuSign first before checking status."
-        );
+        setStatus("❌ Not Authenticated\n\n" + "Please authenticate with DocuSign first before checking status.");
         return;
       }
       if (!envelopeId) {
-        setStatus(
-          "❌ No Envelope Selected\n\n" +
-          "Please create an envelope first before checking status."
-        );
+        setStatus("❌ No Envelope Selected\n\n" + "Please create an envelope first before checking status.");
         return;
       }
-      
+
       try {
-        setStatus(
-          "🔄 Checking Envelope Status...\n" +
-          "Fetching latest information from DocuSign..."
-        );
+        setStatus("🔄 Checking Envelope Status...\n" + "Fetching latest information from DocuSign...");
         const response = await fetch(`/api/docusign/envelopes/${envelopeId}`, {
           headers: {
-            'Authorization': `Bearer ${auth.accessToken}`,
-            'Account-Id': auth.accountId
-          }
+            Authorization: `Bearer ${auth.accessToken}`,
+            "Account-Id": auth.accountId,
+          },
         });
 
         if (!response.ok) {
           const error = await response.json();
-          throw new Error(error.error || 'Failed to get envelope status');
+          throw new Error(error.error || "Failed to get envelope status");
         }
 
         const result = await response.json();
@@ -771,26 +739,22 @@ export const PlaygroundView = () => {
         const statusInfo = ENVELOPE_STATUSES[status] || {
           emoji: "❓",
           title: status,
-          description: "Unknown status"
+          description: "Unknown status",
         };
 
         setStatus(
           `${statusInfo.emoji} Envelope Status: ${statusInfo.title}\n\n` +
-          `Description: ${statusInfo.description}\n\n` +
-          `Created: ${result.createdDateTime}\n` +
-          (result.sentDateTime ? `Sent: ${result.sentDateTime}\n` : '') +
-          (result.completedDateTime ? `Completed: ${result.completedDateTime}\n` : '') +
-          "\nAll Possible Statuses:\n" +
-          Object.entries(ENVELOPE_STATUSES)
-            .map(([_key, info] : [any, any]) => `${info.emoji} ${info.title}: ${info.description}`)
-            .join('\n\n')
+            `Description: ${statusInfo.description}\n\n` +
+            `Created: ${result.createdDateTime}\n` +
+            (result.sentDateTime ? `Sent: ${result.sentDateTime}\n` : "") +
+            (result.completedDateTime ? `Completed: ${result.completedDateTime}\n` : "") +
+            "\nAll Possible Statuses:\n" +
+            Object.entries(ENVELOPE_STATUSES)
+              .map(([_key, info]: [any, any]) => `${info.emoji} ${info.title}: ${info.description}`)
+              .join("\n\n"),
         );
       } catch (error: any) {
-        setStatus(
-          "❌ Status Check Failed\n\n" +
-          `Error: ${error.message}\n\n` +
-          "Please try again later."
-        );
+        setStatus("❌ Status Check Failed\n\n" + `Error: ${error.message}\n\n` + "Please try again later.");
       }
     },
 
@@ -807,27 +771,27 @@ export const PlaygroundView = () => {
       try {
         setStatus("Getting signing URL...");
         const response = await fetch(`/api/docusign/envelopes/${envelopeId}/view`, {
-          method: 'POST',
+          method: "POST",
           headers: {
-            'Authorization': `Bearer ${auth.accessToken}`,
-            'Account-Id': auth.accountId,
-            'Content-Type': 'application/json'
+            Authorization: `Bearer ${auth.accessToken}`,
+            "Account-Id": auth.accountId,
+            "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            email: recipients.split('\n')[0].trim(),
-            name: "Test Signer"
-          })
+            email: recipients.split("\n")[0].trim(),
+            name: "Test Signer",
+          }),
         });
 
         if (!response.ok) {
           const error = await response.json();
-          throw new Error(error.error || 'Failed to get signing URL');
+          throw new Error(error.error || "Failed to get signing URL");
         }
 
         const { url } = await response.json();
         setSigningUrl(url);
         setShowSigningDialog(true);
-        setStatus('Signing view ready');
+        setStatus("Signing view ready");
       } catch (error: any) {
         setStatus(`Failed to get signing URL: ${error.message}`);
       }
@@ -835,83 +799,74 @@ export const PlaygroundView = () => {
 
     sendEnvelope: async () => {
       if (!auth || !authenticated) {
-        setStatus(
-          "❌ Not Authenticated\n\n" +
-          "Please authenticate with DocuSign first before sending an envelope."
-        );
+        setStatus("❌ Not Authenticated\n\n" + "Please authenticate with DocuSign first before sending an envelope.");
         return;
       }
       if (!envelopeId) {
-        setStatus(
-          "❌ No Envelope Selected\n\n" +
-          "Please create an envelope first before sending."
-        );
+        setStatus("❌ No Envelope Selected\n\n" + "Please create an envelope first before sending.");
         return;
       }
       if (!recipients) {
-        setStatus(
-          "❌ No Recipients\n\n" +
-          "Please add at least one recipient email address."
-        );
+        setStatus("❌ No Recipients\n\n" + "Please add at least one recipient email address.");
         return;
       }
 
       try {
-        const recipientsList = recipients.split('\n')
+        const recipientsList = recipients
+          .split("\n")
           .filter(email => email.trim())
           .map((email, index) => ({
             email: email.trim(),
             name: `Recipient ${index + 1}`,
             recipientId: (index + 1).toString(),
-            routingOrder: (index + 1).toString()
+            routingOrder: (index + 1).toString(),
           }));
 
         setStatus(
           "🔄 Sending Envelope...\n\n" +
-          "1. Updating recipients\n" +
-          "2. Configuring email notifications\n" +
-          "3. Sending to DocuSign\n\n" +
-          `Recipients:\n${recipientsList.map(r => `• ${r.email}`).join('\n')}`
+            "1. Updating recipients\n" +
+            "2. Configuring email notifications\n" +
+            "3. Sending to DocuSign\n\n" +
+            `Recipients:\n${recipientsList.map(r => `• ${r.email}`).join("\n")}`,
         );
 
         const response = await fetch(`/api/docusign/envelopes/${envelopeId}`, {
-          method: 'POST',
+          method: "POST",
           headers: {
-            'Authorization': `Bearer ${auth.accessToken}`,
-            'Account-Id': auth.accountId,
-            'Content-Type': 'application/json'
+            Authorization: `Bearer ${auth.accessToken}`,
+            "Account-Id": auth.accountId,
+            "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            status: 'sent',
-            recipients: recipientsList
-          })
+            status: "sent",
+            recipients: recipientsList,
+          }),
         });
 
         if (!response.ok) {
           const error = await response.json();
-          throw new Error(error.error || 'Failed to send envelope');
+          throw new Error(error.error || "Failed to send envelope");
         }
 
         const result = await response.json();
-        
+
         // Log the result to see what we're getting back
-        console.log('Send envelope result:', result);
+        console.log("Send envelope result:", result);
 
         setStatus(
           "✅ Envelope Sent Successfully!\n\n" +
-          `Status: ${result.status}\n` +
-          `Created: ${result.details.created}\n` +
-          `Sent: ${result.details.sentDateTime}\n` +
-          `Subject: ${result.details.emailSubject}\n\n` +
-          "Recipients will receive email notifications to:\n" +
-          recipientsList.map(r => `• ${r.email}`).join('\n') + "\n\n" +
-          "They can click the link in their email to sign the document."
+            `Status: ${result.status}\n` +
+            `Created: ${result.details.created}\n` +
+            `Sent: ${result.details.sentDateTime}\n` +
+            `Subject: ${result.details.emailSubject}\n\n` +
+            "Recipients will receive email notifications to:\n" +
+            recipientsList.map(r => `• ${r.email}`).join("\n") +
+            "\n\n" +
+            "They can click the link in their email to sign the document.",
         );
       } catch (error: any) {
         setStatus(
-          "❌ Send Failed\n\n" +
-          `Error: ${error.message}\n\n` +
-          "Please check recipient emails and try again."
+          "❌ Send Failed\n\n" + `Error: ${error.message}\n\n` + "Please check recipient emails and try again.",
         );
       }
     },
@@ -920,49 +875,49 @@ export const PlaygroundView = () => {
     testNavigator: async () => {
       try {
         setStatus(`🔄 Testing Navigator API...`);
-        
+
         // First try with stored auth
-        const storedAuth = localStorage.getItem('navigatorAuth');
+        const storedAuth = localStorage.getItem("navigatorAuth");
         let response;
-        
+
         if (storedAuth) {
           const authData = JSON.parse(storedAuth);
-          console.log('Using stored auth:', {
+          console.log("Using stored auth:", {
             baseUrl: authData.baseUrl,
             accountId: authData.accountId,
-            tokenStart: authData.accessToken.substring(0, 20) + '...'
+            tokenStart: authData.accessToken.substring(0, 20) + "...",
           });
 
-          response = await fetch('/api/docusign/navigator/proxy', {
-            method: 'POST',
+          response = await fetch("/api/docusign/navigator/proxy", {
+            method: "POST",
             headers: {
-              'Content-Type': 'application/json'
+              "Content-Type": "application/json",
             },
             body: JSON.stringify({
               url: `${authData.baseUrl}/accounts/${authData.accountId}/agreements`,
-              token: authData.accessToken
-            })
+              token: authData.accessToken,
+            }),
           });
 
           const data = await response.json();
 
           // If we need new consent, clear stored auth and redirect
           if (response.status === 401 && data.needsConsent) {
-            console.log('Need new consent, clearing stored auth...');
-            localStorage.removeItem('navigatorAuth');
-            localStorage.removeItem('navigatorConsent');
-            
+            console.log("Need new consent, clearing stored auth...");
+            localStorage.removeItem("navigatorAuth");
+            localStorage.removeItem("navigatorConsent");
+
             // Redirect to get fresh auth
-            response = await fetch('/api/docusign/navigator?useMock=false', {
-              method: 'POST'
+            response = await fetch("/api/docusign/navigator?useMock=false", {
+              method: "POST",
             });
             const freshData = await response.json();
-            
+
             if (freshData.consentUrl) {
               setStatus(
                 "⚠️ Authentication expired\n\n" +
-                "You will be redirected to re-authenticate.\n" +
-                "After granting consent, click 'Test Navigator API' again."
+                  "You will be redirected to re-authenticate.\n" +
+                  "After granting consent, click 'Test Navigator API' again.",
               );
               window.location.href = freshData.consentUrl;
               return;
@@ -971,7 +926,7 @@ export const PlaygroundView = () => {
 
           // Handle other errors
           if (!response.ok) {
-            throw new Error(data.error || 'Failed to call Navigator API');
+            throw new Error(data.error || "Failed to call Navigator API");
           }
 
           // Success!
@@ -988,34 +943,32 @@ export const PlaygroundView = () => {
                 >
                   View Details
                 </button>
-              )
-            }))
+              ),
+            })),
           });
-
         } else {
           // No stored auth, get fresh auth
-          response = await fetch('/api/docusign/navigator?useMock=false', {
-            method: 'POST'
+          response = await fetch("/api/docusign/navigator?useMock=false", {
+            method: "POST",
           });
           const data = await response.json();
-          
+
           if (data.consentUrl) {
             setStatus(
               "⚠️ Authentication Required\n\n" +
-              "You will be redirected to authenticate.\n" +
-              "After granting consent, click 'Test Navigator API' again."
+                "You will be redirected to authenticate.\n" +
+                "After granting consent, click 'Test Navigator API' again.",
             );
             window.location.href = data.consentUrl;
             return;
           }
         }
-
       } catch (error: any) {
-        console.error('Navigator API error:', error);
+        console.error("Navigator API error:", error);
         setTestResult({
           success: false,
           message: error.message,
-          details: null
+          details: null,
         });
       }
     },
@@ -1023,25 +976,23 @@ export const PlaygroundView = () => {
     testNavigatorMock: async () => {
       try {
         setStatus("🔄 Testing Navigator API (Mock Mode)...\n\nFetching mock agreements list...");
-        
+
         // Get mock agreements list
-        const listResponse = await fetch('/api/docusign/navigator?useMock=true', {
-          method: 'POST'
+        const listResponse = await fetch("/api/docusign/navigator?useMock=true", {
+          method: "POST",
         });
 
         if (!listResponse.ok) {
-          throw new Error('Failed to fetch mock agreements list');
+          throw new Error("Failed to fetch mock agreements list");
         }
 
         const agreements = await listResponse.json();
-        
+
         setTestResult({
           success: true,
-          message: `✅ Navigator API Test Successful!\n\nMock Agreements:\n${
-            agreements.agreements.map((a: any) => 
-              `• ${a.file_name} (ID: ${a.id})`
-            ).join('\n')
-          }`,
+          message: `✅ Navigator API Test Successful!\n\nMock Agreements:\n${agreements.agreements
+            .map((a: any) => `• ${a.file_name} (ID: ${a.id})`)
+            .join("\n")}`,
           details: agreements.agreements.map((a: any) => ({
             ...a,
             action: (
@@ -1052,21 +1003,19 @@ export const PlaygroundView = () => {
               >
                 View Details
               </button>
-            )
-          }))
+            ),
+          })),
         });
 
         // Get mock details for first agreement
-        const detailsResponse = await fetch(
-          `/api/docusign/navigator?agreementId=mock-agreement-1&useMock=true`
-        );
+        const detailsResponse = await fetch(`/api/docusign/navigator?agreementId=mock-agreement-1&useMock=true`);
 
         if (!detailsResponse.ok) {
-          throw new Error('Failed to fetch mock agreement details');
+          throw new Error("Failed to fetch mock agreement details");
         }
 
         const details = await detailsResponse.json();
-        
+
         setTestResult(prev => ({
           ...prev,
           details: {
@@ -1079,15 +1028,14 @@ export const PlaygroundView = () => {
               >
                 View Details
               </button>
-            )
-          }
+            ),
+          },
         }));
-
       } catch (error: any) {
         setTestResult({
           success: false,
           message: error.message,
-          details: null
+          details: null,
         });
       }
     },
@@ -1095,97 +1043,93 @@ export const PlaygroundView = () => {
     authenticateNavigator: async () => {
       try {
         setStatus("🔄 Authenticating with Navigator API...");
-        
+
         // Check for code in URL
         const urlParams = new URLSearchParams(window.location.search);
-        const code = urlParams.get('code');
-        const error = urlParams.get('error');
+        const code = urlParams.get("code");
+        const error = urlParams.get("error");
 
         if (error) {
           throw new Error(`Authentication failed: ${error}`);
         }
 
-        const response = await fetch('/api/docusign/navigator/authenticate', {
-          method: 'POST',
+        const response = await fetch("/api/docusign/navigator/authenticate", {
+          method: "POST",
           headers: {
-            'Content-Type': 'application/json'
+            "Content-Type": "application/json",
           },
           body: JSON.stringify({
             code,
-            scopes: [
-              'signature',
-              'impersonation',
-              'click.manage',
-              'click.send',
-              'extended'
-            ]
-          })
+            scopes: ["signature", "impersonation", "click.manage", "click.send", "extended"],
+          }),
         });
 
         const data = await response.json();
-        console.log('Authentication response:', data);
+        console.log("Authentication response:", data);
 
-        if (data.error === 'consent_required' && data.consentUrl) {
+        if (data.error === "consent_required" && data.consentUrl) {
           // Save current state if needed
-          localStorage.setItem('preAuthState', JSON.stringify({
-            returnTo: window.location.pathname
-          }));
-          
+          localStorage.setItem(
+            "preAuthState",
+            JSON.stringify({
+              returnTo: window.location.pathname,
+            }),
+          );
+
           // Redirect to consent URL
           window.location.href = data.consentUrl;
           return;
         }
 
         if (!response.ok || !data.baseUrl) {
-          throw new Error(data.error || 'Failed to authenticate');
+          throw new Error(data.error || "Failed to authenticate");
         }
 
         // Clear URL parameters
-        window.history.replaceState({}, '', window.location.pathname);
+        window.history.replaceState({}, "", window.location.pathname);
 
         const authData = {
           accessToken: data.accessToken,
           accountId: data.accountId,
           baseUrl: data.baseUrl,
-          type: 'navigator',
-          scopes: data.scopes
+          type: "navigator",
+          scopes: data.scopes,
         };
 
-        localStorage.setItem('navigatorAuth', JSON.stringify(authData));
+        localStorage.setItem("navigatorAuth", JSON.stringify(authData));
         setAuth(authData);
         setAuthenticated(true);
         setStatus(
           `✅ Authentication Successful\n` +
-          `Base URL: ${data.baseUrl}\n` +
-          `Account ID: ${data.accountId}\n` +
-          `Scopes: ${authData.scopes.join(', ')}`
+            `Base URL: ${data.baseUrl}\n` +
+            `Account ID: ${data.accountId}\n` +
+            `Scopes: ${authData.scopes.join(", ")}`,
         );
-
       } catch (error: any) {
-        console.error('Authentication error:', error);
+        console.error("Authentication error:", error);
         setStatus(
           "❌ Authentication Failed\n\n" +
-          `Error: ${error.message}\n\n` +
-          "Please check your configuration and try again."
+            `Error: ${error.message}\n\n` +
+            "Please check your configuration and try again.",
         );
       }
-    }
+    },
   };
 
   // Update the auth check effect
   useEffect(() => {
     // First check URL parameters
     const params = new URLSearchParams(window.location.search);
-    const error = params.get('error');
+    const error = params.get("error");
 
     if (error) {
       setStatus(`❌ Navigator Authentication Failed: ${error}`);
-      window.history.replaceState({}, '', window.location.pathname);
+      window.history.replaceState({}, "", window.location.pathname);
       return;
     }
 
     // Then check localStorage
-    const storedAuth = localStorage.getItem('navigatorAuth');
+    const storedAuth = localStorage.getItem("navigatorAuth");
     if (storedAuth) {
       try {
         const authData = JSON.parse(storedAuth);
@@ -1193,13 +1137,13 @@ export const PlaygroundView = () => {
         setAuthenticated(true);
         setStatus(
           `✅ Navigator Authentication Successful\n` +
-          `Base URL: ${authData.baseUrl}\n` +
-          `Account ID: ${authData.accountId}\n` +
-          `Scopes: ${authData.scopes?.join(', ') || 'signature, impersonation, adm_store_unified_repo_read, models_read'}`
+            `Base URL: ${authData.baseUrl}\n` +
+            `Account ID: ${authData.accountId}\n` +
+            `Scopes: ${authData.scopes?.join(", ") || "signature, impersonation, adm_store_unified_repo_read, models_read"}`,
         );
       } catch (e) {
-        console.error('Failed to parse stored auth:', e);
-        localStorage.removeItem('navigatorAuth');
+        console.error("Failed to parse stored auth:", e);
+        localStorage.removeItem("navigatorAuth");
       }
     }
   }, []);
@@ -1208,37 +1152,37 @@ export const PlaygroundView = () => {
   const handleLogout = () => {
     setAuth(null);
     setAuthenticated(false);
-    localStorage.removeItem('navigatorAuth');
+    localStorage.removeItem("navigatorAuth");
   };
 
   // Add new test function
   const testNavigatorAgreement = async (agreementId?: string) => {
     try {
       if (!auth?.accessToken || !auth?.accountId) {
-        throw new Error('Please authenticate first');
+        throw new Error("Please authenticate first");
       }
 
-      console.log('[Navigator] Getting agreements:', agreementId ? 'specific ID' : 'all');
-      
-      const endpoint = agreementId 
+      console.log("[Navigator] Getting agreements:", agreementId ? "specific ID" : "all");
+
+      const endpoint = agreementId
         ? `${auth.baseUrl}/accounts/${auth.accountId}/agreements/${agreementId}`
         : `${auth.baseUrl}/accounts/${auth.accountId}/agreements`;
 
-      const response = await fetch('/api/docusign/navigator/proxy', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/docusign/navigator/proxy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           url: endpoint,
-          method: 'GET',
-          token: auth.accessToken
-        })
+          method: "GET",
+          token: auth.accessToken,
+        }),
       });
 
       const data = await response.json();
       if (data.error) throw new Error(data.error);
 
-      console.log('Agreement response:', data);
-      
+      console.log("Agreement response:", data);
+
       if (agreementId) {
         // Single agreement details
         setTestResult({
@@ -1251,10 +1195,10 @@ export const PlaygroundView = () => {
             type: data.type,
             category: data.category,
             status: data.status,
-            created: data.created_date ? new Date(data.created_date).toLocaleString() : 'N/A',
-            modified: data.last_modified_date ? new Date(data.last_modified_date).toLocaleString() : 'N/A',
-            rawData: data
-          }
+            created: data.created_date ? new Date(data.created_date).toLocaleString() : "N/A",
+            modified: data.last_modified_date ? new Date(data.last_modified_date).toLocaleString() : "N/A",
+            rawData: data,
+          },
         });
       } else {
         // List of agreements
@@ -1263,21 +1207,20 @@ export const PlaygroundView = () => {
           success: true,
           message: `Found ${agreements.length} agreements`,
           details: {
-            id: 'multiple',
-            name: 'Agreement List',
-            type: 'List',
+            id: "multiple",
+            name: "Agreement List",
+            type: "List",
             agreements: agreements,
-            rawData: data
-          }
+            rawData: data,
+          },
         });
       }
-
     } catch (error: any) {
-      console.error('Navigator API error:', error);
+      console.error("Navigator API error:", error);
       setTestResult({
         success: false,
         message: `Failed to get agreement details: ${error.message}`,
-        details: null
+        details: null,
       });
     }
   };
@@ -1289,57 +1232,57 @@ export const PlaygroundView = () => {
   const authenticateAll = async () => {
     try {
       setStatus("🔄 Authenticating with all scopes...");
-      const response = await fetch('/api/docusign/authenticate', {
-        method: 'POST'
+      const response = await fetch("/api/docusign/authenticate", {
+        method: "POST",
       });
-      
+
       if (!response.ok) {
         const error = await response.json();
-        if (error.error === 'consent_required' && error.consentUrl) {
+        if (error.error === "consent_required" && error.consentUrl) {
           window.location.href = error.consentUrl;
           return;
         }
-        throw new Error(error.error || 'Authentication failed');
+        throw new Error(error.error || "Authentication failed");
       }
 
       const authData = await response.json();
-      console.log('Auth response:', authData);
+      console.log("Auth response:", authData);
 
       // Validate required fields
       if (!authData.accessToken || !authData.accountId || !authData.baseUrl || !authData.type) {
-        console.error('Invalid auth data:', authData);
-        throw new Error('Missing required authentication data');
+        console.error("Invalid auth data:", authData);
+        throw new Error("Missing required authentication data");
       }
 
       // Ensure type is valid
-      if (!['esignature', 'navigator', 'click'].includes(authData.type)) {
-        console.error('Invalid auth type:', authData.type);
-        throw new Error('Invalid authentication type');
+      if (!["esignature", "navigator", "click"].includes(authData.type)) {
+        console.error("Invalid auth type:", authData.type);
+        throw new Error("Invalid authentication type");
       }
 
       setAuth({
         accessToken: authData.accessToken,
         accountId: authData.accountId,
         baseUrl: authData.baseUrl,
-        type: authData.type as 'esignature' | 'navigator' | 'click',
-        scopes: authData.scopes || ALL_SCOPES
+        type: authData.type as "esignature" | "navigator" | "click",
+        scopes: authData.scopes || ALL_SCOPES,
       });
-      
+
       setAuthenticated(true);
       setStatus(
         "✅ Authentication Successful!\n\n" +
-        "Connected to DocuSign with:\n" +
-        `Account ID: ${authData.accountId}\n` +
-        `Type: ${authData.type}\n` +
-        `Scopes: ${authData.scopes?.join(', ') || ALL_SCOPES.join(', ')}\n\n` +
-        "You can now use all DocuSign features."
+          "Connected to DocuSign with:\n" +
+          `Account ID: ${authData.accountId}\n` +
+          `Type: ${authData.type}\n` +
+          `Scopes: ${authData.scopes?.join(", ") || ALL_SCOPES.join(", ")}\n\n` +
+          "You can now use all DocuSign features.",
       );
     } catch (error: any) {
-      console.error('Authentication error:', error);
+      console.error("Authentication error:", error);
       setStatus(
         "❌ Authentication Failed\n\n" +
-        `Error: ${error.message}\n\n` +
-        "Please check your configuration and try again."
+          `Error: ${error.message}\n\n` +
+          "Please check your configuration and try again.",
       );
     }
   };
@@ -1356,12 +1299,8 @@ export const PlaygroundView = () => {
 
             <TabsContent value="config" className="space-y-4">
               <div className="flex justify-end">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={toggleEdit}
-                >
-                  {isEditing ? 'Cancel Editing' : 'Edit Configuration'}
+                <Button variant="outline" size="sm" onClick={toggleEdit}>
+                  {isEditing ? "Cancel Editing" : "Edit Configuration"}
                 </Button>
               </div>
 
@@ -1396,22 +1335,14 @@ export const PlaygroundView = () => {
                 <div>
                   <div className="flex justify-between items-center mb-2">
                     <h3 className="text-sm font-medium">Private Key (RSA)</h3>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setShowPrivateKey(!showPrivateKey)}
-                    >
-                      {showPrivateKey ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
+                    <Button variant="ghost" size="sm" onClick={() => setShowPrivateKey(!showPrivateKey)}>
+                      {showPrivateKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </Button>
                   </div>
                   <Textarea
                     placeholder="Paste your RSA private key here"
-                    value={showPrivateKey ? privateKeyContent : '••••••••••••••••••••••••••••••••'}
-                    onChange={(e) => {
+                    value={showPrivateKey ? privateKeyContent : "••••••••••••••••••••••••••••••••"}
+                    onChange={e => {
                       setPrivateKeyContent(e.target.value);
                       handleConfigChange("privateKey")(e);
                     }}
@@ -1436,32 +1367,20 @@ export const PlaygroundView = () => {
                 <div className="p-4 border rounded-lg space-y-4">
                   <h3 className="font-medium">Authentication</h3>
                   <div className="grid gap-4">
-                    <Button
-                      variant="default"
-                      onClick={authenticateAll}
-                    >
+                    <Button variant="default" onClick={authenticateAll}>
                       <LogOut className="h-4 w-4 mr-2" />
                       Authenticate (All Scopes)
                     </Button>
                     <div className="grid grid-cols-3 gap-4">
-                      <Button
-                        variant="outline"
-                        onClick={operations.authenticate}
-                      >
+                      <Button variant="outline" onClick={operations.authenticate}>
                         <LogOut className="h-4 w-4 mr-2" />
                         Authenticate eSignature
                       </Button>
-                      <Button
-                        variant="outline"
-                        onClick={operations.authenticateNavigator}
-                      >
+                      <Button variant="outline" onClick={operations.authenticateNavigator}>
                         <LogOut className="h-4 w-4 mr-2" />
                         Authenticate Navigator
                       </Button>
-                      <Button
-                        variant="outline"
-                        onClick={clickOperations.authenticateClick}
-                      >
+                      <Button variant="outline" onClick={clickOperations.authenticateClick}>
                         <LogOut className="h-4 w-4 mr-2" />
                         Authenticate Click
                       </Button>
@@ -1471,11 +1390,7 @@ export const PlaygroundView = () => {
 
                 <div className="p-4 border rounded-lg space-y-4">
                   <h3 className="font-medium">Document Upload</h3>
-                  <Input
-                    type="file"
-                    onChange={handleFileChange}
-                    accept=".pdf,.doc,.docx"
-                  />
+                  <Input type="file" onChange={handleFileChange} accept=".pdf,.doc,.docx" />
                 </div>
 
                 <div className="p-4 border rounded-lg space-y-4">
@@ -1483,8 +1398,8 @@ export const PlaygroundView = () => {
                   <Textarea
                     placeholder="Enter email addresses (one per line)"
                     value={recipients}
-                    onChange={(e) => {
-                      console.log('Recipients changed:', e.target.value);
+                    onChange={e => {
+                      console.log("Recipients changed:", e.target.value);
                       setRecipients(e.target.value);
                     }}
                     rows={3}
@@ -1499,7 +1414,7 @@ export const PlaygroundView = () => {
                         <Input
                           placeholder="Page"
                           value={pos.pageNumber}
-                          onChange={(e) => {
+                          onChange={e => {
                             const newPositions = [...tabPositions];
                             newPositions[index].pageNumber = e.target.value;
                             setTabPositions(newPositions);
@@ -1509,7 +1424,7 @@ export const PlaygroundView = () => {
                         <Input
                           placeholder="X"
                           value={pos.xPosition}
-                          onChange={(e) => {
+                          onChange={e => {
                             const newPositions = [...tabPositions];
                             newPositions[index].xPosition = e.target.value;
                             setTabPositions(newPositions);
@@ -1519,7 +1434,7 @@ export const PlaygroundView = () => {
                         <Input
                           placeholder="Y"
                           value={pos.yPosition}
-                          onChange={(e) => {
+                          onChange={e => {
                             const newPositions = [...tabPositions];
                             newPositions[index].yPosition = e.target.value;
                             setTabPositions(newPositions);
@@ -1529,9 +1444,7 @@ export const PlaygroundView = () => {
                         <Button
                           variant="destructive"
                           onClick={() => {
-                            setTabPositions(positions => 
-                              positions.filter((_, i) => i !== index)
-                            );
+                            setTabPositions(positions => positions.filter((_, i) => i !== index));
                           }}
                         >
                           Remove
@@ -1544,12 +1457,12 @@ export const PlaygroundView = () => {
                         setTabPositions(positions => [
                           ...positions,
                           {
-                            pageNumber: '1',
-                            xPosition: '100',
-                            yPosition: '100',
+                            pageNumber: "1",
+                            xPosition: "100",
+                            yPosition: "100",
                             name: `SignHere_${positions.length + 1}`,
-                            tabLabel: `SignHere_${positions.length + 1}`
-                          }
+                            tabLabel: `SignHere_${positions.length + 1}`,
+                          },
                         ]);
                       }}
                     >
@@ -1566,7 +1479,7 @@ export const PlaygroundView = () => {
                         <Input
                           placeholder="Variable Name"
                           value={key}
-                          onChange={(e) => {
+                          onChange={e => {
                             const newVars = { ...templateVariables };
                             delete newVars[key];
                             newVars[e.target.value] = value;
@@ -1576,10 +1489,10 @@ export const PlaygroundView = () => {
                         <Input
                           placeholder="Value"
                           value={value}
-                          onChange={(e) => {
+                          onChange={e => {
                             setTemplateVariables(vars => ({
                               ...vars,
-                              [key]: e.target.value
+                              [key]: e.target.value,
                             }));
                           }}
                         />
@@ -1600,7 +1513,7 @@ export const PlaygroundView = () => {
                       onClick={() => {
                         setTemplateVariables(vars => ({
                           ...vars,
-                          [`variable_${Object.keys(vars).length + 1}`]: ''
+                          [`variable_${Object.keys(vars).length + 1}`]: "",
                         }));
                       }}
                     >
@@ -1610,39 +1523,23 @@ export const PlaygroundView = () => {
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <Button
-                    variant="outline"
-                    onClick={operations.createEnvelope}
-                  >
+                  <Button variant="outline" onClick={operations.createEnvelope}>
                     <Upload className="h-4 w-4 mr-2" />
                     Create Envelope
                   </Button>
-                  <Button
-                    variant="outline"
-                    onClick={operations.sendEnvelope}
-                  >
+                  <Button variant="outline" onClick={operations.sendEnvelope}>
                     <Send className="h-4 w-4 mr-2" />
                     Send Envelope
                   </Button>
-                  <Button
-                    variant="outline"
-                    onClick={operations.getEnvelopes}
-                  >
+                  <Button variant="outline" onClick={operations.getEnvelopes}>
                     <List className="h-4 w-4 mr-2" />
                     List Envelopes
                   </Button>
-                  <Button
-                    variant="outline"
-                    onClick={operations.getEnvelopeStatus}
-                  >
+                  <Button variant="outline" onClick={operations.getEnvelopeStatus}>
                     <Download className="h-4 w-4 mr-2" />
                     Check Status
                   </Button>
-                  <Button
-                    variant="outline"
-                    onClick={operations.openSigningView}
-                    disabled={!envelopeId}
-                  >
+                  <Button variant="outline" onClick={operations.openSigningView} disabled={!envelopeId}>
                     <FileSignature className="h-4 w-4 mr-2" />
                     Sign Document
                   </Button>
@@ -1651,16 +1548,11 @@ export const PlaygroundView = () => {
                 {/* Click API Section */}
                 <div className="p-4 border rounded-lg space-y-4">
                   <h3 className="font-medium">Click API Operations</h3>
-                  
+
                   <div className="grid gap-4">
                     <div className="p-4 border rounded-lg">
                       <h4 className="font-medium mb-2">Create Clickwrap</h4>
-                      <Input
-                        type="file"
-                        onChange={handleFileChange}
-                        accept=".pdf,.doc,.docx"
-                        className="mb-2"
-                      />
+                      <Input type="file" onChange={handleFileChange} accept=".pdf,.doc,.docx" className="mb-2" />
                       <Button
                         variant="outline"
                         onClick={clickOperations.createClickwrap}
@@ -1672,11 +1564,7 @@ export const PlaygroundView = () => {
 
                     <div className="p-4 border rounded-lg">
                       <h4 className="font-medium mb-2">List Clickwraps</h4>
-                      <Button
-                        variant="outline"
-                        onClick={clickOperations.listClickwraps}
-                        disabled={!authenticated}
-                      >
+                      <Button variant="outline" onClick={clickOperations.listClickwraps} disabled={!authenticated}>
                         List All Clickwraps
                       </Button>
                     </div>
@@ -1686,7 +1574,7 @@ export const PlaygroundView = () => {
                       <Input
                         placeholder="Clickwrap ID"
                         value={clickwrapId}
-                        onChange={(e) => setClickwrapId(e.target.value)}
+                        onChange={e => setClickwrapId(e.target.value)}
                         className="mb-2"
                       />
                       <Button
@@ -1750,16 +1638,12 @@ export const PlaygroundView = () => {
                 {/* Navigator API Section */}
                 <div className="p-4 border rounded-lg space-y-4">
                   <h3 className="font-medium">Navigator API Operations</h3>
-                  
+
                   <div className="grid gap-4">
                     <div className="p-4 border rounded-lg">
                       <h4 className="font-medium mb-2">List Agreements</h4>
                       <div className="space-y-2">
-                        <Button
-                          variant="outline"
-                          onClick={() => testNavigatorAgreement()}
-                          disabled={!authenticated}
-                        >
+                        <Button variant="outline" onClick={() => testNavigatorAgreement()} disabled={!authenticated}>
                           List All Agreements
                         </Button>
                       </div>
@@ -1838,7 +1722,7 @@ export const PlaygroundView = () => {
                               </div>
                               <div>
                                 <p className="font-medium">Languages</p>
-                                <p className="text-sm">{testResult.details.rawData.languages?.join(', ') || 'N/A'}</p>
+                                <p className="text-sm">{testResult.details.rawData.languages?.join(", ") || "N/A"}</p>
                               </div>
                             </div>
 
@@ -1848,15 +1732,17 @@ export const PlaygroundView = () => {
                               <div className="grid grid-cols-2 gap-4">
                                 <div>
                                   <p className="font-medium text-sm">Source Name</p>
-                                  <p className="text-sm">{testResult.details.rawData.source_name || 'N/A'}</p>
+                                  <p className="text-sm">{testResult.details.rawData.source_name || "N/A"}</p>
                                 </div>
                                 <div>
                                   <p className="font-medium text-sm">Source ID</p>
-                                  <p className="text-sm font-mono">{testResult.details.rawData.source_id || 'N/A'}</p>
+                                  <p className="text-sm font-mono">{testResult.details.rawData.source_id || "N/A"}</p>
                                 </div>
                                 <div>
                                   <p className="font-medium text-sm">Source Account ID</p>
-                                  <p className="text-sm font-mono">{testResult.details.rawData.source_account_id || 'N/A'}</p>
+                                  <p className="text-sm font-mono">
+                                    {testResult.details.rawData.source_account_id || "N/A"}
+                                  </p>
                                 </div>
                               </div>
                             </div>
@@ -1884,9 +1770,14 @@ export const PlaygroundView = () => {
                                   {Object.entries(testResult.details.rawData.provisions).map(([key, value]) => (
                                     <div key={key} className="mb-2 last:mb-0">
                                       <p className="text-sm">
-                                        <span className="font-medium">{key.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}:</span>
-                                        {' '}
-                                        {typeof value === 'boolean' ? (value ? 'Yes' : 'No') : value}
+                                        <span className="font-medium">
+                                          {key
+                                            .split("_")
+                                            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                                            .join(" ")}
+                                          :
+                                        </span>{" "}
+                                        {typeof value === "boolean" ? (value ? "Yes" : "No") : value}
                                       </p>
                                     </div>
                                   ))}
@@ -1901,10 +1792,9 @@ export const PlaygroundView = () => {
                                 <div>
                                   <p className="font-medium text-sm">Created At</p>
                                   <p className="text-sm">
-                                    {testResult.details.rawData.metadata?.created_at 
+                                    {testResult.details.rawData.metadata?.created_at
                                       ? new Date(testResult.details.rawData.metadata.created_at).toLocaleString()
-                                      : 'N/A'
-                                    }
+                                      : "N/A"}
                                   </p>
                                 </div>
                                 <div>
@@ -1912,8 +1802,7 @@ export const PlaygroundView = () => {
                                   <p className="text-sm">
                                     {testResult.details.rawData.metadata?.modified_at
                                       ? new Date(testResult.details.rawData.metadata.modified_at).toLocaleString()
-                                      : 'N/A'
-                                    }
+                                      : "N/A"}
                                   </p>
                                 </div>
                               </div>
@@ -1946,7 +1835,7 @@ export const PlaygroundView = () => {
                 <div className="p-4 border rounded-lg">
                   <h3 className="font-medium mb-4">Status</h3>
                   <pre className="text-sm whitespace-pre-wrap bg-muted p-4 rounded-lg">
-                    {status || 'No status to display'}
+                    {status || "No status to display"}
                   </pre>
                 </div>
               </div>
@@ -1960,15 +1849,9 @@ export const PlaygroundView = () => {
           <DialogHeader>
             <DialogTitle>DocuSign Signing</DialogTitle>
           </DialogHeader>
-          {signingUrl && (
-            <iframe 
-              src={signingUrl}
-              className="w-full h-full border-0"
-              title="DocuSign Signing"
-            />
-          )}
+          {signingUrl && <iframe src={signingUrl} className="w-full h-full border-0" title="DocuSign Signing" />}
         </DialogContent>
       </Dialog>
     </>
   );
-}; 
+};

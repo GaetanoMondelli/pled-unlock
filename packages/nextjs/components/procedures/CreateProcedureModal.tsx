@@ -1,32 +1,32 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog"
-import { Button } from "../ui/button"
-import { Card } from "../ui/card"
-import { Input } from "../ui/input"
-import { Label } from "../ui/label"
-import { ScrollArea } from "../ui/scroll-area"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "../ui/tabs"
-import { D3Graph } from '../ui/d3-graph'
-import { fetchFromDb, updateDb } from "../../utils/api"
-import { 
-  ArrowRight, 
-  Zap, 
-  MessageSquare, 
-  Settings, 
+import { useEffect, useState } from "react";
+import { fetchFromDb, updateDb } from "../../utils/api";
+import { Button } from "../ui/button";
+import { Card } from "../ui/card";
+import { D3Graph } from "../ui/d3-graph";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
+import { Input } from "../ui/input";
+import { Label } from "../ui/label";
+import { ScrollArea } from "../ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
+import {
   AlertCircle,
-  CheckCircle2,
+  ArrowRight,
   ArrowRightLeft,
-  FileText,
+  CheckCircle2,
+  ChevronLeft,
   ChevronRight,
-  ChevronLeft
+  FileText,
+  MessageSquare,
+  Settings,
+  Zap,
 } from "lucide-react";
 
 interface CreateProcedureModalProps {
-  open: boolean
-  onClose: () => void
-  onSave: (data: any) => Promise<void>
+  open: boolean;
+  onClose: () => void;
+  onSave: (data: any) => Promise<void>;
 }
 
 interface FSMNode {
@@ -60,28 +60,28 @@ interface NestedVariables {
 // Add this helper function at the top of the component
 const countRules = (template: any) => {
   if (!template.messageRules) return 0;
-  return Array.isArray(template.messageRules) 
-    ? template.messageRules.length 
+  return Array.isArray(template.messageRules)
+    ? template.messageRules.length
     : Object.keys(template.messageRules).length;
 };
 
 // Add this helper function at the top of the component
 const formatRuleValue = (value: any): string => {
-  if (typeof value === 'object' && value !== null) {
+  if (typeof value === "object" && value !== null) {
     if (value.type && value.template) {
       return `${value.type} (${Object.keys(value.template).length} fields)`;
     }
     return JSON.stringify(value);
   }
-  return String(value || '');
+  return String(value || "");
 };
 
 // Add this helper function
 const formatActionValue = (action: any): string => {
-  if (typeof action === 'object' && action !== null) {
+  if (typeof action === "object" && action !== null) {
     return JSON.stringify(action);
   }
-  return String(action || '');
+  return String(action || "");
 };
 
 // Add this type for better type safety
@@ -97,22 +97,22 @@ interface ProcedureInstance {
 }
 
 export const CreateProcedureModal = ({ open, onClose, onSave }: CreateProcedureModalProps) => {
-  const [templates, setTemplates] = useState<any[]>([])
-  const [selectedTemplate, setSelectedTemplate] = useState<any>(null)
-  const [variables, setVariables] = useState<Record<string, any>>({})
-  const [activeTab, setActiveTab] = useState('template')
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
+  const [variables, setVariables] = useState<Record<string, any>>({});
+  const [activeTab, setActiveTab] = useState("template");
 
   // Add validation state
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [step, setStep] = useState(1);
-  
+
   const steps = [
     { number: 1, title: "Select Template" },
     { number: 2, title: "Configure Variables" },
     { number: 3, title: "Rules & Actions" },
-    { number: 4, title: "Review" }
+    { number: 4, title: "Review" },
   ];
 
   const nextStep = () => {
@@ -134,13 +134,13 @@ export const CreateProcedureModal = ({ open, onClose, onSave }: CreateProcedureM
   // Load available templates
   useEffect(() => {
     const loadTemplates = async () => {
-      const data = await fetchFromDb()
-      setTemplates(data.procedureTemplates || [])
-    }
+      const data = await fetchFromDb();
+      setTemplates(data.procedureTemplates || []);
+    };
     if (open) {
-      loadTemplates()
+      loadTemplates();
     }
-  }, [open])
+  }, [open]);
 
   // Update variables when template changes
   useEffect(() => {
@@ -150,19 +150,19 @@ export const CreateProcedureModal = ({ open, onClose, onSave }: CreateProcedureM
       Object.entries(selectedTemplate.variables).forEach(([groupKey, groupConfig]: [string, any]) => {
         defaultVars[groupKey] = {};
         Object.entries(groupConfig).forEach(([fieldKey, fieldConfig]: [string, any]) => {
-          defaultVars[groupKey][fieldKey] = fieldConfig.default || '';
+          defaultVars[groupKey][fieldKey] = fieldConfig.default || "";
         });
       });
       setVariables(defaultVars);
     }
-  }, [selectedTemplate])
+  }, [selectedTemplate]);
 
   // Convert FSM definition to nodes and links
-  const getFSMNodesAndLinks = (fsl: string): { nodes: FSMNode[], links: FSMTransition[] } => {
+  const getFSMNodesAndLinks = (fsl: string): { nodes: FSMNode[]; links: FSMTransition[] } => {
     const nodes = new Set<string>();
     const links: FSMTransition[] = [];
 
-    fsl.split(';').forEach(line => {
+    fsl.split(";").forEach(line => {
       line = line.trim();
       if (!line) return;
 
@@ -178,14 +178,14 @@ export const CreateProcedureModal = ({ open, onClose, onSave }: CreateProcedureM
     return {
       nodes: Array.from(nodes).map(id => ({
         id,
-        isInitial: id === 'idle',
+        isInitial: id === "idle",
         isFinal: !links.some(l => l.source === id),
         metadata: {
           actions: [],
-          description: ''
-        }
+          description: "",
+        },
       })),
-      links
+      links,
     };
   };
 
@@ -211,8 +211,8 @@ export const CreateProcedureModal = ({ open, onClose, onSave }: CreateProcedureM
       ...prev,
       [groupKey]: {
         ...prev[groupKey],
-        [fieldKey]: value
-      }
+        [fieldKey]: value,
+      },
     }));
 
     // Clear error if exists
@@ -228,7 +228,7 @@ export const CreateProcedureModal = ({ open, onClose, onSave }: CreateProcedureM
   const handleSave = async () => {
     setIsSubmitting(true);
     const validationErrors = validateVariables();
-    
+
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
       setIsSubmitting(false);
@@ -238,7 +238,7 @@ export const CreateProcedureModal = ({ open, onClose, onSave }: CreateProcedureM
     try {
       // Fetch current DB state
       const db = await fetchFromDb();
-      
+
       // Create new procedure instance
       const newInstance = {
         instanceId: `proc_${Date.now()}`,
@@ -246,34 +246,34 @@ export const CreateProcedureModal = ({ open, onClose, onSave }: CreateProcedureM
         variables: variables,
         currentState: {
           name: "idle",
-          enteredAt: new Date().toISOString()
+          enteredAt: new Date().toISOString(),
         },
         history: {
           events: [],
           messages: [],
-          completedActions: []
+          completedActions: [],
         },
-        startDate: new Date().toISOString()
+        startDate: new Date().toISOString(),
       };
 
       // Add to procedure instances
       const updatedDb = {
         ...db,
-        procedureInstances: [...(db.procedureInstances || []), newInstance]
+        procedureInstances: [...(db.procedureInstances || []), newInstance],
       };
 
       // Update DB
       await updateDb(updatedDb);
-      
+
       // Call the onSave callback with the created procedure
       await onSave(newInstance);
-      
+
       // Close the modal
       onClose();
     } catch (error: any) {
-      console.error('Error creating procedure:', error);
+      console.error("Error creating procedure:", error);
       setErrors({
-        submit: error.message || 'Failed to create procedure. Please try again.'
+        submit: error.message || "Failed to create procedure. Please try again.",
       });
     } finally {
       setIsSubmitting(false);
@@ -287,26 +287,26 @@ export const CreateProcedureModal = ({ open, onClose, onSave }: CreateProcedureM
           <DialogTitle>Create New Procedure</DialogTitle>
           {/* Steps indicator */}
           <div className="flex justify-center items-center gap-4 mt-4">
-            {steps.map((s) => (
+            {steps.map(s => (
               <div key={s.number} className="flex items-center">
-                <div className={`flex items-center justify-center w-8 h-8 rounded-full 
-                  ${step === s.number 
-                    ? 'bg-primary text-primary-foreground' 
-                    : step > s.number 
-                      ? 'bg-primary/20 text-primary' 
-                      : 'bg-muted text-muted-foreground'
+                <div
+                  className={`flex items-center justify-center w-8 h-8 rounded-full 
+                  ${
+                    step === s.number
+                      ? "bg-primary text-primary-foreground"
+                      : step > s.number
+                        ? "bg-primary/20 text-primary"
+                        : "bg-muted text-muted-foreground"
                   }`}
                 >
                   {s.number}
                 </div>
-                <span className={`ml-2 text-sm ${
-                  step === s.number ? 'text-primary font-medium' : 'text-muted-foreground'
-                }`}>
+                <span
+                  className={`ml-2 text-sm ${step === s.number ? "text-primary font-medium" : "text-muted-foreground"}`}
+                >
                   {s.title}
                 </span>
-                {s.number < 4 && (
-                  <ChevronRight className="w-4 h-4 mx-4 text-muted-foreground" />
-                )}
+                {s.number < 4 && <ChevronRight className="w-4 h-4 mx-4 text-muted-foreground" />}
               </div>
             ))}
           </div>
@@ -324,33 +324,28 @@ export const CreateProcedureModal = ({ open, onClose, onSave }: CreateProcedureM
                     <ScrollArea className="h-[300px]">
                       <div className="space-y-4">
                         {templates.map(template => (
-                          <div 
+                          <div
                             key={template.templateId}
                             className={`group cursor-pointer p-4 rounded-lg border transition-colors
-                              ${selectedTemplate?.templateId === template.templateId 
-                                ? 'border-primary bg-primary/5 text-primary' 
-                                : 'border-border hover:bg-muted'
+                              ${
+                                selectedTemplate?.templateId === template.templateId
+                                  ? "border-primary bg-primary/5 text-primary"
+                                  : "border-border hover:bg-muted"
                               }`}
                             onClick={() => setSelectedTemplate(template)}
                           >
                             <div className="flex items-center justify-between mb-2">
-                              <h4 className="font-medium text-lg">
-                                {template.name || 'Unnamed Template'}
-                              </h4>
-                              <span className="text-xs bg-primary/10 px-2 py-1 rounded">
-                                {template.templateId}
-                              </span>
+                              <h4 className="font-medium text-lg">{template.name || "Unnamed Template"}</h4>
+                              <span className="text-xs bg-primary/10 px-2 py-1 rounded">{template.templateId}</span>
                             </div>
                             <p className="text-sm text-muted-foreground group-hover:text-foreground line-clamp-2">
-                              {template.description || 'No description available'}
+                              {template.description || "No description available"}
                             </p>
                             <div className="mt-3 flex gap-2 text-xs text-muted-foreground">
                               <span className="px-2 py-1 rounded-full bg-muted">
                                 {Object.keys(template.variables || {}).length} Variables
                               </span>
-                              <span className="px-2 py-1 rounded-full bg-muted">
-                                {countRules(template)} Rules
-                              </span>
+                              <span className="px-2 py-1 rounded-full bg-muted">{countRules(template)} Rules</span>
                               <span className="px-2 py-1 rounded-full bg-muted">
                                 {Object.keys(template.actions || {}).length} Actions
                               </span>
@@ -383,35 +378,34 @@ export const CreateProcedureModal = ({ open, onClose, onSave }: CreateProcedureM
             {/* Step 2: Variables Configuration */}
             {step === 2 && (
               <div className="space-y-6">
-                {selectedTemplate?.variables && Object.entries(selectedTemplate.variables).map(([groupKey, groupConfig]: [string, any]) => (
-                  <div key={groupKey} className="space-y-4 p-4 border rounded-lg">
-                    <h3 className="font-medium capitalize">{groupKey}</h3>
-                    <div className="space-y-4">
-                      {Object.entries(groupConfig).map(([fieldKey, fieldConfig]: [string, any]) => (
-                        <div key={`${groupKey}.${fieldKey}`} className="space-y-2">
-                          <Label className="flex items-center gap-2">
-                            {fieldKey}
-                            {fieldConfig.required && (
-                              <span className="text-red-500 text-sm">* Required</span>
+                {selectedTemplate?.variables &&
+                  Object.entries(selectedTemplate.variables).map(([groupKey, groupConfig]: [string, any]) => (
+                    <div key={groupKey} className="space-y-4 p-4 border rounded-lg">
+                      <h3 className="font-medium capitalize">{groupKey}</h3>
+                      <div className="space-y-4">
+                        {Object.entries(groupConfig).map(([fieldKey, fieldConfig]: [string, any]) => (
+                          <div key={`${groupKey}.${fieldKey}`} className="space-y-2">
+                            <Label className="flex items-center gap-2">
+                              {fieldKey}
+                              {fieldConfig.required && <span className="text-red-500 text-sm">* Required</span>}
+                            </Label>
+                            <Input
+                              value={variables[groupKey]?.[fieldKey] || ""}
+                              onChange={e => handleVariableChange(groupKey, fieldKey, e.target.value)}
+                              placeholder={fieldConfig.placeholder || `Enter ${fieldKey}`}
+                              className={errors[`${groupKey}.${fieldKey}`] ? "border-red-500" : ""}
+                            />
+                            {fieldConfig.description && (
+                              <p className="text-xs text-muted-foreground">{fieldConfig.description}</p>
                             )}
-                          </Label>
-                          <Input
-                            value={variables[groupKey]?.[fieldKey] || ''}
-                            onChange={e => handleVariableChange(groupKey, fieldKey, e.target.value)}
-                            placeholder={fieldConfig.placeholder || `Enter ${fieldKey}`}
-                            className={errors[`${groupKey}.${fieldKey}`] ? 'border-red-500' : ''}
-                          />
-                          {fieldConfig.description && (
-                            <p className="text-xs text-muted-foreground">{fieldConfig.description}</p>
-                          )}
-                          {errors[`${groupKey}.${fieldKey}`] && (
-                            <p className="text-xs text-red-500">{errors[`${groupKey}.${fieldKey}`]}</p>
-                          )}
-                        </div>
-                      ))}
+                            {errors[`${groupKey}.${fieldKey}`] && (
+                              <p className="text-xs text-red-500">{errors[`${groupKey}.${fieldKey}`]}</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
               </div>
             )}
 
@@ -518,14 +512,16 @@ export const CreateProcedureModal = ({ open, onClose, onSave }: CreateProcedureM
                             </td>
                             <td className="p-2">
                               <div className="space-y-2">
-                                {Array.isArray(actions) ? actions.map((action, idx) => (
-                                  <div key={idx} className="flex items-center gap-2 text-xs">
-                                    <Settings className="h-3 w-3 text-blue-500" />
-                                    <span className="font-mono bg-blue-50 text-blue-700 px-2 py-1 rounded-sm">
-                                      {formatActionValue(action)}
-                                    </span>
-                                  </div>
-                                )) : null}
+                                {Array.isArray(actions)
+                                  ? actions.map((action, idx) => (
+                                      <div key={idx} className="flex items-center gap-2 text-xs">
+                                        <Settings className="h-3 w-3 text-blue-500" />
+                                        <span className="font-mono bg-blue-50 text-blue-700 px-2 py-1 rounded-sm">
+                                          {formatActionValue(action)}
+                                        </span>
+                                      </div>
+                                    ))
+                                  : null}
                               </div>
                             </td>
                           </tr>
@@ -544,9 +540,7 @@ export const CreateProcedureModal = ({ open, onClose, onSave }: CreateProcedureM
                   <h3 className="text-lg font-medium mb-4">Selected Template</h3>
                   <div className="bg-muted/50 p-4 rounded-lg">
                     <h4 className="font-medium">{selectedTemplate?.name}</h4>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {selectedTemplate?.description}
-                    </p>
+                    <p className="text-sm text-muted-foreground mt-1">{selectedTemplate?.description}</p>
                   </div>
                 </div>
 
@@ -584,26 +578,22 @@ export const CreateProcedureModal = ({ open, onClose, onSave }: CreateProcedureM
             )}
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={onClose}>Cancel</Button>
+            <Button variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
             {step < 4 ? (
-              <Button 
-                onClick={nextStep}
-                disabled={step === 1 && !selectedTemplate}
-              >
+              <Button onClick={nextStep} disabled={step === 1 && !selectedTemplate}>
                 Next
                 <ChevronRight className="w-4 h-4 ml-2" />
               </Button>
             ) : (
-              <Button 
-                onClick={handleSave}
-                disabled={Object.keys(errors).length > 0 || isSubmitting}
-              >
-                {isSubmitting ? 'Creating...' : 'Create Procedure'}
+              <Button onClick={handleSave} disabled={Object.keys(errors).length > 0 || isSubmitting}>
+                {isSubmitting ? "Creating..." : "Create Procedure"}
               </Button>
             )}
           </div>
         </div>
       </DialogContent>
     </Dialog>
-  )
-} 
+  );
+};

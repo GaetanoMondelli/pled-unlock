@@ -3,32 +3,29 @@ import { NextRequest, NextResponse } from "next/server";
 export async function POST(req: NextRequest) {
   try {
     // Get auth headers
-    const accessToken = req.headers.get('authorization')?.replace('Bearer ', '');
-    const accountId = req.headers.get('account-id');
+    const accessToken = req.headers.get("authorization")?.replace("Bearer ", "");
+    const accountId = req.headers.get("account-id");
 
     if (!accessToken || !accountId) {
-      return NextResponse.json(
-        { error: 'Missing authentication headers' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Missing authentication headers" }, { status: 401 });
     }
 
     // Parse JSON body instead of FormData
     const body = await req.json();
-    console.log('Received request body:', {
+    console.log("Received request body:", {
       ...body,
       documents: body.documents?.map((doc: any) => ({
         ...doc,
-        documentBase64: '[BASE64_CONTENT]'
-      }))
+        documentBase64: "[BASE64_CONTENT]",
+      })),
     });
-    
+
     // First create the clickwrap
-    const createResponse = await fetch('https://demo.docusign.net/clickapi/v1/accounts/' + accountId + '/clickwraps', {
-      method: 'POST',
+    const createResponse = await fetch("https://demo.docusign.net/clickapi/v1/accounts/" + accountId + "/clickwraps", {
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
         clickwrapName: body.displaySettings.displayName,
@@ -46,42 +43,42 @@ export async function POST(req: NextRequest) {
           requireReacceptance: false,
           termsAndConditionsLabel: "Terms and Conditions",
           topLabel: "Please review the following terms and conditions",
-          bottomLabel: "Click 'I Agree' to continue"
+          bottomLabel: "Click 'I Agree' to continue",
         },
-        documents: body.documents.map(doc => ({
+        documents: body.documents.map((doc: any) => ({
           ...doc,
           documentName: doc.documentName || "Terms and Conditions",
           documentDisplay: "document",
-          order: 1
+          order: 1,
         })),
         requireReacceptance: false,
-        status: "draft"
-      })
+        status: "draft",
+      }),
     });
 
     const createResult = await createResponse.json();
-    console.log('Create clickwrap response:', createResult);
+    console.log("Create clickwrap response:", createResult);
 
     if (!createResponse.ok) {
-      console.error('DocuSign Click API error (create):', createResult);
-      throw new Error(createResult.message || 'Failed to create clickwrap');
+      console.error("DocuSign Click API error (create):", createResult);
+      throw new Error(createResult.message || "Failed to create clickwrap");
     }
 
     const clickwrapId = createResult.clickwrapId;
 
     // Then activate the clickwrap
     const activateResponse = await fetch(
-      `https://demo.docusign.net/clickapi/v1/accounts/${accountId}/clickwraps/${clickwrapId}/versions/1`, 
+      `https://demo.docusign.net/clickapi/v1/accounts/${accountId}/clickwraps/${clickwrapId}/versions/1`,
       {
-        method: 'PUT',
+        method: "PUT",
         headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          status: "active"
-        })
-      }
+          status: "active",
+        }),
+      },
     );
 
     // Don't try to parse response if it's empty
@@ -89,17 +86,14 @@ export async function POST(req: NextRequest) {
     const activateText = await activateResponse.text();
     try {
       activateResult = activateText ? JSON.parse(activateText) : {};
-      console.log('Activate clickwrap response:', activateResult);
+      console.log("Activate clickwrap response:", activateResult);
     } catch (e) {
-      console.log('Activate response (raw):', activateText);
+      console.log("Activate response (raw):", activateText);
     }
 
     if (!activateResponse.ok) {
-      console.error('DocuSign Click API error (activate):', activateResult || activateText);
-      throw new Error(
-        (activateResult && activateResult.message) || 
-        'Failed to activate clickwrap'
-      );
+      console.error("DocuSign Click API error (activate):", activateResult || activateText);
+      throw new Error((activateResult && activateResult.message) || "Failed to activate clickwrap");
     }
 
     // Get the final clickwrap status
@@ -107,83 +101,69 @@ export async function POST(req: NextRequest) {
       `https://demo.docusign.net/clickapi/v1/accounts/${accountId}/clickwraps/${clickwrapId}`,
       {
         headers: {
-          'Authorization': `Bearer ${accessToken}`
-        }
-      }
+          Authorization: `Bearer ${accessToken}`,
+        },
+      },
     );
 
     const statusResult = await statusResponse.json();
-    console.log('Final clickwrap status:', statusResult);
+    console.log("Final clickwrap status:", statusResult);
 
     return NextResponse.json({
       clickwrapId: clickwrapId,
-      status: statusResult.status || "active"
+      status: statusResult.status || "active",
     });
-
   } catch (error: any) {
-    console.error('Error creating/activating clickwrap:', error);
-    return NextResponse.json(
-      { error: error.message || 'Failed to create/activate clickwrap' },
-      { status: 500 }
-    );
+    console.error("Error creating/activating clickwrap:", error);
+    return NextResponse.json({ error: error.message || "Failed to create/activate clickwrap" }, { status: 500 });
   }
 }
 
 export async function GET(req: NextRequest) {
   try {
     // Get auth headers
-    const accessToken = req.headers.get('authorization')?.replace('Bearer ', '');
-    const accountId = req.headers.get('account-id');
+    const accessToken = req.headers.get("authorization")?.replace("Bearer ", "");
+    const accountId = req.headers.get("account-id");
 
     if (!accessToken || !accountId) {
-      return NextResponse.json(
-        { error: 'Missing authentication headers' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Missing authentication headers" }, { status: 401 });
     }
 
     // Get all clickwraps
-    const response = await fetch(
-      `https://demo.docusign.net/clickapi/v1/accounts/${accountId}/clickwraps`,
-      {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`
-        }
-      }
-    );
+    const response = await fetch(`https://demo.docusign.net/clickapi/v1/accounts/${accountId}/clickwraps`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
 
     // Get response text first
     const responseText = await response.text();
-    console.log('Raw response:', responseText);
+    console.log("Raw response:", responseText);
 
     if (!response.ok) {
       let error;
       try {
-        error = responseText ? JSON.parse(responseText) : { message: 'Unknown error' };
+        error = responseText ? JSON.parse(responseText) : { message: "Unknown error" };
       } catch (e) {
-        error = { message: responseText || 'Failed to parse error response' };
+        error = { message: responseText || "Failed to parse error response" };
       }
-      console.error('DocuSign Click API error:', error);
-      throw new Error(error.message || 'Failed to list clickwraps');
+      console.error("DocuSign Click API error:", error);
+      throw new Error(error.message || "Failed to list clickwraps");
     }
 
     let result;
     try {
       result = responseText ? JSON.parse(responseText) : { clickwraps: [] };
     } catch (e) {
-      console.error('Failed to parse response:', e);
-      throw new Error('Invalid response from DocuSign Click API');
+      console.error("Failed to parse response:", e);
+      throw new Error("Invalid response from DocuSign Click API");
     }
 
     return NextResponse.json({
-      clickwraps: result.clickwraps || []
+      clickwraps: result.clickwraps || [],
     });
-
   } catch (error: any) {
-    console.error('Error listing clickwraps:', error);
-    return NextResponse.json(
-      { error: error.message || 'Failed to list clickwraps' },
-      { status: 500 }
-    );
+    console.error("Error listing clickwraps:", error);
+    return NextResponse.json({ error: error.message || "Failed to list clickwraps" }, { status: 500 });
   }
-} 
+}

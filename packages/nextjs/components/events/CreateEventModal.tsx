@@ -1,24 +1,24 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "../ui/tabs";
-import { Card } from "../ui/card";
-import { Button } from "../ui/button";
-import { Input } from "../ui/input";
-import { Label } from "../ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
-import { Textarea } from "../ui/textarea";
-import { matchEventToRule } from "../../utils/eventMatching";
-import { ChevronDown, ChevronUp, ChevronRight } from "lucide-react";
-import { ScrollArea } from "../ui/scroll-area";
+import { useEffect, useState } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
 import { DocuSignService } from "../../lib/docusign-service";
-import { getProcedureData, fetchFromDb } from "~~/utils/api";
+import { matchEventToRule } from "../../utils/eventMatching";
 import { getNotMatchingReason } from "../../utils/message-rules";
 import { handleEventAndGenerateMessages } from "../../utils/stateAndMessageHandler";
-import { useSearchParams, usePathname } from 'next/navigation';
-import { useAccount, useSignMessage } from 'wagmi';
+import { Button } from "../ui/button";
+import { Card } from "../ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
+import { Input } from "../ui/input";
+import { Label } from "../ui/label";
+import { ScrollArea } from "../ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
+import { Textarea } from "../ui/textarea";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
+import { ChevronDown, ChevronRight, ChevronUp } from "lucide-react";
+import { useAccount, useSignMessage } from "wagmi";
+import { fetchFromDb, getProcedureData } from "~~/utils/api";
 
 interface CreateEventModalProps {
   open: boolean;
@@ -32,29 +32,31 @@ const EVENT_TEMPLATES = {
     to: "hr@company.com",
     subject: "Interview request",
     body: "I would like to schedule an interview",
-    time: new Date().toISOString()
+    time: new Date().toISOString(),
   },
   DOCUMENT_UPLOADED: {
     filename: "resume.pdf",
     type: "application/pdf",
-    url: "https://example.com/files/resume.pdf"
+    url: "https://example.com/files/resume.pdf",
   },
   DOCUSIGN_EVENT: {
     envelopeStatus: "sent",
     envelopeId: "ENV-123",
     recipientStatus: ["sent"],
-    recipients: [{
-      email: "john@example.com",
-      status: "sent",
-      sentAt: new Date().toISOString()
-    }]
+    recipients: [
+      {
+        email: "john@example.com",
+        status: "sent",
+        sentAt: new Date().toISOString(),
+      },
+    ],
   },
   HR_EVENT: {
     action: "approve_candidate",
     decision: "approved",
     candidateId: "CAND-123",
-    approver: "hr@company.com"
-  }
+    approver: "hr@company.com",
+  },
 };
 
 // Update type definitions for procedure data
@@ -69,19 +71,19 @@ interface ProcedureData {
 
 const fetchProcedureState = async (procedureId: string) => {
   try {
-    const data = await getProcedureData(procedureId) as ProcedureData;
-    
+    const data = (await getProcedureData(procedureId)) as ProcedureData;
+
     // Find the current state from the procedure data
-    const currentState = data.currentState || 'idle';
-    const fsmDefinition = data.template?.stateMachine?.fsl || '';
+    const currentState = data.currentState || "idle";
+    const fsmDefinition = data.template?.stateMachine?.fsl || "";
 
     return {
       currentState,
-      fsmDefinition
+      fsmDefinition,
     };
   } catch (error) {
-    console.error('Error fetching procedure state:', error);
-    throw new Error('Failed to fetch procedure state');
+    console.error("Error fetching procedure state:", error);
+    throw new Error("Failed to fetch procedure state");
   }
 };
 
@@ -91,17 +93,17 @@ type Envelope = {
   emailSubject: string;
   sentDateTime: string;
   status: string;
-}
+};
 
 export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProps) => {
   // Get procedureId from URL
   const pathname = usePathname();
-  const procedureId = pathname?.split('/').pop()?.split('?')[0]; // This will get 'proc_123' from the URL
+  const procedureId = pathname?.split("/").pop()?.split("?")[0]; // This will get 'proc_123' from the URL
 
   const [selectedEndpoint, setSelectedEndpoint] = useState<string>("");
   const [selectedAction, setSelectedAction] = useState<string>("");
   const [selectedEnvelope, setSelectedEnvelope] = useState<string>("");
-  
+
   // Raw event form state
   const [eventType, setEventType] = useState<string>("");
   const [eventData, setEventData] = useState<string>("");
@@ -171,9 +173,7 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
   };
 
   const toggleRuleExpand = (ruleId: string) => {
-    setExpandedRules(prev => 
-      prev.includes(ruleId) ? prev.filter(id => id !== ruleId) : [...prev, ruleId]
-    );
+    setExpandedRules(prev => (prev.includes(ruleId) ? prev.filter(id => id !== ruleId) : [...prev, ruleId]));
   };
 
   // Add useEffect to fetch rules when modal opens
@@ -186,31 +186,27 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
   // Update the fetchRules function
   const fetchRules = async () => {
     try {
-      console.log('Fetching rules for procedure:', procedureId);
+      console.log("Fetching rules for procedure:", procedureId);
       const data = await fetchFromDb();
-      
+
       // Find the instance and template
-      const instance = data.procedureInstances?.find(
-        (p: any) => p.instanceId === procedureId
-      );
-      const template = data.procedureTemplates?.find(
-        (t: any) => t.templateId === instance?.templateId
-      );
+      const instance = data.procedureInstances?.find((p: any) => p.instanceId === procedureId);
+      const template = data.procedureTemplates?.find((t: any) => t.templateId === instance?.templateId);
 
       if (!instance || !template) {
-        console.error('Instance or template not found:', { instance, template });
+        console.error("Instance or template not found:", { instance, template });
         return;
       }
 
-      console.log('Fetched rules:', {
+      console.log("Fetched rules:", {
         messageRules: template.messageRules,
-        variables: instance.variables
+        variables: instance.variables,
       });
 
       setTemplateRules(template.messageRules || []);
       setInstanceVariables(instance.variables || {});
     } catch (error) {
-      console.error('Error fetching rules:', error);
+      console.error("Error fetching rules:", error);
     }
   };
 
@@ -219,7 +215,7 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
     if (statusResult) {
       checkRuleMatching({
         type: "DOCUSIGN_EVENT",
-        data: statusResult
+        data: statusResult,
       });
     }
   }, [statusResult]);
@@ -228,7 +224,7 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
     if (navigatorResult) {
       checkRuleMatching({
         type: "DOCUSIGN_NAVIGATOR_GET_AGREEMENT",
-        data: navigatorResult
+        data: navigatorResult,
       });
     }
   }, [navigatorResult]);
@@ -237,7 +233,7 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
     if (clickwrapResult) {
       checkRuleMatching({
         type: "DOCUSIGN_CLICK_STATUS",
-        data: clickwrapResult
+        data: clickwrapResult,
       });
     }
   }, [clickwrapResult]);
@@ -249,14 +245,14 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
         data: {
           message: messageToSign,
           signature: signedMessage,
-          signer: address
-        }
+          signer: address,
+        },
       });
     }
   }, [signedMessage, messageToSign, address]);
 
   // Update checkRuleMatching to take type as parameter
-  const checkRuleMatching = async (event: { type: string, data: any }) => {
+  const checkRuleMatching = async (event: { type: string; data: any }) => {
     try {
       const matching = [];
       const nonMatching = [];
@@ -267,39 +263,40 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
             const matches = matchEventToRule(
               event,
               { type: rule.matches.type, conditions: rule.matches.conditions },
-              instanceVariables
+              instanceVariables,
             );
 
             if (matches) {
               matching.push(rule);
             } else {
               // Add detailed condition comparison with interpolated values
-              const conditionDetails = Object.entries(rule.matches.conditions || {}).map(([field, condition]: [string, any]) => {
-                const actualValue = field.split('.').reduce((obj, key) => obj?.[key], event.data);
-                const expectedTemplate = condition.toString();
-                const interpolated = expectedTemplate.replace(/\{\{([^}]+)\}\}/g, (match: string, path: string) => {
-                  return path.split('.')
-                    .reduce((obj: any, key: string) => obj?.[key], instanceVariables) || match;
-                });
+              const conditionDetails = Object.entries(rule.matches.conditions || {}).map(
+                ([field, condition]: [string, any]) => {
+                  const actualValue = field.split(".").reduce((obj, key) => obj?.[key], event.data);
+                  const expectedTemplate = condition.toString();
+                  const interpolated = expectedTemplate.replace(/\{\{([^}]+)\}\}/g, (match: string, path: string) => {
+                    return path.split(".").reduce((obj: any, key: string) => obj?.[key], instanceVariables) || match;
+                  });
 
-                const operatorMatch = interpolated.match(/^\((.*?)\)\s*(.*)/);
-                const operator = operatorMatch ? operatorMatch[1] : 'equals';
-                const expectedValue = operatorMatch ? operatorMatch[2] : interpolated;
+                  const operatorMatch = interpolated.match(/^\((.*?)\)\s*(.*)/);
+                  const operator = operatorMatch ? operatorMatch[1] : "equals";
+                  const expectedValue = operatorMatch ? operatorMatch[2] : interpolated;
 
-                return {
-                  field,
-                  operator,
-                  expected: expectedValue,
-                  actual: actualValue || 'undefined',
-                  template: condition.toString(),
-                  matches: false
-                };
-              });
+                  return {
+                    field,
+                    operator,
+                    expected: expectedValue,
+                    actual: actualValue || "undefined",
+                    template: condition.toString(),
+                    matches: false,
+                  };
+                },
+              );
 
               nonMatching.push({
                 rule,
                 reason: "Conditions do not match",
-                details: conditionDetails
+                details: conditionDetails,
               });
             }
           } catch (error) {
@@ -307,21 +304,23 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
             nonMatching.push({
               rule,
               reason: "Error matching rule",
-              details: []
+              details: [],
             });
           }
         } else {
           nonMatching.push({
             rule,
             reason: `Wrong type: expected ${rule.matches.type}`,
-            details: [{
-              field: 'type',
-              operator: 'equals',
-              expected: rule.matches.type,
-              actual: event.type,
-              template: rule.matches.type,
-              matches: false
-            }]
+            details: [
+              {
+                field: "type",
+                operator: "equals",
+                expected: rule.matches.type,
+                actual: event.type,
+                template: rule.matches.type,
+                matches: false,
+              },
+            ],
           });
         }
       }
@@ -341,7 +340,7 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
       const parsedData = JSON.parse(eventData);
       checkRuleMatching({
         type: eventType,
-        data: parsedData
+        data: parsedData,
       });
     } catch (error) {
       console.error("Invalid JSON:", error);
@@ -353,7 +352,7 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
   const handleRawEventSubmit = async () => {
     try {
       const parsedData = JSON.parse(eventData);
-      
+
       // Create event template
       const eventTemplate = {
         id: `email_received_${Date.now()}`,
@@ -362,8 +361,8 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
         type: eventType,
         template: {
           source: "manual",
-          data: parsedData
-        }
+          data: parsedData,
+        },
       };
 
       // Let parent handle the API call
@@ -386,45 +385,45 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
 
   // Update handleTabChange to handle separate auth flows correctly
   const handleTabChange = async (tab: string) => {
-    if (tab === 'docusign') {
+    if (tab === "docusign") {
       setIsAuthenticating(true);
       try {
         // Try to use stored auth first
-        const storedAuth = localStorage.getItem('navigatorAuth');
+        const storedAuth = localStorage.getItem("navigatorAuth");
         if (storedAuth) {
           const authData = JSON.parse(storedAuth);
-          console.log('Using stored auth:', {
+          console.log("Using stored auth:", {
             baseUrl: authData.baseUrl,
             accountId: authData.accountId,
-            tokenStart: authData.accessToken.substring(0, 20) + '...'
+            tokenStart: authData.accessToken.substring(0, 20) + "...",
           });
 
           // Test the stored auth
-          let authResponse = await fetch('/api/docusign/navigator/proxy', {
-            method: 'POST',
+          let authResponse = await fetch("/api/docusign/navigator/proxy", {
+            method: "POST",
             headers: {
-              'Content-Type': 'application/json'
+              "Content-Type": "application/json",
             },
             body: JSON.stringify({
               url: `${authData.baseUrl}/accounts/${authData.accountId}/agreements`,
-              token: authData.accessToken
-            })
+              token: authData.accessToken,
+            }),
           });
 
           const data = await authResponse.json();
 
           // If we need new consent, clear stored auth and redirect
           if (authResponse.status === 401 && data.needsConsent) {
-            console.log('Need new consent, clearing stored auth...');
-            localStorage.removeItem('navigatorAuth');
-            localStorage.removeItem('navigatorConsent');
-            
+            console.log("Need new consent, clearing stored auth...");
+            localStorage.removeItem("navigatorAuth");
+            localStorage.removeItem("navigatorConsent");
+
             // Redirect to get fresh auth
-            authResponse = await fetch('/api/docusign/navigator?useMock=false', {
-              method: 'POST'
+            authResponse = await fetch("/api/docusign/navigator?useMock=false", {
+              method: "POST",
             });
             const freshData = await authResponse.json();
-            
+
             if (freshData.consentUrl) {
               window.location.href = freshData.consentUrl;
               return;
@@ -441,18 +440,17 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
         }
 
         // No stored auth or invalid auth, get fresh auth
-        const response = await fetch('/api/docusign/navigator?useMock=false', {
-          method: 'POST'
+        const response = await fetch("/api/docusign/navigator?useMock=false", {
+          method: "POST",
         });
         const data = await response.json();
-        
+
         if (data.consentUrl) {
           window.location.href = data.consentUrl;
           return;
         }
-
       } catch (error) {
-        console.error('Authentication failed:', error);
+        console.error("Authentication failed:", error);
       } finally {
         setIsAuthenticating(false);
       }
@@ -461,34 +459,36 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
 
   // Update fetchEnvelopes to use the correct endpoint
   const fetchEnvelopes = async () => {
-    const storedAuth = localStorage.getItem('navigatorAuth');
+    const storedAuth = localStorage.getItem("navigatorAuth");
     if (!storedAuth) return;
-    
+
     setIsLoadingEnvelopes(true);
     try {
       const authData = JSON.parse(storedAuth);
-      const response = await fetch('/api/docusign/envelopes', {
+      const response = await fetch("/api/docusign/envelopes", {
         headers: {
-          'Authorization': `Bearer ${authData.accessToken}`,
-          'Account-Id': authData.accountId
-        }
+          Authorization: `Bearer ${authData.accessToken}`,
+          "Account-Id": authData.accountId,
+        },
       });
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Failed to fetch envelopes');
+        throw new Error(error.error || "Failed to fetch envelopes");
       }
 
       const data = await response.json();
-      console.log('Envelopes response:', data);
-      setEnvelopes(data.envelopes.map((env: any) => ({
-        envelopeId: env.envelopeId,
-        emailSubject: env.emailSubject,
-        sentDateTime: env.sentDateTime,
-        status: env.status
-      })));
+      console.log("Envelopes response:", data);
+      setEnvelopes(
+        data.envelopes.map((env: any) => ({
+          envelopeId: env.envelopeId,
+          emailSubject: env.emailSubject,
+          sentDateTime: env.sentDateTime,
+          status: env.status,
+        })),
+      );
     } catch (error) {
-      console.error('Error fetching envelopes:', error);
+      console.error("Error fetching envelopes:", error);
     } finally {
       setIsLoadingEnvelopes(false);
     }
@@ -496,7 +496,7 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
 
   // Update handleDocusignAction for envelopes to use specific endpoint
   const handleDocusignAction = async () => {
-    const storedAuth = localStorage.getItem('navigatorAuth');
+    const storedAuth = localStorage.getItem("navigatorAuth");
     if (!selectedEnvelope || !storedAuth) return;
 
     setIsCheckingStatus(true);
@@ -504,19 +504,19 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
       const authData = JSON.parse(storedAuth);
       const response = await fetch(`/api/docusign/envelopes/${selectedEnvelope}`, {
         headers: {
-          'Authorization': `Bearer ${authData.accessToken}`,
-          'Account-Id': authData.accountId
-        }
+          Authorization: `Bearer ${authData.accessToken}`,
+          "Account-Id": authData.accountId,
+        },
       });
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Failed to get envelope status');
+        throw new Error(error.error || "Failed to get envelope status");
       }
       const data = await response.json();
       setStatusResult(data);
     } catch (error) {
-      console.error('Error checking envelope status:', error);
+      console.error("Error checking envelope status:", error);
     } finally {
       setIsCheckingStatus(false);
     }
@@ -524,7 +524,7 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
 
   const addAsVerifiedEvent = async () => {
     if (!statusResult || !procedureId) return;
-    
+
     try {
       const eventData = {
         type: "DOCUSIGN_STATUS",
@@ -532,27 +532,25 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
         description: "DocuSign envelope status check",
         template: {
           source: "manual",
-          data: statusResult
-        }
+          data: statusResult,
+        },
       };
 
       await onSave(eventData);
       onClose();
     } catch (error) {
-      console.error('Error adding event:', error);
+      console.error("Error adding event:", error);
     }
   };
 
   // Add state handler for expanded rule debug
   const toggleRuleDebug = (ruleId: string) => {
-    setExpandedRuleDebug(prev => 
-      prev.includes(ruleId) ? prev.filter(id => id !== ruleId) : [...prev, ruleId]
-    );
+    setExpandedRuleDebug(prev => (prev.includes(ruleId) ? prev.filter(id => id !== ruleId) : [...prev, ruleId]));
   };
 
   // Update handleNavigatorAction for agreements to use specific endpoint
   const handleNavigatorAction = async (agreementId: string) => {
-    const storedAuth = localStorage.getItem('navigatorAuth');
+    const storedAuth = localStorage.getItem("navigatorAuth");
     if (!storedAuth) return;
 
     setIsLoadingAgreement(true);
@@ -560,27 +558,27 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
       const authData = JSON.parse(storedAuth);
       const endpoint = `${authData.baseUrl}/accounts/${authData.accountId}/agreements/${agreementId}`;
 
-      const response = await fetch('/api/docusign/navigator/proxy', {
-        method: 'POST',
+      const response = await fetch("/api/docusign/navigator/proxy", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json'
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           url: endpoint,
-          method: 'GET',
-          token: authData.accessToken
-        })
+          method: "GET",
+          token: authData.accessToken,
+        }),
       });
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Failed to get agreement details');
+        throw new Error(error.error || "Failed to get agreement details");
       }
 
       const data = await response.json();
       if (data.error) throw new Error(data.error);
 
-      console.log('Agreement response:', data);
+      console.log("Agreement response:", data);
       setNavigatorResult({
         id: data.id,
         name: data.name,
@@ -588,12 +586,12 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
         type: data.type,
         category: data.category,
         status: data.status,
-        created: data.created_date ? new Date(data.created_date).toLocaleString() : 'N/A',
-        modified: data.last_modified_date ? new Date(data.last_modified_date).toLocaleString() : 'N/A',
-        rawData: data
+        created: data.created_date ? new Date(data.created_date).toLocaleString() : "N/A",
+        modified: data.last_modified_date ? new Date(data.last_modified_date).toLocaleString() : "N/A",
+        rawData: data,
       });
     } catch (error) {
-      console.error('Error getting agreement details:', error);
+      console.error("Error getting agreement details:", error);
     } finally {
       setIsLoadingAgreement(false);
     }
@@ -601,37 +599,37 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
 
   // Update fetchNavigatorAgreements to match playground formatting
   const fetchNavigatorAgreements = async () => {
-    const storedAuth = localStorage.getItem('navigatorAuth');
+    const storedAuth = localStorage.getItem("navigatorAuth");
     if (!storedAuth) return;
-    
+
     setIsLoadingNavigator(true);
     try {
       const authData = JSON.parse(storedAuth);
-      const response = await fetch('/api/docusign/navigator/proxy', {
-        method: 'POST',
+      const response = await fetch("/api/docusign/navigator/proxy", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json'
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           url: `${authData.baseUrl}/accounts/${authData.accountId}/agreements`,
-          token: authData.accessToken
-        })
+          token: authData.accessToken,
+        }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to fetch Navigator agreements');
+        throw new Error("Failed to fetch Navigator agreements");
       }
 
       const responseData = await response.json();
-      console.log('Raw Navigator response:', responseData);
-      
+      console.log("Raw Navigator response:", responseData);
+
       // Use agreements from the top level instead of data
       const agreements = responseData.agreements || [];
-      console.log('Agreements to display:', agreements);
-      
+      console.log("Agreements to display:", agreements);
+
       setNavigatorAgreements(agreements);
     } catch (error) {
-      console.error('Error fetching Navigator agreements:', error);
+      console.error("Error fetching Navigator agreements:", error);
     } finally {
       setIsLoadingNavigator(false);
     }
@@ -639,36 +637,38 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
 
   // Update fetchClickwraps to use the correct endpoint
   const fetchClickwraps = async () => {
-    const storedAuth = localStorage.getItem('navigatorAuth');
+    const storedAuth = localStorage.getItem("navigatorAuth");
     if (!storedAuth) return;
-    
+
     setIsLoadingClickwraps(true);
     try {
       const authData = JSON.parse(storedAuth);
-      const response = await fetch('/api/docusign/click/clickwraps', {
+      const response = await fetch("/api/docusign/click/clickwraps", {
         headers: {
-          'Authorization': `Bearer ${authData.accessToken}`,
-          'Account-Id': authData.accountId
-        }
+          Authorization: `Bearer ${authData.accessToken}`,
+          "Account-Id": authData.accountId,
+        },
       });
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Failed to list clickwraps');
+        throw new Error(error.error || "Failed to list clickwraps");
       }
 
       const data = await response.json();
-      console.log('Clickwraps response:', data);
-      setClickwraps(data.clickwraps.map((cw: any) => ({
-        clickwrapId: cw.clickwrapId,
-        clickwrapName: cw.clickwrapName,
-        versionNumber: cw.versionNumber,
-        status: cw.status,
-        accountId: cw.accountId,
-        createdTime: cw.createdTime
-      })));
+      console.log("Clickwraps response:", data);
+      setClickwraps(
+        data.clickwraps.map((cw: any) => ({
+          clickwrapId: cw.clickwrapId,
+          clickwrapName: cw.clickwrapName,
+          versionNumber: cw.versionNumber,
+          status: cw.status,
+          accountId: cw.accountId,
+          createdTime: cw.createdTime,
+        })),
+      );
     } catch (error) {
-      console.error('Error fetching clickwraps:', error);
+      console.error("Error fetching clickwraps:", error);
     } finally {
       setIsLoadingClickwraps(false);
     }
@@ -676,27 +676,27 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
 
   // Update handleClickwrapAction for clickwraps to use specific endpoint
   const handleClickwrapAction = async () => {
-    const storedAuth = localStorage.getItem('navigatorAuth');
+    const storedAuth = localStorage.getItem("navigatorAuth");
     if (!selectedClickwrap || !storedAuth) return;
-    
+
     setIsLoadingClickwrapStatus(true);
     try {
       const authData = JSON.parse(storedAuth);
       const response = await fetch(`/api/docusign/click/clickwraps/${selectedClickwrap}`, {
         headers: {
-          'Authorization': `Bearer ${authData.accessToken}`,
-          'Account-Id': authData.accountId
-        }
+          Authorization: `Bearer ${authData.accessToken}`,
+          "Account-Id": authData.accountId,
+        },
       });
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Failed to get clickwrap status');
+        throw new Error(error.error || "Failed to get clickwrap status");
       }
       const data = await response.json();
       setClickwrapResult(data);
     } catch (error) {
-      console.error('Error getting clickwrap status:', error);
+      console.error("Error getting clickwrap status:", error);
     } finally {
       setIsLoadingClickwrapStatus(false);
     }
@@ -704,17 +704,17 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
 
   const addClickwrapResultAsEvent = async () => {
     if (!clickwrapResult) return;
-    
+
     try {
       const event = {
         id: `click_${Date.now()}`,
-        type: 'DOCUSIGN_CLICK_STATUS',
+        type: "DOCUSIGN_CLICK_STATUS",
         name: "DocuSign Click Status",
         description: "Clickwrap status from DocuSign Click API",
         template: {
           source: "docusign-click",
-          data: clickwrapResult
-        }
+          data: clickwrapResult,
+        },
       };
 
       // Let parent handle the API call
@@ -722,27 +722,27 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
       onClose();
       setClickwrapResult(null);
     } catch (error) {
-      console.error('Error adding Click result as event:', error);
+      console.error("Error adding Click result as event:", error);
     }
   };
 
   const addNavigatorResultAsEvent = async () => {
     if (!navigatorResult) return;
-    
+
     try {
       const event = {
         id: `evt_${Date.now()}`,
-        type: 'DOCUSIGN_NAVIGATOR_GET_AGREEMENT',
+        type: "DOCUSIGN_NAVIGATOR_GET_AGREEMENT",
         name: "DocuSign Navigator Agreement",
         description: "Agreement details from DocuSign Navigator",
         template: {
           source: "docusign-navigator",
           data: {
-            accountId: '{{docusign.accountId}}',
+            accountId: "{{docusign.accountId}}",
             agreementId: selectedNavigatorAgreement,
-            result: navigatorResult
-          }
-        }
+            result: navigatorResult,
+          },
+        },
       };
 
       // Let parent handle the API call
@@ -750,7 +750,7 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
       onClose();
       setNavigatorResult(null);
     } catch (error) {
-      console.error('Error adding Navigator result as event:', error);
+      console.error("Error adding Navigator result as event:", error);
     }
   };
 
@@ -761,18 +761,18 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
       const signature = await signMessageAsync({ message: messageToSign });
       setSignedMessage(signature);
     } catch (error) {
-      console.error('Error signing message:', error);
+      console.error("Error signing message:", error);
     }
   };
 
   // Add Web3 event creation handler
   const addSignedMessageAsEvent = async () => {
     if (!signedMessage || !messageToSign) return;
-    
+
     try {
       const event = {
         id: `web3_${Date.now()}`,
-        type: 'WEB3_SIGNED_MESSAGE',
+        type: "WEB3_SIGNED_MESSAGE",
         name: "Web3 Signed Message",
         description: "Message signed with Web3 wallet",
         template: {
@@ -780,9 +780,9 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
           data: {
             message: messageToSign,
             signature: signedMessage,
-            signer: address
-          }
-        }
+            signer: address,
+          },
+        },
       };
 
       await onSave(event);
@@ -790,7 +790,7 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
       setSignedMessage(null);
       setMessageToSign("");
     } catch (error) {
-      console.error('Error adding Web3 event:', error);
+      console.error("Error adding Web3 event:", error);
     }
   };
 
@@ -806,8 +806,7 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
 
   // Add type annotations for pattern replace callback
   const handlePatternReplace = (match: string, path: string): string => {
-    return path.split('.')
-      .reduce((obj: any, key: string) => obj?.[key], instanceVariables) ?? '(undefined)';
+    return path.split(".").reduce((obj: any, key: string) => obj?.[key], instanceVariables) ?? "(undefined)";
   };
 
   // Update the checkRulesAgainstData function to take a setter
@@ -818,8 +817,8 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
         data: data,
         template: {
           source: "manual",
-          data: data
-        }
+          data: data,
+        },
       };
       const matching = [];
       const nonMatching = [];
@@ -830,38 +829,39 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
             const matches = matchEventToRule(
               event,
               { type: rule.matches.type, conditions: rule.matches.conditions },
-              instanceVariables
+              instanceVariables,
             );
 
             if (matches) {
               matching.push(rule);
             } else {
-              const conditionDetails = Object.entries(rule.matches.conditions || {}).map(([field, condition]: [string, any]) => {
-                const actualValue = field.split('.').reduce((obj, key) => obj?.[key], data);
-                const expectedTemplate = condition.toString();
-                const interpolated = expectedTemplate.replace(/\{\{([^}]+)\}\}/g, (match: string, path: string) => {
-                  return path.split('.')
-                    .reduce((obj: any, key: string) => obj?.[key], instanceVariables) || match;
-                });
+              const conditionDetails = Object.entries(rule.matches.conditions || {}).map(
+                ([field, condition]: [string, any]) => {
+                  const actualValue = field.split(".").reduce((obj, key) => obj?.[key], data);
+                  const expectedTemplate = condition.toString();
+                  const interpolated = expectedTemplate.replace(/\{\{([^}]+)\}\}/g, (match: string, path: string) => {
+                    return path.split(".").reduce((obj: any, key: string) => obj?.[key], instanceVariables) || match;
+                  });
 
-                const operatorMatch = interpolated.match(/^\((.*?)\)\s*(.*)/);
-                const operator = operatorMatch ? operatorMatch[1] : 'equals';
-                const expectedValue = operatorMatch ? operatorMatch[2] : interpolated;
+                  const operatorMatch = interpolated.match(/^\((.*?)\)\s*(.*)/);
+                  const operator = operatorMatch ? operatorMatch[1] : "equals";
+                  const expectedValue = operatorMatch ? operatorMatch[2] : interpolated;
 
-                return {
-                  field,
-                  operator,
-                  expected: expectedValue,
-                  actual: actualValue || 'undefined',
-                  template: condition.toString(),
-                  matches: false
-                };
-              });
+                  return {
+                    field,
+                    operator,
+                    expected: expectedValue,
+                    actual: actualValue || "undefined",
+                    template: condition.toString(),
+                    matches: false,
+                  };
+                },
+              );
 
               nonMatching.push({
                 rule,
                 reason: "Conditions do not match",
-                details: conditionDetails
+                details: conditionDetails,
               });
             }
           } catch (error) {
@@ -869,21 +869,23 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
             nonMatching.push({
               rule,
               reason: "Error matching rule",
-              details: []
+              details: [],
             });
           }
         } else {
           nonMatching.push({
             rule,
             reason: `Wrong type: expected ${rule.matches.type}`,
-            details: [{
-              field: 'type',
-              operator: 'equals',
-              expected: rule.matches.type,
-              actual: eventType,
-              template: rule.matches.type,
-              matches: false
-            }]
+            details: [
+              {
+                field: "type",
+                operator: "equals",
+                expected: rule.matches.type,
+                actual: eventType,
+                template: rule.matches.type,
+                matches: false,
+              },
+            ],
           });
         }
       }
@@ -896,10 +898,10 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
   };
 
   // Add RuleMatchingDisplay component
-  const RuleMatchingDisplay = ({ data }: { data: { matching: any[], nonMatching: any[] } }) => (
+  const RuleMatchingDisplay = ({ data }: { data: { matching: any[]; nonMatching: any[] } }) => (
     <div className="mt-4 space-y-4 border-t pt-4">
       <h4 className="text-sm font-medium">Rule Matching Results</h4>
-      
+
       {data.matching.length > 0 && (
         <div className="space-y-2">
           <h5 className="text-sm font-medium text-green-600">Matching Rules:</h5>
@@ -918,11 +920,8 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
           <h5 className="text-sm font-medium text-yellow-600">Non-Matching Rules:</h5>
           <div className="space-y-1">
             {data.nonMatching.map(({ rule, reason, details }) => (
-              <div 
-                key={rule.id} 
-                className="text-xs bg-yellow-50 text-yellow-700 rounded overflow-hidden"
-              >
-                <div 
+              <div key={rule.id} className="text-xs bg-yellow-50 text-yellow-700 rounded overflow-hidden">
+                <div
                   className="p-2 flex items-center justify-between cursor-pointer hover:bg-yellow-100"
                   onClick={() => toggleRuleExpand(rule.id)}
                 >
@@ -936,7 +935,7 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                     <ChevronDown className="h-4 w-4" />
                   )}
                 </div>
-                
+
                 {expandedRules.includes(rule.id) && details.length > 0 && (
                   <div className="border-t border-yellow-200 bg-yellow-50/50 p-2">
                     <table className="w-full text-left">
@@ -984,23 +983,23 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
   // Update the checkClickwrapUsers function to use the existing endpoint
   const checkClickwrapUsers = async () => {
     try {
-      const storedAuth = localStorage.getItem('navigatorAuth');
+      const storedAuth = localStorage.getItem("navigatorAuth");
       if (!storedAuth) return;
       const authData = JSON.parse(storedAuth);
 
       const response = await fetch(`/api/docusign/click/clickwraps/${selectedClickwrap}/agreements`, {
-        method: 'POST',  // Using POST to get users list as per the existing endpoint
+        method: "POST", // Using POST to get users list as per the existing endpoint
         headers: {
-          'Authorization': `Bearer ${authData.accessToken}`,
-          'Account-Id': authData.accountId
-        }
+          Authorization: `Bearer ${authData.accessToken}`,
+          "Account-Id": authData.accountId,
+        },
       });
 
-      if (!response.ok) throw new Error('Failed to get users');
+      if (!response.ok) throw new Error("Failed to get users");
       const data = await response.json();
       setClickwrapUsers(data);
     } catch (error) {
-      console.error('Error checking users:', error);
+      console.error("Error checking users:", error);
     }
   };
 
@@ -1013,14 +1012,14 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
         description: "DocuSign clickwrap users consent check",
         template: {
           source: "manual",
-          data: clickwrapUsers
-        }
+          data: clickwrapUsers,
+        },
       };
 
       await onSave(eventData);
       onClose();
     } catch (error) {
-      console.error('Error adding event:', error);
+      console.error("Error adding event:", error);
     }
   };
 
@@ -1062,7 +1061,7 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                   <Label>Event Data (JSON)</Label>
                   <Textarea
                     value={eventData}
-                    onChange={(e) => setEventData(e.target.value)}
+                    onChange={e => setEventData(e.target.value)}
                     className="font-mono"
                     rows={10}
                   />
@@ -1087,11 +1086,8 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                     <h4 className="text-sm font-medium text-yellow-600">Non-Matching Rules:</h4>
                     <div className="space-y-1">
                       {nonMatchingRules.map(({ rule, reason, details }) => (
-                        <div 
-                          key={rule.id} 
-                          className="text-xs bg-yellow-50 text-yellow-700 rounded overflow-hidden"
-                        >
-                          <div 
+                        <div key={rule.id} className="text-xs bg-yellow-50 text-yellow-700 rounded overflow-hidden">
+                          <div
                             className="p-2 flex items-center justify-between cursor-pointer hover:bg-yellow-100"
                             onClick={() => toggleRuleExpand(rule.id)}
                           >
@@ -1105,7 +1101,7 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                               <ChevronDown className="h-4 w-4" />
                             )}
                           </div>
-                          
+
                           {expandedRules.includes(rule.id) && details.length > 0 && (
                             <div className="border-t border-yellow-200 bg-yellow-50/50 p-2">
                               <table className="w-full text-left">
@@ -1138,9 +1134,7 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                   </div>
                 )}
 
-                <Button onClick={handleRawEventSubmit}>
-                  Create Event
-                </Button>
+                <Button onClick={handleRawEventSubmit}>Create Event</Button>
               </div>
             </Card>
           </TabsContent>
@@ -1158,15 +1152,13 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                     <SelectItem value="check_status">Check Status</SelectItem>
                   </SelectContent>
                 </Select>
-                
+
                 <div className="space-y-2">
                   <Label>Parameters</Label>
                   {/* Dynamic parameter inputs based on selected endpoint */}
                 </div>
 
-                <Button onClick={handleApiExecution}>
-                  Execute
-                </Button>
+                <Button onClick={handleApiExecution}>Execute</Button>
               </div>
             </Card>
           </TabsContent>
@@ -1177,12 +1169,9 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
               <div className="space-y-4">
                 <div>
                   <Label>Search Filter</Label>
-                  <Input 
-                    placeholder="from:example@gmail.com subject:interview"
-                    className="w-full"
-                  />
+                  <Input placeholder="from:example@gmail.com subject:interview" className="w-full" />
                 </div>
-                
+
                 <div>
                   <Label>Time Range</Label>
                   <div className="grid grid-cols-2 gap-2">
@@ -1191,9 +1180,7 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                   </div>
                 </div>
 
-                <Button onClick={handleGmailImport}>
-                  Import Emails
-                </Button>
+                <Button onClick={handleGmailImport}>Import Emails</Button>
               </div>
             </Card>
           </TabsContent>
@@ -1205,12 +1192,10 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                 <div className="text-center py-4">
                   <p className="text-sm text-muted-foreground">Authenticating with DocuSign...</p>
                 </div>
-              ) : !localStorage.getItem('navigatorAuth') ? (
+              ) : !localStorage.getItem("navigatorAuth") ? (
                 <div className="text-center py-4">
                   <p className="text-sm text-muted-foreground mb-2">Not authenticated with DocuSign</p>
-                  <Button onClick={() => handleTabChange('docusign')}>
-                    Authenticate
-                  </Button>
+                  <Button onClick={() => handleTabChange("docusign")}>Authenticate</Button>
                 </div>
               ) : (
                 <div className="space-y-6">
@@ -1221,19 +1206,11 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
                           <Label>Select Envelope</Label>
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={fetchEnvelopes}
-                            disabled={isLoadingEnvelopes}
-                          >
+                          <Button variant="ghost" size="sm" onClick={fetchEnvelopes} disabled={isLoadingEnvelopes}>
                             Refresh
                           </Button>
                         </div>
-                        <Select
-                          value={selectedEnvelope}
-                          onValueChange={setSelectedEnvelope}
-                        >
+                        <Select value={selectedEnvelope} onValueChange={setSelectedEnvelope}>
                           <SelectTrigger className="w-full">
                             <SelectValue placeholder="Select envelope" />
                           </SelectTrigger>
@@ -1241,16 +1218,16 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                             {envelopes
                               .sort((a, b) => {
                                 // Handle undefined sentDateTime with empty string fallback
-                                const dateA = a.sentDateTime || '';
-                                const dateB = b.sentDateTime || '';
+                                const dateA = a.sentDateTime || "";
+                                const dateB = b.sentDateTime || "";
                                 return dateB.localeCompare(dateA);
                               })
-                              .map((envelope) => (
+                              .map(envelope => (
                                 <SelectItem key={envelope.envelopeId} value={envelope.envelopeId}>
                                   <div className="flex flex-col">
                                     <span>{envelope.envelopeId}</span>
                                     <span className="text-xs text-muted-foreground">
-                                      {envelope.sentDateTime || 'No date'}
+                                      {envelope.sentDateTime || "No date"}
                                     </span>
                                   </div>
                                 </SelectItem>
@@ -1258,7 +1235,7 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                           </SelectContent>
                         </Select>
 
-                        <Button 
+                        <Button
                           onClick={handleDocusignAction}
                           disabled={!selectedEnvelope || isCheckingStatus}
                           className="w-full"
@@ -1272,10 +1249,12 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                           <div className="flex items-center justify-between">
                             <h4 className="text-sm font-medium">Envelope Status</h4>
                             <div className="space-x-2">
-                              <Button 
+                              <Button
                                 size="sm"
-                                variant="outline" 
-                                onClick={() => checkRulesAgainstData(statusResult, "DOCUSIGN_STATUS", setEnvelopeRuleCheckData)}
+                                variant="outline"
+                                onClick={() =>
+                                  checkRulesAgainstData(statusResult, "DOCUSIGN_STATUS", setEnvelopeRuleCheckData)
+                                }
                               >
                                 Check Rules
                               </Button>
@@ -1289,7 +1268,7 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                           <div className="flex items-center">
                             <span className="text-xs font-medium mr-2">Source:</span>
                             <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-800">
-                              {selectedEndpoint === 'docusign' ? 'docusign' : 'manual'}
+                              {selectedEndpoint === "docusign" ? "docusign" : "manual"}
                             </span>
                           </div>
 
@@ -1320,8 +1299,8 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
                           <Label>Select Agreement</Label>
-                          <Button 
-                            variant="ghost" 
+                          <Button
+                            variant="ghost"
                             size="sm"
                             onClick={fetchNavigatorAgreements}
                             disabled={isLoadingNavigator}
@@ -1329,8 +1308,8 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                             Refresh
                           </Button>
                         </div>
-                        <Select 
-                          value={selectedNavigatorAgreement} 
+                        <Select
+                          value={selectedNavigatorAgreement}
                           onValueChange={setSelectedNavigatorAgreement}
                           disabled={isLoadingNavigator}
                         >
@@ -1339,23 +1318,21 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                           </SelectTrigger>
                           <SelectContent>
                             <ScrollArea className="h-[200px]">
-                              {navigatorAgreements.map((agreement) => (
-                                <SelectItem 
-                                  key={agreement.id} 
+                              {navigatorAgreements.map(agreement => (
+                                <SelectItem
+                                  key={agreement.id}
                                   value={agreement.id}
                                   className="flex flex-col py-2 cursor-pointer"
                                 >
                                   <span className="font-medium">{agreement.fileName}</span>
-                                  <span className="text-xs text-muted-foreground">
-                                    Status: {agreement.status}
-                                  </span>
+                                  <span className="text-xs text-muted-foreground">Status: {agreement.status}</span>
                                 </SelectItem>
                               ))}
                             </ScrollArea>
                           </SelectContent>
                         </Select>
 
-                        <Button 
+                        <Button
                           onClick={() => handleNavigatorAction(selectedNavigatorAgreement)}
                           disabled={!selectedNavigatorAgreement || isLoadingAgreement}
                           className="w-full mt-2"
@@ -1368,20 +1345,26 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                             <div className="flex items-center justify-between">
                               <h4 className="text-sm font-medium">Agreement Details</h4>
                               <div className="space-x-2">
-                                <Button 
+                                <Button
                                   size="sm"
-                                  variant="outline" 
-                                  onClick={() => checkRulesAgainstData(navigatorResult, "DOCUSIGN_NAVIGATOR_GET_AGREEMENT", setNavigatorRuleCheckData)}
+                                  variant="outline"
+                                  onClick={() =>
+                                    checkRulesAgainstData(
+                                      navigatorResult,
+                                      "DOCUSIGN_NAVIGATOR_GET_AGREEMENT",
+                                      setNavigatorRuleCheckData,
+                                    )
+                                  }
                                 >
                                   Check Rules
                                 </Button>
-                                <Button 
-                                  size="sm" 
+                                <Button
+                                  size="sm"
                                   onClick={async () => {
                                     try {
                                       await addNavigatorResultAsEvent();
                                     } catch (error) {
-                                      console.error('Error adding event:', error);
+                                      console.error("Error adding event:", error);
                                     }
                                   }}
                                 >
@@ -1413,12 +1396,7 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
                             <Label>Select Clickwrap</Label>
-                            <Button 
-                              variant="ghost" 
-                              size="sm"
-                              onClick={fetchClickwraps}
-                              disabled={isLoadingClickwraps}
-                            >
+                            <Button variant="ghost" size="sm" onClick={fetchClickwraps} disabled={isLoadingClickwraps}>
                               Refresh
                             </Button>
                           </div>
@@ -1434,14 +1412,14 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                             <SelectContent>
                               <ScrollArea className="h-[200px]">
                                 {clickwraps.map((clickwrap: any) => (
-                                  <SelectItem 
-                                    key={clickwrap.clickwrapId} 
-                                    value={clickwrap.clickwrapId}
-                                  >
+                                  <SelectItem key={clickwrap.clickwrapId} value={clickwrap.clickwrapId}>
                                     <div className="flex flex-col py-1">
-                                      <span className="font-medium text-sm">{clickwrap.clickwrapName || 'Untitled Clickwrap'}</span>
+                                      <span className="font-medium text-sm">
+                                        {clickwrap.clickwrapName || "Untitled Clickwrap"}
+                                      </span>
                                       <span className="text-xs text-muted-foreground mt-0.5">
-                                        Version: {clickwrap.versionNumber || '1'} - Status: {clickwrap.status || 'Unknown'}
+                                        Version: {clickwrap.versionNumber || "1"} - Status:{" "}
+                                        {clickwrap.status || "Unknown"}
                                       </span>
                                     </div>
                                   </SelectItem>
@@ -1450,7 +1428,7 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                             </SelectContent>
                           </Select>
 
-                          <Button 
+                          <Button
                             onClick={handleClickwrapAction}
                             disabled={!selectedClickwrap || isLoadingClickwrapStatus}
                             className="w-full mt-2"
@@ -1463,20 +1441,26 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                               <div className="flex items-center justify-between">
                                 <h4 className="text-sm font-medium">Clickwrap Status</h4>
                                 <div className="space-x-2">
-                                  <Button 
+                                  <Button
                                     size="sm"
-                                    variant="outline" 
-                                    onClick={() => checkRulesAgainstData(clickwrapResult, "DOCUSIGN_CLICK_STATUS", setClickwrapRuleCheckData)}
+                                    variant="outline"
+                                    onClick={() =>
+                                      checkRulesAgainstData(
+                                        clickwrapResult,
+                                        "DOCUSIGN_CLICK_STATUS",
+                                        setClickwrapRuleCheckData,
+                                      )
+                                    }
                                   >
                                     Check Rules
                                   </Button>
-                                  <Button 
-                                    size="sm" 
+                                  <Button
+                                    size="sm"
                                     onClick={async () => {
                                       try {
                                         await addClickwrapResultAsEvent();
                                       } catch (error) {
-                                        console.error('Error adding event:', error);
+                                        console.error("Error adding event:", error);
                                       }
                                     }}
                                   >
@@ -1502,19 +1486,15 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                           <div className="flex items-center justify-between">
                             <h4 className="text-sm font-medium">Users Consent</h4>
                             <div className="space-x-2">
-                              <Button 
+                              <Button
                                 size="sm"
-                                variant="outline" 
+                                variant="outline"
                                 onClick={checkClickwrapUsers}
                                 disabled={!selectedClickwrap}
                               >
                                 Check Users
                               </Button>
-                              <Button 
-                                size="sm" 
-                                onClick={addUsersConsentAsEvent}
-                                disabled={!clickwrapUsers}
-                              >
+                              <Button size="sm" onClick={addUsersConsentAsEvent} disabled={!clickwrapUsers}>
                                 Add as Event
                               </Button>
                             </div>
@@ -1549,9 +1529,7 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                 {!isConnected ? (
                   <div className="text-center py-4">
                     <p className="text-sm text-muted-foreground mb-2">Connect your wallet to sign messages</p>
-                    <Button onClick={openConnectModal}>
-                      Connect Wallet
-                    </Button>
+                    <Button onClick={openConnectModal}>Connect Wallet</Button>
                   </div>
                 ) : (
                   <>
@@ -1559,17 +1537,13 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                       <Label>Message to Sign</Label>
                       <Textarea
                         value={messageToSign}
-                        onChange={(e) => setMessageToSign(e.target.value)}
+                        onChange={e => setMessageToSign(e.target.value)}
                         placeholder="Enter a message to sign..."
                         className="mt-1"
                       />
                     </div>
 
-                    <Button
-                      onClick={handleSignMessage}
-                      disabled={!messageToSign}
-                      className="w-full"
-                    >
+                    <Button onClick={handleSignMessage} disabled={!messageToSign} className="w-full">
                       Sign Message
                     </Button>
 
@@ -1578,21 +1552,24 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                         <div className="flex items-center justify-between">
                           <h4 className="text-sm font-medium">Signature</h4>
                           <div className="space-x-2">
-                            <Button 
+                            <Button
                               size="sm"
-                              variant="outline" 
-                              onClick={() => checkRulesAgainstData({
-                                message: messageToSign,
-                                signature: signedMessage,
-                                signer: address
-                              }, "WEB3_SIGNED_MESSAGE", setWeb3RuleCheckData)}
+                              variant="outline"
+                              onClick={() =>
+                                checkRulesAgainstData(
+                                  {
+                                    message: messageToSign,
+                                    signature: signedMessage,
+                                    signer: address,
+                                  },
+                                  "WEB3_SIGNED_MESSAGE",
+                                  setWeb3RuleCheckData,
+                                )
+                              }
                             >
                               Check Rules
                             </Button>
-                            <Button 
-                              size="sm" 
-                              onClick={addSignedMessageAsEvent}
-                            >
+                            <Button size="sm" onClick={addSignedMessageAsEvent}>
                               Add as Event
                             </Button>
                           </div>
@@ -1604,15 +1581,21 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                               <div className="space-y-2">
                                 <div>
                                   <span className="text-sm font-medium">Message:</span>
-                                  <pre className="text-xs mt-1 bg-slate-100 p-2 rounded max-w-full overflow-x-auto">{messageToSign}</pre>
+                                  <pre className="text-xs mt-1 bg-slate-100 p-2 rounded max-w-full overflow-x-auto">
+                                    {messageToSign}
+                                  </pre>
                                 </div>
                                 <div>
                                   <span className="text-sm font-medium">Signature:</span>
-                                  <pre className="text-xs mt-1 bg-slate-100 p-2 rounded max-w-full overflow-x-auto whitespace-pre-wrap break-all">{signedMessage}</pre>
+                                  <pre className="text-xs mt-1 bg-slate-100 p-2 rounded max-w-full overflow-x-auto whitespace-pre-wrap break-all">
+                                    {signedMessage}
+                                  </pre>
                                 </div>
                                 <div>
                                   <span className="text-sm font-medium">Signer:</span>
-                                  <pre className="text-xs mt-1 bg-slate-100 p-2 rounded max-w-full overflow-x-auto">{address}</pre>
+                                  <pre className="text-xs mt-1 bg-slate-100 p-2 rounded max-w-full overflow-x-auto">
+                                    {address}
+                                  </pre>
                                 </div>
                               </div>
                             </div>
@@ -1643,11 +1626,11 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
               <div className="space-y-2 pr-4">
                 {templateRules.map(async (rule: any) => {
                   try {
-                    const eventObj = { 
-                      type: eventType, 
-                      data: JSON.parse(eventData) 
+                    const eventObj = {
+                      type: eventType,
+                      data: JSON.parse(eventData),
                     };
-                    
+
                     return (
                       <Card key={rule.id} className="p-2">
                         <Button
@@ -1657,15 +1640,31 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                         >
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-medium">Rule: {rule.id}</span>
-                            <span className={`text-xs px-2 py-0.5 rounded-full ${
-                              matchEventToRule(eventObj, { type: rule.matches.type, conditions: rule.matches.conditions }, instanceVariables)
-                                ? 'bg-green-100 text-green-800'
-                                : 'bg-red-100 text-red-800'
-                            }`}>
-                              {matchEventToRule(eventObj, { type: rule.matches.type, conditions: rule.matches.conditions }, instanceVariables) ? 'Matches' : 'No Match'}
+                            <span
+                              className={`text-xs px-2 py-0.5 rounded-full ${
+                                matchEventToRule(
+                                  eventObj,
+                                  { type: rule.matches.type, conditions: rule.matches.conditions },
+                                  instanceVariables,
+                                )
+                                  ? "bg-green-100 text-green-800"
+                                  : "bg-red-100 text-red-800"
+                              }`}
+                            >
+                              {matchEventToRule(
+                                eventObj,
+                                { type: rule.matches.type, conditions: rule.matches.conditions },
+                                instanceVariables,
+                              )
+                                ? "Matches"
+                                : "No Match"}
                             </span>
                           </div>
-                          {expandedRuleDebug.includes(rule.id) ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                          {expandedRuleDebug.includes(rule.id) ? (
+                            <ChevronDown className="h-4 w-4" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4" />
+                          )}
                         </Button>
 
                         {expandedRuleDebug.includes(rule.id) && (
@@ -1682,29 +1681,37 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                               </thead>
                               <tbody>
                                 {Object.entries(rule.matches.conditions).map(([path, pattern]: [string, any]) => {
-                                  const eventValue = path.split('.')
+                                  const eventValue = path
+                                    .split(".")
                                     .reduce((obj: any, key: string) => obj?.[key], JSON.parse(eventData));
-                                  const isContains = pattern.startsWith('(contains)');
-                                  const isLlmPrompt = pattern.startsWith('(llm-prompt)');
-                                  const isTemplate = pattern.includes('{{');
-                                  
-                                  const operator = isContains ? 'contains' : 
-                                                 isLlmPrompt ? 'llm-prompt' :
-                                                 isTemplate ? 'template' : 'equals';
-                                                     
+                                  const isContains = pattern.startsWith("(contains)");
+                                  const isLlmPrompt = pattern.startsWith("(llm-prompt)");
+                                  const isTemplate = pattern.includes("{{");
+
+                                  const operator = isContains
+                                    ? "contains"
+                                    : isLlmPrompt
+                                      ? "llm-prompt"
+                                      : isTemplate
+                                        ? "template"
+                                        : "equals";
+
                                   // Get the interpolated value for templates
-                                  const expectedValue = isTemplate ? 
-                                    pattern.replace(/\{\{([^}]+)\}\}/g, handlePatternReplace) :
-                                    isContains ? pattern.replace('(contains)', '').trim() :
-                                    isLlmPrompt ? pattern.replace('(llm-prompt)', '').trim() :
-                                    pattern;
-                                                      
-                                  const matches = isTemplate ? 
-                                    eventValue === expectedValue :
-                                    isContains ? 
-                                      String(eventValue).toLowerCase().includes(expectedValue.toLowerCase()) :
-                                    isLlmPrompt ? true :
-                                    eventValue === pattern;
+                                  const expectedValue = isTemplate
+                                    ? pattern.replace(/\{\{([^}]+)\}\}/g, handlePatternReplace)
+                                    : isContains
+                                      ? pattern.replace("(contains)", "").trim()
+                                      : isLlmPrompt
+                                        ? pattern.replace("(llm-prompt)", "").trim()
+                                        : pattern;
+
+                                  const matches = isTemplate
+                                    ? eventValue === expectedValue
+                                    : isContains
+                                      ? String(eventValue).toLowerCase().includes(expectedValue.toLowerCase())
+                                      : isLlmPrompt
+                                        ? true
+                                        : eventValue === pattern;
 
                                   return (
                                     <tr key={path} className="border-b">
@@ -1724,10 +1731,12 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
                                       </td>
                                       <td className="p-2 font-mono">{String(eventValue)}</td>
                                       <td className="p-2">
-                                        <span className={`px-2 py-0.5 rounded-full ${
-                                          matches ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                                        }`}>
-                                          {matches ? '✓' : '✗'}
+                                        <span
+                                          className={`px-2 py-0.5 rounded-full ${
+                                            matches ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                                          }`}
+                                        >
+                                          {matches ? "✓" : "✗"}
                                         </span>
                                       </td>
                                     </tr>
@@ -1750,4 +1759,4 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
       </DialogContent>
     </Dialog>
   );
-}; 
+};

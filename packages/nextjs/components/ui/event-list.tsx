@@ -1,31 +1,18 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react";
-import { Card } from "./card";
-import { Button } from "./button";
-import { ArrowRight, ArrowLeft, ChevronDown, ChevronRight, Plus, Trash2, MoveHorizontal } from "lucide-react";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { useSearchParams } from 'next/navigation';
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Event } from "../../types/events";
-import { CreateEventModal } from "../events/CreateEventModal";
+import { fetchFromDb, updateDb } from "../../utils/api";
 import { matchEventToRule } from "../../utils/eventMatching";
 import { getValueByPath } from "../../utils/eventMatching";
-import { fetchFromDb, updateDb } from "../../utils/api";
+import { CreateEventModal } from "../events/CreateEventModal";
+import { Button } from "./button";
+import { Card } from "./card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ArrowLeft, ArrowRight, ChevronDown, ChevronRight, MoveHorizontal, Plus, Trash2 } from "lucide-react";
 
 interface EventListProps {
   procedureId: string;
@@ -47,7 +34,7 @@ export default function EventList({ procedureId }: EventListProps) {
     stateTransitions: any[];
   }>();
   const searchParams = useSearchParams();
-  const highlightedEvent = searchParams?.get('highlight');
+  const highlightedEvent = searchParams?.get("highlight");
   const [showTransferModal, setShowTransferModal] = useState(false);
 
   // Load data through DB API
@@ -58,7 +45,7 @@ export default function EventList({ procedureId }: EventListProps) {
         const data = await fetchFromDb();
         setPledData(data);
       } catch (error) {
-        console.error('Failed to load data:', error);
+        console.error("Failed to load data:", error);
       } finally {
         setIsLoading(false);
       }
@@ -67,9 +54,7 @@ export default function EventList({ procedureId }: EventListProps) {
   }, []);
 
   // Get the instance with null check
-  const instance = pledData?.procedureInstances?.find(
-    (p: any) => p.instanceId === procedureId
-  );
+  const instance = pledData?.procedureInstances?.find((p: any) => p.instanceId === procedureId);
 
   useEffect(() => {
     if (pledData && !isLoading) {
@@ -79,47 +64,45 @@ export default function EventList({ procedureId }: EventListProps) {
 
   const fetchEvents = async () => {
     if (!pledData?.eventTemplates) return;
-    
+
     try {
-      const availableEvts = Object.entries(pledData.eventTemplates)
-        .reduce((acc, [key, event] : [any, any]) => {
+      const availableEvts = Object.entries(pledData.eventTemplates).reduce(
+        (acc, [key, event]: [any, any]) => {
           if (!event.received) {
             acc[key] = event;
           }
           return acc;
-        }, {} as Record<string, any>);
+        },
+        {} as Record<string, any>,
+      );
 
       const processedEvts = instance?.history?.events || [];
 
       setAvailableEvents(availableEvts);
       setProcessedEvents(processedEvts);
     } catch (error) {
-      console.error('Failed to fetch events:', error);
+      console.error("Failed to fetch events:", error);
     }
   };
 
   const toggleEventExpand = (id: string) => {
-    setExpandedEvents(prev => 
-      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
-    );
+    setExpandedEvents(prev => (prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]));
   };
 
-  const handleTransfer = async (direction: 'receive' | 'revert') => {
+  const handleTransfer = async (direction: "receive" | "revert") => {
     if (!pledData) return;
-    
+
     setIsProcessing(true);
     try {
       const updatedPledData = JSON.parse(JSON.stringify(pledData));
-      
-      const instanceIndex = updatedPledData.procedureInstances.findIndex(
-        (p: any) => p.instanceId === procedureId
-      );
+
+      const instanceIndex = updatedPledData.procedureInstances.findIndex((p: any) => p.instanceId === procedureId);
 
       if (instanceIndex === -1) {
-        throw new Error('Instance not found');
+        throw new Error("Instance not found");
       }
 
-      if (direction === 'receive') {
+      if (direction === "receive") {
         // Process selected events
         const eventsToProcess = selectedAvailable.map(key => {
           const event = availableEvents[key];
@@ -127,7 +110,7 @@ export default function EventList({ procedureId }: EventListProps) {
             id: `${event.id}-${Date.now()}`,
             type: event.type,
             timestamp: new Date().toISOString(),
-            data: event.template.data
+            data: event.template.data,
           };
         });
 
@@ -135,10 +118,10 @@ export default function EventList({ procedureId }: EventListProps) {
         if (!updatedPledData.procedureInstances[instanceIndex].history) {
           updatedPledData.procedureInstances[instanceIndex].history = { events: [], messages: [] };
         }
-        
+
         updatedPledData.procedureInstances[instanceIndex].history.events = [
           ...(updatedPledData.procedureInstances[instanceIndex].history.events || []),
-          ...eventsToProcess
+          ...eventsToProcess,
         ];
 
         // Mark events as received in eventTemplates
@@ -149,23 +132,21 @@ export default function EventList({ procedureId }: EventListProps) {
         });
       } else {
         // Revert: Remove events from processed and their associated messages
-        const updatedProcessedEvents = processedEvents.filter(
-          event => !selectedProcessed.includes(event.id)
-        );
-        
+        const updatedProcessedEvents = processedEvents.filter(event => !selectedProcessed.includes(event.id));
+
         updatedPledData.procedureInstances[instanceIndex].history.events = updatedProcessedEvents;
-        
+
         const existingMessages = updatedPledData.procedureInstances[instanceIndex].history.messages || [];
         const updatedMessages = existingMessages.filter(
-          (message: any) => !selectedProcessed.includes(message.fromEvent)
+          (message: any) => !selectedProcessed.includes(message.fromEvent),
         );
-        
+
         updatedPledData.procedureInstances[instanceIndex].history.messages = updatedMessages;
 
         // Mark events as not received in eventTemplates
         selectedProcessed.forEach(eventId => {
-          const templateKey = Object.keys(updatedPledData.eventTemplates).find(key => 
-            eventId.startsWith(`${updatedPledData.eventTemplates[key].id}-`)
+          const templateKey = Object.keys(updatedPledData.eventTemplates).find(key =>
+            eventId.startsWith(`${updatedPledData.eventTemplates[key].id}-`),
           );
           if (templateKey) {
             updatedPledData.eventTemplates[templateKey].received = false;
@@ -175,32 +156,33 @@ export default function EventList({ procedureId }: EventListProps) {
 
       // Update data through DB API
       await updateDb(updatedPledData);
-      
+
       // Refresh data
       const refreshedData = await fetchFromDb();
       setPledData(refreshedData);
-      
+
       // Update available events
-      const availableEvts = Object.entries(refreshedData.eventTemplates)
-        .reduce((acc, [key, event] : [any, any]) => {
+      const availableEvts = Object.entries(refreshedData.eventTemplates).reduce(
+        (acc, [key, event]: [any, any]) => {
           if (!event.received) {
             acc[key] = event;
           }
           return acc;
-        }, {} as Record<string, any>);
+        },
+        {} as Record<string, any>,
+      );
 
       const processedEvts = refreshedData.procedureInstances[instanceIndex].history.events || [];
 
       setAvailableEvents(availableEvts);
       setProcessedEvents(processedEvts);
-      
+
       // Clear selections
-      if (direction === 'receive') {
+      if (direction === "receive") {
         setSelectedAvailable([]);
       } else {
         setSelectedProcessed([]);
       }
-
     } catch (error) {
       console.error(`Error ${direction}ing events:`, error);
     } finally {
@@ -209,56 +191,46 @@ export default function EventList({ procedureId }: EventListProps) {
   };
 
   const getMatchingRules = (event: any) => {
-    const template = pledData.procedureTemplates.find(
-      (t: any) => t.templateId === "hiring_process"
-    );
+    const template = pledData.procedureTemplates.find((t: any) => t.templateId === "hiring_process");
 
     if (!template) return [];
 
     // Get the instance variables
-    const instance = pledData.procedureInstances.find(
-      (p: any) => p.instanceId === procedureId
-    );
+    const instance = pledData.procedureInstances.find((p: any) => p.instanceId === procedureId);
 
     const variables = instance?.variables || {};
 
     // For available events, we need to convert the template to match event format
-    const eventToMatch = event.template ? {
-      type: event.type,
-      data: event.template.data
-    } : event;
+    const eventToMatch = event.template
+      ? {
+          type: event.type,
+          data: event.template.data,
+        }
+      : event;
 
-    return template.messageRules.filter((rule: any) => 
+    return template.messageRules.filter((rule: any) =>
       matchEventToRule(
         eventToMatch,
         {
           type: rule.matches.type,
-          conditions: rule.matches.conditions
+          conditions: rule.matches.conditions,
         },
-        variables
-      )
+        variables,
+      ),
     );
   };
 
   const renderTransition = (transition: any) => {
-    if (typeof transition === 'string') {
-      return (
-        <span className="text-xs bg-blue-100 px-2 py-0.5 rounded">
-          {transition}
-        </span>
-      );
+    if (typeof transition === "string") {
+      return <span className="text-xs bg-blue-100 px-2 py-0.5 rounded">{transition}</span>;
     }
-    
+
     // If it's an object with 'to' and 'conditions'
     if (transition.to) {
       return (
         <span className="text-xs bg-blue-100 px-2 py-0.5 rounded flex gap-1 items-center">
           <span>{transition.to}</span>
-          {transition.conditions && (
-            <span className="text-xs bg-blue-200 px-1 rounded">
-              with conditions
-            </span>
-          )}
+          {transition.conditions && <span className="text-xs bg-blue-200 px-1 rounded">with conditions</span>}
         </span>
       );
     }
@@ -267,17 +239,13 @@ export default function EventList({ procedureId }: EventListProps) {
   };
 
   const getCapturedOutputs = () => {
-    const instance = pledData.procedureInstances.find(
-      (p: any) => p.instanceId === procedureId
-    );
-    
+    const instance = pledData.procedureInstances.find((p: any) => p.instanceId === procedureId);
+
     const outputs: Record<string, Record<string, any>> = {};
-    
+
     // Get all rules with captures
-    const template = pledData.procedureTemplates.find(
-      (t: any) => t.templateId === "hiring_process"
-    );
-    
+    const template = pledData.procedureTemplates.find((t: any) => t.templateId === "hiring_process");
+
     instance?.messages?.forEach((message: any) => {
       const rule = template?.messageRules.find((r: any) => r.id === message.rule);
       if (rule?.captures) {
@@ -286,7 +254,7 @@ export default function EventList({ procedureId }: EventListProps) {
           outputs[message.type] = {};
         }
 
-        Object.entries(rule.captures).forEach(([key, pathTemplate] : [any, any]) => {
+        Object.entries(rule.captures).forEach(([key, pathTemplate]: [any, any]) => {
           const event = processedEvents.find(e => e.id === message.fromEvent);
           if (event) {
             const pathMatch = pathTemplate.toString().match(/{{event\.data\.(.+)}}/);
@@ -301,7 +269,7 @@ export default function EventList({ procedureId }: EventListProps) {
         });
       }
     });
-    
+
     return outputs;
   };
 
@@ -309,33 +277,36 @@ export default function EventList({ procedureId }: EventListProps) {
   const getAllVariables = () => {
     const baseVars = instance?.variables || {};
     const capturedVars = getCapturedOutputs();
-    
+
     // Convert captured vars to match instance variables format
-    const capturedFormatted = Object.entries(capturedVars).reduce((acc, [messageType, captures]) => {
-      const sectionName = messageType.replace(/_/g, ' ');
-      acc[sectionName] = captures;
-      return acc;
-    }, {} as Record<string, any>);
+    const capturedFormatted = Object.entries(capturedVars).reduce(
+      (acc, [messageType, captures]) => {
+        const sectionName = messageType.replace(/_/g, " ");
+        acc[sectionName] = captures;
+        return acc;
+      },
+      {} as Record<string, any>,
+    );
 
     return {
       ...baseVars,
-      ...capturedFormatted
+      ...capturedFormatted,
     };
   };
 
   const handleDeleteEvent = async (eventId: string) => {
     if (!pledData) return;
-    
+
     try {
       const updatedPledData = JSON.parse(JSON.stringify(pledData));
-      
+
       if (updatedPledData.eventTemplates[eventId]) {
         delete updatedPledData.eventTemplates[eventId];
       }
 
       // Update data through DB API
       await updateDb(updatedPledData);
-      
+
       // Refresh data
       const refreshedData = await fetchFromDb();
       setPledData(refreshedData);
@@ -344,18 +315,13 @@ export default function EventList({ procedureId }: EventListProps) {
         delete updated[eventId];
         return updated;
       });
-
     } catch (error) {
-      console.error('Error deleting event:', error);
+      console.error("Error deleting event:", error);
     }
   };
 
   const toggleEvent = (eventId: string) => {
-    setExpandedEvents(prev => 
-      prev.includes(eventId) 
-        ? prev.filter(id => id !== eventId)
-        : [...prev, eventId]
-    );
+    setExpandedEvents(prev => (prev.includes(eventId) ? prev.filter(id => id !== eventId) : [...prev, eventId]));
   };
 
   // Auto-expand and scroll to highlighted event
@@ -366,7 +332,7 @@ export default function EventList({ procedureId }: EventListProps) {
       setTimeout(() => {
         const element = document.getElementById(highlightedEvent);
         if (element) {
-          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          element.scrollIntoView({ behavior: "smooth", block: "center" });
         }
       }, 100);
     }
@@ -375,43 +341,35 @@ export default function EventList({ procedureId }: EventListProps) {
   // Add helper functions at top
   const getSourceBadgeStyle = (source: string) => {
     switch (source) {
-      case 'manual':
-        return 'bg-blue-100 text-blue-800';
-      case 'action':
-        return 'bg-purple-100 text-purple-800';
+      case "manual":
+        return "bg-blue-100 text-blue-800";
+      case "action":
+        return "bg-purple-100 text-purple-800";
       default:
-        return 'bg-gray-100 text-gray-800';
+        return "bg-gray-100 text-gray-800";
     }
   };
 
   const getSourceLabel = (event: any) => {
     // For events in event templates/list
     if (event.template?.source) return event.template.source;
-    
+
     // For history events from actions
-    if (event.type === 'CUSTOM_EVENT') return 'action';
-    
+    if (event.type === "CUSTOM_EVENT") return "action";
+
     // For manually added events in history
-    if (event.id?.startsWith('email_received_')) return 'manual';
-    
+    if (event.id?.startsWith("email_received_")) return "manual";
+
     // Default case
-    return 'received';
+    return "received";
   };
 
   if (isLoading) {
-    return (
-      <div className="flex justify-center items-center p-4">
-        Loading...
-      </div>
-    );
+    return <div className="flex justify-center items-center p-4">Loading...</div>;
   }
 
   if (!pledData) {
-    return (
-      <div className="flex justify-center items-center p-4">
-        Error loading data
-      </div>
-    );
+    return <div className="flex justify-center items-center p-4">Error loading data</div>;
   }
 
   return (
@@ -425,7 +383,7 @@ export default function EventList({ procedureId }: EventListProps) {
             Manage Events
           </Button>
         </div>
-        
+
         <Card>
           <Table>
             <TableHeader>
@@ -438,23 +396,17 @@ export default function EventList({ procedureId }: EventListProps) {
             </TableHeader>
             <TableBody>
               {processedEvents?.map((event: any) => (
-                <TableRow 
+                <TableRow
                   key={event.id}
-                  className={`${highlightedEvent === event.id ? 'bg-yellow-50' : ''}`}
+                  className={`${highlightedEvent === event.id ? "bg-yellow-50" : ""}`}
                   id={event.id}
                 >
                   <TableCell>
                     <div className="font-medium">{event.type}</div>
                   </TableCell>
+                  <TableCell>{new Date(event.timestamp).toLocaleString()}</TableCell>
                   <TableCell>
-                    {new Date(event.timestamp).toLocaleString()}
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => toggleEvent(event.id)}
-                    >
+                    <Button variant="ghost" size="sm" onClick={() => toggleEvent(event.id)}>
                       {expandedEvents.includes(event.id) ? (
                         <ChevronDown className="h-4 w-4" />
                       ) : (
@@ -466,7 +418,9 @@ export default function EventList({ procedureId }: EventListProps) {
                         {/* Source Badge */}
                         <div className="flex items-center">
                           <span className="text-xs font-medium mr-2">Source:</span>
-                          <span className={`text-xs px-2 py-0.5 rounded-full ${getSourceBadgeStyle(getSourceLabel(event))}`}>
+                          <span
+                            className={`text-xs px-2 py-0.5 rounded-full ${getSourceBadgeStyle(getSourceLabel(event))}`}
+                          >
                             {getSourceLabel(event)}
                           </span>
                         </div>
@@ -480,7 +434,7 @@ export default function EventList({ procedureId }: EventListProps) {
                         </div>
 
                         {/* History for action events */}
-                        {event.template?.source === 'action' && event.template.history && (
+                        {event.template?.source === "action" && event.template.history && (
                           <div>
                             <span className="text-xs font-medium">Event History:</span>
                             <div className="mt-1 overflow-x-auto">
@@ -495,13 +449,9 @@ export default function EventList({ procedureId }: EventListProps) {
                                 <tbody className="divide-y divide-gray-100">
                                   {event.template.history.events.map((historyEvent: any) => (
                                     <tr key={historyEvent.id}>
-                                      <td className="px-2 py-1">
-                                        {new Date(historyEvent.timestamp).toLocaleString()}
-                                      </td>
+                                      <td className="px-2 py-1">{new Date(historyEvent.timestamp).toLocaleString()}</td>
                                       <td className="px-2 py-1">{historyEvent.type}</td>
-                                      <td className="px-2 py-1">
-                                        {JSON.stringify(historyEvent.data)}
-                                      </td>
+                                      <td className="px-2 py-1">{JSON.stringify(historyEvent.data)}</td>
                                     </tr>
                                   ))}
                                 </tbody>
@@ -515,10 +465,7 @@ export default function EventList({ procedureId }: EventListProps) {
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
                       {getMatchingRules(event).map((rule: any) => (
-                        <span 
-                          key={rule.id} 
-                          className="text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded"
-                        >
+                        <span key={rule.id} className="text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded">
                           {rule.id}
                         </span>
                       ))}
@@ -546,11 +493,7 @@ export default function EventList({ procedureId }: EventListProps) {
                   <span className="text-sm text-gray-500">
                     {selectedAvailable.length}/{Object.keys(availableEvents || {})?.length || 0} selected
                   </span>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setShowCreateModal(true)}
-                  >
+                  <Button size="sm" variant="outline" onClick={() => setShowCreateModal(true)}>
                     <Plus className="h-4 w-4" />
                   </Button>
                 </div>
@@ -560,26 +503,27 @@ export default function EventList({ procedureId }: EventListProps) {
                   .filter(([_, event]) => !event.received)
                   .map(([key, event]: [string, any]) => (
                     <div key={key} className="border rounded">
-                      <div 
+                      <div
                         className={`p-2 ${
-                          selectedAvailable.includes(key) ? 'bg-blue-50 border-blue-200' : 'hover:bg-gray-50'
+                          selectedAvailable.includes(key) ? "bg-blue-50 border-blue-200" : "hover:bg-gray-50"
                         }`}
                       >
                         <div className="flex items-center justify-between">
-                          <div className="flex-1 cursor-pointer" onClick={() => {
-                            setSelectedAvailable(prev =>
-                              prev.includes(key)
-                                ? prev.filter(id => id !== key)
-                                : [...prev, key]
-                            );
-                          }}>
+                          <div
+                            className="flex-1 cursor-pointer"
+                            onClick={() => {
+                              setSelectedAvailable(prev =>
+                                prev.includes(key) ? prev.filter(id => id !== key) : [...prev, key],
+                              );
+                            }}
+                          >
                             <span className="font-medium text-sm">{event.type}</span>
                           </div>
                           <div className="flex gap-2 items-center">
                             <Button
                               size="sm"
                               variant="destructive"
-                              onClick={(e) => {
+                              onClick={e => {
                                 e.stopPropagation();
                                 handleDeleteEvent(key);
                               }}
@@ -589,7 +533,7 @@ export default function EventList({ procedureId }: EventListProps) {
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={(e) => {
+                              onClick={e => {
                                 e.stopPropagation();
                                 toggleEventExpand(key);
                               }}
@@ -607,8 +551,8 @@ export default function EventList({ procedureId }: EventListProps) {
                             <p className="text-xs font-medium">Matches:</p>
                             <div className="flex flex-wrap gap-1">
                               {getMatchingRules(event).map((rule: any) => (
-                                <span 
-                                  key={rule.id} 
+                                <span
+                                  key={rule.id}
                                   className="text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded"
                                 >
                                   {rule.id}
@@ -635,7 +579,7 @@ export default function EventList({ procedureId }: EventListProps) {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => handleTransfer('receive')}
+                onClick={() => handleTransfer("receive")}
                 disabled={isProcessing || selectedAvailable.length === 0}
               >
                 <ArrowRight className="h-4 w-4" />
@@ -643,7 +587,7 @@ export default function EventList({ procedureId }: EventListProps) {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => handleTransfer('revert')}
+                onClick={() => handleTransfer("revert")}
                 disabled={isProcessing || selectedProcessed.length === 0}
               >
                 <ArrowLeft className="h-4 w-4" />
@@ -661,28 +605,24 @@ export default function EventList({ procedureId }: EventListProps) {
               <div className="space-y-2 max-h-[400px] overflow-auto">
                 {processedEvents?.map((event: any) => (
                   <div key={event.id} className="border rounded">
-                    <div 
+                    <div
                       className={`p-2 cursor-pointer ${
-                        selectedProcessed.includes(event.id) ? 'bg-blue-50 border-blue-200' : 'hover:bg-gray-50'
+                        selectedProcessed.includes(event.id) ? "bg-blue-50 border-blue-200" : "hover:bg-gray-50"
                       }`}
                       onClick={() => {
                         setSelectedProcessed(prev =>
-                          prev.includes(event.id)
-                            ? prev.filter(id => id !== event.id)
-                            : [...prev, event.id]
+                          prev.includes(event.id) ? prev.filter(id => id !== event.id) : [...prev, event.id],
                         );
                       }}
                     >
                       <div className="flex items-center justify-between">
                         <span className="font-medium text-sm">{event.type}</span>
                         <div className="flex gap-2 items-center">
-                          <span className="text-xs text-gray-500">
-                            {new Date(event.timestamp).toLocaleString()}
-                          </span>
+                          <span className="text-xs text-gray-500">{new Date(event.timestamp).toLocaleString()}</span>
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={(e) => {
+                            onClick={e => {
                               e.stopPropagation();
                               toggleEventExpand(event.id);
                             }}
@@ -712,8 +652,8 @@ export default function EventList({ procedureId }: EventListProps) {
                             <p className="text-xs font-medium mb-1">Matching Rules:</p>
                             <div className="flex flex-wrap gap-1">
                               {getMatchingRules(event).map((rule: any) => (
-                                <span 
-                                  key={rule.id} 
+                                <span
+                                  key={rule.id}
                                   className="text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded"
                                 >
                                   {rule.id}
@@ -739,11 +679,11 @@ export default function EventList({ procedureId }: EventListProps) {
       <Card className="p-4">
         <h3 className="font-semibold mb-4">Instance Variables</h3>
         <div className="space-y-4">
-          {Object.entries(getAllVariables()).map(([section, vars] : [any, any]) => (
+          {Object.entries(getAllVariables()).map(([section, vars]: [any, any]) => (
             <div key={section} className="space-y-1">
               <h4 className="text-sm font-medium capitalize">{section}</h4>
               <div className="pl-2 space-y-1">
-                {Object.entries(vars).map(([key, value] : [any, any]) => (
+                {Object.entries(vars).map(([key, value]: [any, any]) => (
                   <div key={key} className="flex items-center gap-2 text-sm">
                     <span className="text-gray-500">{key}:</span>
                     <span className="font-mono">{value}</span>
@@ -759,22 +699,22 @@ export default function EventList({ procedureId }: EventListProps) {
       <CreateEventModal
         open={showCreateModal}
         onClose={() => setShowCreateModal(false)}
-        onSave={async (template) => {
+        onSave={async template => {
           try {
-            const response = await fetch('/api/events', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+            const response = await fetch("/api/events", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 event: template,
-                action: 'add_template',
-                procedureId
-              })
+                action: "add_template",
+                procedureId,
+              }),
             });
 
             if (!response.ok) {
               const errorData = await response.json();
-              console.error('Error response:', errorData);
-              throw new Error(errorData.error || 'Failed to create event');
+              console.error("Error response:", errorData);
+              throw new Error(errorData.error || "Failed to create event");
             }
 
             // Refresh the events list
@@ -783,11 +723,10 @@ export default function EventList({ procedureId }: EventListProps) {
             await fetchEvents();
             setShowCreateModal(false);
           } catch (error) {
-            console.error('Error creating event:', error);
+            console.error("Error creating event:", error);
           }
         }}
       />
     </div>
   );
 }
-

@@ -1,12 +1,12 @@
-import { NavigatorResponse } from '../types/navigator';
+import { NavigatorResponse } from "../types/navigator";
 
 export enum ContractState {
-  DRAFT = 'DRAFT',
-  PENDING_SIGNATURE = 'PENDING_SIGNATURE',
-  ACTIVE = 'ACTIVE',
-  EXPIRED = 'EXPIRED',
-  TERMINATED = 'TERMINATED',
-  COMPLETE = 'COMPLETE'
+  DRAFT = "DRAFT",
+  PENDING_SIGNATURE = "PENDING_SIGNATURE",
+  ACTIVE = "ACTIVE",
+  EXPIRED = "EXPIRED",
+  TERMINATED = "TERMINATED",
+  COMPLETE = "COMPLETE",
 }
 
 export interface ContractStateContext {
@@ -23,9 +23,9 @@ export class ContractStateMachine {
 
   constructor(navigatorData?: NavigatorResponse) {
     this.context = {
-      currentState: ContractState.DRAFT
+      currentState: ContractState.DRAFT,
     };
-    
+
     if (navigatorData) {
       this.updateFromNavigator(navigatorData);
     }
@@ -33,14 +33,14 @@ export class ContractStateMachine {
 
   private updateFromNavigator(data: NavigatorResponse) {
     const { provisions, parties } = data.rawData;
-    
+
     this.context = {
       ...this.context,
       navigatorData: data,
       effectiveDate: new Date(provisions.effective_date),
       expirationDate: new Date(provisions.expiration_date),
       totalValue: provisions.total_agreement_value,
-      parties: parties.map(p => p.name_in_agreement)
+      parties: parties.map(p => p.name_in_agreement),
     };
 
     // Update state based on dates and status
@@ -52,7 +52,7 @@ export class ContractStateMachine {
     const { effectiveDate, expirationDate } = this.context;
     const status = this.context.navigatorData?.status;
 
-    if (status === 'COMPLETE') {
+    if (status === "COMPLETE") {
       this.context.currentState = ContractState.COMPLETE;
       return;
     }
@@ -75,7 +75,7 @@ export class ContractStateMachine {
   public canTransitionTo(newState: ContractState): boolean {
     // Implement transition rules
     const { currentState } = this.context;
-    
+
     // Example rules:
     switch (currentState) {
       case ContractState.DRAFT:
@@ -92,4 +92,4 @@ export class ContractStateMachine {
   public getContext(): ContractStateContext {
     return { ...this.context };
   }
-} 
+}

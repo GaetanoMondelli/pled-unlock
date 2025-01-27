@@ -1,9 +1,9 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import { getValueByPath } from "../../utils/eventMatching";
 import { Card } from "./card";
 import { ScrollArea } from "./scroll-area";
-import { getValueByPath } from "../../utils/eventMatching";
 
 interface VariablesViewProps {
   procedureId: string;
@@ -17,12 +17,12 @@ export const VariablesView = ({ procedureId }: VariablesViewProps) => {
     async function fetchData() {
       try {
         const response = await fetch(`/api/procedures/${procedureId}`);
-        if (!response.ok) throw new Error('Failed to fetch procedure data');
+        if (!response.ok) throw new Error("Failed to fetch procedure data");
         const data = await response.json();
         setInstance(data.instance);
         setTemplate(data.template);
       } catch (error) {
-        console.error('Error fetching procedure data:', error);
+        console.error("Error fetching procedure data:", error);
       }
     }
     fetchData();
@@ -31,7 +31,7 @@ export const VariablesView = ({ procedureId }: VariablesViewProps) => {
   const getCapturedOutputs = () => {
     if (!instance || !template) return {};
     const outputs: Record<string, Record<string, any>> = {};
-    
+
     instance?.messages?.forEach((message: any) => {
       const rule = template?.messageRules.find((r: any) => r.id === message.rule);
       if (rule?.captures) {
@@ -53,24 +53,27 @@ export const VariablesView = ({ procedureId }: VariablesViewProps) => {
         });
       }
     });
-    
+
     return outputs;
   };
 
   const getAllVariables = () => {
     const baseVars = instance?.variables || {};
     const capturedVars = getCapturedOutputs();
-    
+
     // Convert captured vars to match instance variables format
-    const capturedFormatted = Object.entries(capturedVars).reduce((acc, [messageType, captures]) => {
-      const sectionName = `${messageType} outputs`;
-      acc[sectionName] = captures;
-      return acc;
-    }, {} as Record<string, any>);
+    const capturedFormatted = Object.entries(capturedVars).reduce(
+      (acc, [messageType, captures]) => {
+        const sectionName = `${messageType} outputs`;
+        acc[sectionName] = captures;
+        return acc;
+      },
+      {} as Record<string, any>,
+    );
 
     return {
       ...baseVars,
-      ...capturedFormatted
+      ...capturedFormatted,
     };
   };
 
@@ -79,11 +82,11 @@ export const VariablesView = ({ procedureId }: VariablesViewProps) => {
       <ScrollArea className="h-[85vh]">
         <div className="p-4 space-y-4">
           <h3 className="font-semibold">Variables</h3>
-          {Object.entries(getAllVariables()).map(([section, vars] : [any, any]) => (
+          {Object.entries(getAllVariables()).map(([section, vars]: [any, any]) => (
             <div key={section} className="space-y-1">
               <h4 className="text-sm font-medium capitalize">{section}</h4>
               <div className="pl-2 space-y-1">
-                {Object.entries(vars).map(([key, value] : [any, any]) => (
+                {Object.entries(vars).map(([key, value]: [any, any]) => (
                   <div key={key} className="flex items-center gap-2 text-sm">
                     <span className="text-gray-500">{key}:</span>
                     <span className="font-mono">{value}</span>
@@ -96,4 +99,4 @@ export const VariablesView = ({ procedureId }: VariablesViewProps) => {
       </ScrollArea>
     </Card>
   );
-}; 
+};

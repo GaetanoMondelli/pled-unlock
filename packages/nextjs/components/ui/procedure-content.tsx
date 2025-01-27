@@ -1,13 +1,13 @@
-"use client"
+"use client";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import EventList from "@/components/ui/event-list"
-import MessageRules from "@/components/ui/message-rules"
-import ProcedureState from "@/components/ui/procedure-state"
-import ActionList from "@/components/ui/action-list"
-import { useEffect, useState } from 'react';
-import { sm } from 'jssm';
+import { useEffect, useState } from "react";
+import ActionList from "@/components/ui/action-list";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import EventList from "@/components/ui/event-list";
+import MessageRules from "@/components/ui/message-rules";
+import ProcedureState from "@/components/ui/procedure-state";
 import StateGraph from "@/components/ui/state-graph";
+import { sm } from "jssm";
 
 interface ProcedureContentProps {
   procedureId: string;
@@ -19,7 +19,7 @@ export default function ProcedureContent({ procedureId, activeSubsection, select
   const procedure = {
     id: procedureId,
     name: "Procedure Name", // You might want to fetch the actual name based on the ID
-    description: "Procedure Description" // Fetch the actual description
+    description: "Procedure Description", // Fetch the actual description
   };
 
   useEffect(() => {
@@ -32,7 +32,7 @@ export default function ProcedureContent({ procedureId, activeSubsection, select
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{selectedProcedure ? selectedProcedure : 'Select a procedure'}</CardTitle>
+        <CardTitle>{selectedProcedure ? selectedProcedure : "Select a procedure"}</CardTitle>
         <CardDescription>{procedure.description}</CardDescription>
       </CardHeader>
       <CardContent>
@@ -46,4 +46,3 @@ export default function ProcedureContent({ procedureId, activeSubsection, select
     </Card>
   );
 }
-

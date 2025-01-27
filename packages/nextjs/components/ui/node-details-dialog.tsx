@@ -1,14 +1,8 @@
-import React from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "./dialog";
+import React from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "./button";
-import { FileText, Play, LucideIcon, Mail, Calendar, Bell, FileSignature, Activity } from "lucide-react";
-import { useRouter } from 'next/navigation';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./dialog";
+import { Activity, Bell, Calendar, FileSignature, FileText, LucideIcon, Mail, Play } from "lucide-react";
 
 interface NodeDetailsDialogProps {
   node: {
@@ -32,10 +26,10 @@ interface NodeDetailsDialogProps {
 
 // Define action type icons mapping with lowercase keys
 const actionIcons: Record<string, LucideIcon> = {
-  "send_email": Mail,
-  "create_calendar_event": Calendar,
-  "send_reminder": Bell,
-  "docusign_send": FileSignature,
+  send_email: Mail,
+  create_calendar_event: Calendar,
+  send_reminder: Bell,
+  docusign_send: FileSignature,
 };
 
 const defaultActionIcon = Activity;
@@ -43,9 +37,7 @@ const defaultActionIcon = Activity;
 // Helper function to get the icon for an action
 export const getActionIcon = (action: any): LucideIcon => {
   // Extract type from our action structure
-  const actionType = action?.type?.toLowerCase() || 
-                    action?.template?.data?.type?.toLowerCase() || 
-                    'unknown';
+  const actionType = action?.type?.toLowerCase() || action?.template?.data?.type?.toLowerCase() || "unknown";
   return actionIcons[actionType] || defaultActionIcon;
 };
 
@@ -54,15 +46,13 @@ export const NodeDetailsDialog: React.FC<NodeDetailsDialogProps> = ({
   isOpen,
   onClose,
   documents,
-  procedureId
+  procedureId,
 }) => {
   const router = useRouter();
-  
+
   if (!node) return null;
 
-  const linkedDocuments = documents?.contracts?.filter(
-    doc => doc.linkedStates?.includes(node.id)
-  ) || [];
+  const linkedDocuments = documents?.contracts?.filter(doc => doc.linkedStates?.includes(node.id)) || [];
 
   const handleDocumentClick = (docId: string) => {
     router.push(`/procedures/${procedureId}/envelope?doc=${docId}`);
@@ -79,29 +69,29 @@ export const NodeDetailsDialog: React.FC<NodeDetailsDialogProps> = ({
         type: action.type,
         template: {
           source: "action",
-          data: action.template?.data || {}
+          data: action.template?.data || {},
         },
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
 
       // Add event to database
-      const response = await fetch('/api/events', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           event,
-          action: 'add',
-          procedureId
-        })
+          action: "add",
+          procedureId,
+        }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to create test event');
+        throw new Error("Failed to create test event");
       }
 
-      console.log('Test event created:', event);
+      console.log("Test event created:", event);
     } catch (error) {
-      console.error('Error testing action:', error);
+      console.error("Error testing action:", error);
     }
   };
 
@@ -110,11 +100,9 @@ export const NodeDetailsDialog: React.FC<NodeDetailsDialogProps> = ({
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle className="text-xl">State: {node.id}</DialogTitle>
-          <DialogDescription>
-            {node.metadata?.description}
-          </DialogDescription>
+          <DialogDescription>{node.metadata?.description}</DialogDescription>
         </DialogHeader>
-        
+
         <div className="space-y-6">
           {node.metadata?.actions?.length > 0 && (
             <div className="space-y-4">
@@ -126,13 +114,9 @@ export const NodeDetailsDialog: React.FC<NodeDetailsDialogProps> = ({
                     <div key={index} className="flex items-center justify-between p-2 bg-accent/50 rounded">
                       <div className="flex items-center gap-2">
                         <ActionIcon className="h-4 w-4" />
-                        <span>{action.type || action.template?.data?.type || 'Unknown Action'}</span>
+                        <span>{action.type || action.template?.data?.type || "Unknown Action"}</span>
                       </div>
-                      <Button
-                        size="sm"
-                        onClick={() => handleTestAction(action)}
-                        className="flex items-center gap-2"
-                      >
+                      <Button size="sm" onClick={() => handleTestAction(action)} className="flex items-center gap-2">
                         <Play className="h-4 w-4" />
                         Test Action
                       </Button>
@@ -150,7 +134,7 @@ export const NodeDetailsDialog: React.FC<NodeDetailsDialogProps> = ({
                 Linked Documents
               </h3>
               <div className="grid gap-2">
-                {linkedDocuments.map((doc) => (
+                {linkedDocuments.map(doc => (
                   <button
                     key={doc.id}
                     onClick={() => handleDocumentClick(doc.id)}
@@ -170,4 +154,4 @@ export const NodeDetailsDialog: React.FC<NodeDetailsDialogProps> = ({
       </DialogContent>
     </Dialog>
   );
-}; 
+};

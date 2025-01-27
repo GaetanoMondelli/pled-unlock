@@ -1,30 +1,27 @@
-import { NextResponse } from 'next/server';
-import { fetchFromDb, updateDb } from '../../../utils/api';
+import { NextResponse } from "next/server";
+import { fetchFromDb, updateDb } from "../../../utils/api";
 
 export async function GET() {
   try {
     const data = await fetchFromDb();
     return NextResponse.json({
       events: data.events,
-      receivedEvents: data.receivedEvents
+      receivedEvents: data.receivedEvents,
     });
   } catch (error: any) {
-    return NextResponse.json(
-      { error: error.message || 'Failed to get events' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: error.message || "Failed to get events" }, { status: 500 });
   }
 }
 
 export async function POST(request: Request) {
   try {
     const { event, action, procedureId } = await request.json();
-    console.log('Creating event:', { type: event.type, procedureId });
+    console.log("Creating event:", { type: event.type, procedureId });
 
     const data = await fetchFromDb();
-    console.log('Current DB data:', data);
+    console.log("Current DB data:", data);
 
-    if (action === 'add_template') {
+    if (action === "add_template") {
       // Initialize eventTemplates if it doesn't exist
       if (!data.eventTemplates) {
         data.eventTemplates = {};
@@ -38,15 +35,15 @@ export async function POST(request: Request) {
         description: event.description,
         type: event.type,
         template: event.template,
-        received: false
+        received: false,
       };
 
       // Update the database
       await updateDb(data);
 
-      return NextResponse.json({ 
+      return NextResponse.json({
         success: true,
-        event: data.eventTemplates[templateId]
+        event: data.eventTemplates[templateId],
       });
     } else {
       // Handle adding event to procedure instance
@@ -56,9 +53,9 @@ export async function POST(request: Request) {
 
       // Find the correct procedure instance
       const instance = data.procedureInstances.find((p: any) => p.instanceId === procedureId);
-      console.log('Found instance:', instance);
-      console.log('Looking for procedureId:', procedureId);
-      
+      console.log("Found instance:", instance);
+      console.log("Looking for procedureId:", procedureId);
+
       if (!instance) {
         throw new Error(`Procedure instance not found for ID: ${procedureId}`);
       }
@@ -73,22 +70,25 @@ export async function POST(request: Request) {
         id: event.id,
         type: event.type,
         timestamp: new Date().toISOString(),
-        data: event.template.data
+        data: event.template.data,
       });
 
       // Update the database
       await updateDb(data);
 
-      return NextResponse.json({ 
+      return NextResponse.json({
         success: true,
-        event: event
+        event: event,
       });
     }
   } catch (error) {
     console.error("Error adding event:", error);
-    return NextResponse.json({ 
-      error: error instanceof Error ? error.message : "Failed to add event" 
-    }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: error instanceof Error ? error.message : "Failed to add event",
+      },
+      { status: 500 },
+    );
   }
 }
 
@@ -113,8 +113,7 @@ export async function DELETE(request: Request) {
 // Helper function to interpolate variables in templates
 function interpolateTemplate(template: string, variables: any): string {
   return template.replace(/\{\{([^}]+)\}\}/g, (match, path) => {
-    const value = path.split('.')
-      .reduce((obj: any, key: string) => obj?.[key], variables);
+    const value = path.split(".").reduce((obj: any, key: string) => obj?.[key], variables);
     return value ?? match;
   });
-} 
+}

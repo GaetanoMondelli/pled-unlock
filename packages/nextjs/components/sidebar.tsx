@@ -28,22 +28,22 @@ export default function Sidebar({
         <div className="px-3 py-2">
           <h2 className="mb-2 px-4 text-lg font-semibold">Procedures</h2>
           <div className="space-y-1">
-            {procedures.map((procedure) => (
+            {procedures.map(procedure => (
               <div key={procedure.id}>
                 <Button
                   variant="ghost"
-                  className={`w-full justify-start ${selectedProcedure === procedure.name ? 'bg-gray-200' : ''}`}
+                  className={`w-full justify-start ${selectedProcedure === procedure.name ? "bg-gray-200" : ""}`}
                   onClick={() => setSelectedProcedure(procedure.name)}
                 >
                   {procedure.name}
                 </Button>
                 {selectedProcedure === procedure.name && (
                   <div className="pl-4 space-y-1">
-                    {subsections.map((subsection) => (
+                    {subsections.map(subsection => (
                       <Button
                         key={subsection}
                         variant="ghost"
-                        className={`w-full justify-start ${activeSubsection === subsection ? 'font-bold' : ''}`}
+                        className={`w-full justify-start ${activeSubsection === subsection ? "font-bold" : ""}`}
                         onClick={() => setActiveSubsection(subsection)}
                       >
                         {subsection}
@@ -59,4 +59,3 @@ export default function Sidebar({
     </div>
   );
 }
-

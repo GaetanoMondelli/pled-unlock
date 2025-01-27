@@ -1,10 +1,10 @@
-import { OpenAI } from 'openai';
-import { NextResponse } from 'next/server';
+import { NextResponse } from "next/server";
+import { OpenAI } from "openai";
 
 const AVAILABLE_MODELS = {
   "gpt-4-turbo-preview": "GPT-4 Turbo",
   "gpt-4": "GPT-4",
-  "gpt-3.5-turbo": "GPT-3.5 Turbo"
+  "gpt-3.5-turbo": "GPT-3.5 Turbo",
 } as const;
 
 type ModelId = keyof typeof AVAILABLE_MODELS;
@@ -16,11 +16,11 @@ const requestTimestamps: number[] = [];
 function canMakeRequest(): boolean {
   const now = Date.now();
   const oneMinuteAgo = now - 60000;
-  
+
   while (requestTimestamps.length > 0 && requestTimestamps[0] < oneMinuteAgo) {
     requestTimestamps.shift();
   }
-  
+
   return requestTimestamps.length < REQUESTS_PER_MINUTE;
 }
 
@@ -29,7 +29,7 @@ function trackRequest() {
 }
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
 // Single prompt for regular mode
@@ -155,12 +155,12 @@ Format response as JSON:
   }
 }`,
 
-  getMessageRules: (fsl: string, transitions: string[]) => 
-  `Given this state machine:
+  getMessageRules: (fsl: string, transitions: string[]) =>
+    `Given this state machine:
 ${fsl}
 
 And these transitions:
-${transitions.join(', ')}
+${transitions.join(", ")}
 
 Create message rules and event types that map to these transitions.
 
@@ -196,9 +196,9 @@ Format response as JSON:
   }
 }`,
 
-  getStateActions: (states: string[], variables: any = {}) => 
-  `For these states:
-${states.join(', ')}
+  getStateActions: (states: string[], variables: any = {}) =>
+    `For these states:
+${states.join(", ")}
 
 Available template variables:
 ${JSON.stringify(variables, null, 2)}
@@ -234,7 +234,7 @@ Format response as JSON:
       }
     ]
   }
-}`
+}`,
 };
 
 // Helper functions
@@ -278,7 +278,13 @@ async function createCompletion(model: ModelId, messages: any[]) {
 
 export async function POST(req: Request) {
   try {
-    const { content, model = "gpt-4", expertMode = false, useNavigatorInsight = false, navigatorDocumentId } = await req.json();
+    const {
+      content,
+      model = "gpt-4",
+      expertMode = false,
+      useNavigatorInsight = false,
+      navigatorDocumentId,
+    } = await req.json();
 
     let navigatorData = null;
     let prompt = getSinglePrompt;
@@ -286,77 +292,75 @@ export async function POST(req: Request) {
     // Get Navigator data if enabled
     if (useNavigatorInsight && navigatorDocumentId) {
       try {
-        const auth = JSON.parse(localStorage.getItem('navigatorAuth') || '{}');
-        const response = await fetch('/api/docusign/navigator/proxy', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+        const auth = JSON.parse(localStorage.getItem("navigatorAuth") || "{}");
+        const response = await fetch("/api/docusign/navigator/proxy", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             url: `${auth.baseUrl}/accounts/${auth.accountId}/agreements/${navigatorDocumentId}`,
-            method: 'GET',
-            token: auth.accessToken
-          })
+            method: "GET",
+            token: auth.accessToken,
+          }),
         });
-        
+
         if (response.ok) {
           navigatorData = await response.json();
           const { provisions, parties } = navigatorData.rawData;
 
           // Add insights to the prompt
           prompt += `\n\nConsider these patterns from a similar document:
-- Parties involved: ${parties.map((p: any) => p.name_in_agreement).join(', ')}
+- Parties involved: ${parties.map((p: any) => p.name_in_agreement).join(", ")}
 - Contract value: ${provisions.total_agreement_value} ${provisions.total_agreement_value_currency_code}
-- Payment terms: ${provisions.payment_terms_due_date} (Late fees: ${provisions.can_charge_late_payment_fees ? `${provisions.late_payment_fee_percent}%` : 'None'})
+- Payment terms: ${provisions.payment_terms_due_date} (Late fees: ${provisions.can_charge_late_payment_fees ? `${provisions.late_payment_fee_percent}%` : "None"})
 - Duration: ${provisions.effective_date} to ${provisions.expiration_date}
 - Termination notice: ${provisions.termination_period_for_convenience}`;
         }
       } catch (error) {
-        console.error('Error fetching Navigator data:', error);
+        console.error("Error fetching Navigator data:", error);
       }
     }
 
     if (!content) {
-      return NextResponse.json(
-        { error: 'Document content is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Document content is required" }, { status: 400 });
     }
 
     if (!canMakeRequest()) {
       return NextResponse.json(
-        { 
-          error: 'Rate limit exceeded',
-          details: 'Please wait 1 minute before making another request.'
+        {
+          error: "Rate limit exceeded",
+          details: "Please wait 1 minute before making another request.",
         },
-        { status: 429 }
+        { status: 429 },
       );
     }
 
     if (expertMode) {
       // Add Navigator insights to each expert prompt with warning thresholds
-      const getFSLWithInsights = navigatorData ? 
-        expertPrompts.getFSL + `\n\nConsider these patterns and warning thresholds from a similar document:
+      const getFSLWithInsights = navigatorData
+        ? expertPrompts.getFSL +
+          `\n\nConsider these patterns and warning thresholds from a similar document:
 - Payment terms: ${navigatorData.rawData.provisions.payment_terms_due_date}
   * Add warning_payment_due state 5 days before due date
 - Contract expiration: ${navigatorData.rawData.provisions.expiration_date}
   * Add warning_expiring state 30 days before expiration
-- Late fees: ${navigatorData.rawData.provisions.can_charge_late_payment_fees ? `${navigatorData.rawData.provisions.late_payment_fee_percent}%` : 'None'}
+- Late fees: ${navigatorData.rawData.provisions.can_charge_late_payment_fees ? `${navigatorData.rawData.provisions.late_payment_fee_percent}%` : "None"}
   * Add warning_late_fee state when payment is overdue
 - Termination notice: ${navigatorData.rawData.provisions.termination_period_for_convenience}
   * Add warning_termination state when notice received
 - Compliance requirements:
   * Add warning_compliance state for periodic reviews
 - Renewal deadlines:
-  * Add warning_renewal state 45 days before expiration if auto-renewal enabled` 
+  * Add warning_renewal state 45 days before expiration if auto-renewal enabled`
         : expertPrompts.getFSL;
 
       trackRequest();
       const fslCompletion = await createCompletion("gpt-4", [
         { role: "system", content: getFSLWithInsights },
-        { role: "user", content: content }
+        { role: "user", content: content },
       ]);
 
       const fslStructure = JSON.parse(fslCompletion.choices[0].message.content || "{}");
-      
+
       // Extract transitions and states from FSL
       const transitions = extractTransitions(fslStructure.stateMachine.fsl);
       const states = extractStates(fslStructure.stateMachine.fsl);
@@ -364,10 +368,10 @@ export async function POST(req: Request) {
       // Step 2: Get message rules and event types using GPT-4 Turbo (faster)
       trackRequest();
       const rulesCompletion = await createCompletion("gpt-4-turbo-preview", [
-        { 
-          role: "system", 
-          content: expertPrompts.getMessageRules(fslStructure.stateMachine.fsl, transitions)
-        }
+        {
+          role: "system",
+          content: expertPrompts.getMessageRules(fslStructure.stateMachine.fsl, transitions),
+        },
       ]);
 
       const rulesAndEvents = JSON.parse(rulesCompletion.choices[0].message.content || "{}");
@@ -375,21 +379,21 @@ export async function POST(req: Request) {
       // Step 3: Get actions for states using GPT-4 Turbo (faster)
       trackRequest();
       const actionsCompletion = await createCompletion("gpt-4-turbo-preview", [
-        { 
-          role: "system", 
-          content: expertPrompts.getStateActions(states, rulesAndEvents.variables)
-        }
+        {
+          role: "system",
+          content: expertPrompts.getStateActions(states, rulesAndEvents.variables),
+        },
       ]);
 
       const actionsResult = JSON.parse(actionsCompletion.choices[0].message.content || "{}");
 
       // Validate the results
       const ruleEvents = rulesAndEvents.messageRules?.map((rule: any) => rule.generates.type) || [];
-      
+
       // Check for missing rules
       const missingRules = transitions.filter(t => !ruleEvents.includes(t));
       if (missingRules.length > 0) {
-        throw new Error(`Missing message rules for transitions: ${missingRules.join(', ')}`);
+        throw new Error(`Missing message rules for transitions: ${missingRules.join(", ")}`);
       }
 
       // Combine results
@@ -402,59 +406,58 @@ export async function POST(req: Request) {
         templateId: `template_${Date.now()}`,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        modelUsed: AVAILABLE_MODELS[model as ModelId]
+        modelUsed: AVAILABLE_MODELS[model as ModelId],
       };
 
-      return NextResponse.json({ 
+      return NextResponse.json({
         template,
-        progress: 'Analysis completed'
+        progress: "Analysis completed",
       });
-
     } else {
       // For regular mode, use the selected model (if not expert)
       trackRequest();
-      
+
       const completion = await createCompletion(model as ModelId, [
         { role: "system", content: prompt },
-        { role: "user", content: content }
+        { role: "user", content: content },
       ]);
 
       const template = JSON.parse(completion.choices[0].message.content || "{}");
 
       // Only do basic validation in regular mode
       if (!template.stateMachine?.fsl || !template.messageRules) {
-        throw new Error('Invalid template format: missing required fields');
+        throw new Error("Invalid template format: missing required fields");
       }
 
-      return NextResponse.json({ 
+      return NextResponse.json({
         template: {
           ...template,
           templateId: `template_${Date.now()}`,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
-          modelUsed: AVAILABLE_MODELS[model as ModelId]
-        }
+          modelUsed: AVAILABLE_MODELS[model as ModelId],
+        },
       });
     }
   } catch (error: any) {
-    console.error('Error analyzing document:', error);
-    
-    if (error.response?.status === 429 || error.message.includes('quota')) {
+    console.error("Error analyzing document:", error);
+
+    if (error.response?.status === 429 || error.message.includes("quota")) {
       return NextResponse.json(
-        { 
-          error: 'OpenAI API quota exceeded',
-          details: 'Please check your OpenAI API key and billing settings.'
+        {
+          error: "OpenAI API quota exceeded",
+          details: "Please check your OpenAI API key and billing settings.",
         },
-        { status: 429 }
+        { status: 429 },
       );
     }
 
     return NextResponse.json(
-      { 
-        error: 'Failed to analyze document',
-        details: error.message 
+      {
+        error: "Failed to analyze document",
+        details: error.message,
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
-} 
+}

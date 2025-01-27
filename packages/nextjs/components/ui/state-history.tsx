@@ -1,6 +1,6 @@
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./table"
-import { Button } from "./button"
-import { Eye } from "lucide-react"
+import { Button } from "./button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./table";
+import { Eye } from "lucide-react";
 
 interface StateTransition {
   id: string;
@@ -20,12 +20,7 @@ interface StateHistoryProps {
   onMessageClick: (messageId: string) => void;
 }
 
-export const StateHistory = ({ 
-  transitions, 
-  onFocusState, 
-  focusedState,
-  onMessageClick 
-}: StateHistoryProps) => {
+export const StateHistory = ({ transitions, onFocusState, focusedState, onMessageClick }: StateHistoryProps) => {
   return (
     <div className="border rounded-lg">
       <Table>
@@ -39,20 +34,18 @@ export const StateHistory = ({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {transitions.map((transition) => {
+          {transitions.map(transition => {
             const isStateFocused = focusedState === transition.toState;
             return (
               <TableRow key={transition.id}>
-                <TableCell className="font-mono">
-                  {new Date(transition.timestamp).toLocaleString()}
-                </TableCell>
+                <TableCell className="font-mono">{new Date(transition.timestamp).toLocaleString()}</TableCell>
                 <TableCell>{transition.type || transition.message}</TableCell>
                 <TableCell>
                   <button
                     onClick={() => onMessageClick(transition.messageId || transition.id)}
                     className="hover:underline text-primary"
                   >
-                    {transition.title || transition.type || '-'}
+                    {transition.title || transition.type || "-"}
                   </button>
                 </TableCell>
                 <TableCell>
@@ -68,9 +61,7 @@ export const StateHistory = ({
                     title="Focus on this state"
                     className={isStateFocused ? "bg-primary/20" : ""}
                   >
-                    <Eye 
-                      className={`h-4 w-4 ${isStateFocused ? "text-primary" : ""}`} 
-                    />
+                    <Eye className={`h-4 w-4 ${isStateFocused ? "text-primary" : ""}`} />
                   </Button>
                 </TableCell>
               </TableRow>
@@ -80,4 +71,4 @@ export const StateHistory = ({
       </Table>
     </div>
   );
-}; 
+};

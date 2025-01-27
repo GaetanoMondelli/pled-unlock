@@ -1,5 +1,6 @@
-import { NextApiRequest } from 'next';
-import { NextResponse } from 'next/server'
+import { NextResponse } from "next/server";
+import { NextApiRequest } from "next";
+
 interface User {
   id: number;
   username: string;
@@ -9,8 +10,8 @@ interface User {
 const users: User[] = [
   {
     id: 1,
-    username: 'user1',
-    password: 'password',
+    username: "user1",
+    password: "password",
   },
 ];
 
@@ -23,17 +24,17 @@ function validatePassword(user: User, password: string): boolean {
 }
 
 export async function POST(request: Request) {
-  console.log('POST request to /login');
-  const req = await request.json()
+  console.log("POST request to /login");
+  const req = await request.json();
   const { username, password } = req;
 
-  console.log('username', username, password);
+  console.log("username", username, password);
 
   const user = findUserByUsername(username);
 
   if (!user || !validatePassword(user, password)) {
-    return NextResponse.json({ message: 'Invalid username or password' }, { status: 401 });
+    return NextResponse.json({ message: "Invalid username or password" }, { status: 401 });
   }
 
-  return NextResponse.json({ message: 'Logged in' });
+  return NextResponse.json({ message: "Logged in" });
 }

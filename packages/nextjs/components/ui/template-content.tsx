@@ -1,14 +1,14 @@
-"use client"
+"use client";
 
-import { User, Calendar } from "lucide-react";
+import { Calendar, User } from "lucide-react";
 
 export const formatTemplateContent = (content: string, variables: any) => {
   return content.split(/(\{\{[^}]+\}\})/).map((part, index) => {
-    if (part.startsWith('{{')) {
+    if (part.startsWith("{{")) {
       const variable = part.slice(2, -2).trim();
-      
+
       // Check if it's an event variable
-      if (variable.startsWith('event.')) {
+      if (variable.startsWith("event.")) {
         return (
           <span key={index} className="text-blue-500 group relative inline-flex items-center">
             <Calendar className="h-3 w-3 inline mr-1" />
@@ -19,7 +19,7 @@ export const formatTemplateContent = (content: string, variables: any) => {
           </span>
         );
       }
-      
+
       // Instance variable
       return (
         <span key={index} className="text-green-500 group relative inline-flex items-center">
@@ -33,4 +33,4 @@ export const formatTemplateContent = (content: string, variables: any) => {
     }
     return part;
   });
-}; 
+};

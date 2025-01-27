@@ -1,13 +1,13 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react";
-import { Card } from "../ui/card";
-import { ScrollArea } from "../ui/scroll-area";
-import { getValueByPath } from "../../utils/eventMatching";
-import { Input } from "../ui/input";
-import { Pencil, Save } from "lucide-react";
+import { useEffect, useState } from "react";
 import { fetchFromDb, updateDb } from "../../utils/api";
+import { getValueByPath } from "../../utils/eventMatching";
 import { generateMessages } from "../../utils/messageGeneration";
+import { Card } from "../ui/card";
+import { Input } from "../ui/input";
+import { ScrollArea } from "../ui/scroll-area";
+import { Pencil, Save } from "lucide-react";
 
 interface Message {
   type: string;
@@ -60,17 +60,17 @@ export const VariablesSection = ({ procedureId, template, instance }: VariablesS
       const data = await fetchFromDb();
       const instance = data.procedureInstances?.find((p: any) => p.instanceId === procedureId);
       const template = data.procedureTemplates?.find((t: any) => t.templateId === instance?.templateId);
-      
+
       if (instance && template) {
         const { outputs } = generateMessages(
           instance.history?.events || [],
           template.messageRules || [],
-          instance.variables || {}
+          instance.variables || {},
         );
         setOutputs(outputs);
       }
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error("Error fetching data:", error);
     }
   };
 
@@ -105,7 +105,7 @@ export const VariablesSection = ({ procedureId, template, instance }: VariablesS
         }
       });
     } catch (error) {
-      console.error('Error processing captured outputs:', error);
+      console.error("Error processing captured outputs:", error);
     }
 
     return outputs;
@@ -120,9 +120,9 @@ export const VariablesSection = ({ procedureId, template, instance }: VariablesS
     try {
       const data = await fetchFromDb();
       const instanceIndex = data.procedureInstances?.findIndex((p: any) => p.instanceId === procedureId);
-      
+
       if (instanceIndex === -1) {
-        throw new Error('Instance not found');
+        throw new Error("Instance not found");
       }
 
       // Create a deep copy of the data
@@ -141,16 +141,16 @@ export const VariablesSection = ({ procedureId, template, instance }: VariablesS
 
       // Send the update
       await updateDb(updatedData);
-      
+
       // Update local state
       setEditingState(null);
       await fetchVariables();
     } catch (error) {
-      console.error('Error updating variable:', error);
+      console.error("Error updating variable:", error);
       if (error instanceof Error) {
         alert(`Failed to update variable: ${error.message}`);
       } else {
-        alert('Failed to update variable. Please try again.');
+        alert("Failed to update variable. Please try again.");
       }
     }
   };
@@ -179,10 +179,12 @@ export const VariablesSection = ({ procedureId, template, instance }: VariablesS
                           <Input
                             type="text"
                             value={editingState.value}
-                            onChange={(e) => setEditingState({
-                              ...editingState,
-                              value: e.target.value
-                            })}
+                            onChange={e =>
+                              setEditingState({
+                                ...editingState,
+                                value: e.target.value,
+                              })
+                            }
                             className="h-6 text-xs"
                             autoFocus
                           />
@@ -198,14 +200,16 @@ export const VariablesSection = ({ procedureId, template, instance }: VariablesS
                           <span className="text-primary">
                             {localVariables && localVariables[section]?.[field] !== undefined
                               ? localVariables[section][field]
-                              : '-'}
+                              : "-"}
                           </span>
                           <button
-                            onClick={() => setEditingState({
-                              section,
-                              field,
-                              value: localVariables?.[section]?.[field]?.toString() || ''
-                            })}
+                            onClick={() =>
+                              setEditingState({
+                                section,
+                                field,
+                                value: localVariables?.[section]?.[field]?.toString() || "",
+                              })
+                            }
                             className="p-1 hover:bg-muted-foreground/10 rounded"
                           >
                             <Pencil className="h-3 w-3 text-muted-foreground" />
@@ -230,9 +234,7 @@ export const VariablesSection = ({ procedureId, template, instance }: VariablesS
                       <p className="font-medium">{key}</p>
                       <p className="text-muted-foreground text-[10px]">Captured from event</p>
                     </div>
-                    <span className="text-primary font-mono">
-                      {value}
-                    </span>
+                    <span className="text-primary font-mono">{value}</span>
                   </div>
                 ))}
               </div>
@@ -242,4 +244,4 @@ export const VariablesSection = ({ procedureId, template, instance }: VariablesS
       </ScrollArea>
     </Card>
   );
-}; 
+};

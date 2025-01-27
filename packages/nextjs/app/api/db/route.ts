@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { bucket } from "@/app/lib/firebase";
-const filePath = "pled.json";
 
+const filePath = "pled.json";
 
 export async function GET() {
   try {
@@ -11,10 +11,7 @@ export async function GET() {
     return NextResponse.json(data);
   } catch (error) {
     console.error("Error fetching data from Firebase Storage:", error);
-    return NextResponse.json(
-      { error: "Failed to read the file from Firebase Storage." },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to read the file from Firebase Storage." }, { status: 500 });
   }
 }
 
@@ -23,10 +20,7 @@ export async function PUT(request: Request) {
     const { newEvent } = await request.json();
 
     if (!newEvent || !newEvent.date || !newEvent.title || !newEvent.content) {
-      return NextResponse.json(
-        { error: "Invalid event data" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Invalid event data" }, { status: 400 });
     }
 
     // Reference the file in Firebase Storage
@@ -73,10 +67,7 @@ export async function PUT(request: Request) {
     });
   } catch (error) {
     console.error("Error updating file in Firebase Storage:", error);
-    return NextResponse.json(
-      { error: "Failed to update the file in Firebase Storage." },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to update the file in Firebase Storage." }, { status: 500 });
   }
 }
 
@@ -84,13 +75,13 @@ export async function POST(request: Request) {
   try {
     const { action, data } = await request.json();
 
-    if (action !== 'update') {
+    if (action !== "update") {
       return NextResponse.json({ error: "Invalid action" }, { status: 400 });
     }
 
     // Get the current file
     const file = bucket.file(filePath);
-    
+
     // Save the updated data
     await file.save(JSON.stringify(data, null, 2), {
       contentType: "application/json",
@@ -99,9 +90,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error updating file in Firebase Storage:", error);
-    return NextResponse.json(
-      { error: "Failed to update the file in Firebase Storage." },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to update the file in Firebase Storage." }, { status: 500 });
   }
 }

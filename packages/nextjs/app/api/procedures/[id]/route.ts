@@ -1,21 +1,16 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { fetchFromDb, updateDb } from '@/utils/api';
+import { NextRequest, NextResponse } from "next/server";
+import { fetchFromDb, updateDb } from "@/utils/api";
 
-export async function PATCH(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   try {
     const updates = await request.json();
     const data = await fetchFromDb();
-    
+
     // Find and update the instance
-    const instanceIndex = data.procedureInstances.findIndex(
-      (p: any) => p.instanceId === params.id
-    );
-    
+    const instanceIndex = data.procedureInstances.findIndex((p: any) => p.instanceId === params.id);
+
     if (instanceIndex === -1) {
-      return NextResponse.json({ error: 'Instance not found' }, { status: 404 });
+      return NextResponse.json({ error: "Instance not found" }, { status: 404 });
     }
 
     const instance = data.procedureInstances[instanceIndex];
@@ -35,19 +30,19 @@ export async function PATCH(
         type: updates.event.type,
         template: {
           source: "action",
-          data: updates.event.template?.data || {}
+          data: updates.event.template?.data || {},
         },
         data: updates.event.template?.data || {},
         timestamp: new Date().toISOString(),
         history: {
-          events: [...instance.history.events]
-        }
+          events: [...instance.history.events],
+        },
       };
 
       // Create new instance with updated history
       instance.history = {
         ...instance.history,
-        events: [...instance.history.events, newEvent]
+        events: [...instance.history.events, newEvent],
       };
     }
 
@@ -59,9 +54,9 @@ export async function PATCH(
           actionId: updates.action.actionId,
           state: updates.action.state,
           type: updates.action.type,
-          trigger: updates.action.trigger || 'INIT',
-          timestamp: new Date().toISOString()
-        }
+          trigger: updates.action.trigger || "INIT",
+          timestamp: new Date().toISOString(),
+        },
       ];
     }
 
@@ -71,17 +66,17 @@ export async function PATCH(
       procedureInstances: [
         ...data.procedureInstances.slice(0, instanceIndex),
         instance,
-        ...data.procedureInstances.slice(instanceIndex + 1)
-      ]
+        ...data.procedureInstances.slice(instanceIndex + 1),
+      ],
     };
 
     // Single update to Firebase
     await updateDb(newData);
-    
+
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error updating procedure:', error);
-    return NextResponse.json({ error: 'Failed to update procedure' }, { status: 500 });
+    console.error("Error updating procedure:", error);
+    return NextResponse.json({ error: "Failed to update procedure" }, { status: 500 });
   }
 }
 
@@ -91,18 +86,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const eventData = await req.json();
     const data = await fetchFromDb();
 
-    console.log('Creating event:', eventData); // Debug log
+    console.log("Creating event:", eventData); // Debug log
 
     // Find the procedure instance
-    const instance = data.procedureInstances?.find(
-      (p: any) => p.instanceId === procedureId
-    );
+    const instance = data.procedureInstances?.find((p: any) => p.instanceId === procedureId);
 
     if (!instance) {
-      return NextResponse.json(
-        { error: 'Procedure not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Procedure not found" }, { status: 404 });
     }
 
     // Initialize events array if it doesn't exist
@@ -118,10 +108,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       timestamp: eventData.timestamp || new Date().toISOString(),
       title: eventData.title,
       content: eventData.content,
-      source: eventData.source
+      source: eventData.source,
     };
 
-    console.log('New event:', newEvent); // Debug log
+    console.log("New event:", newEvent); // Debug log
 
     // Add event to instance
     instance.events.push(newEvent);
@@ -131,10 +121,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     return NextResponse.json(newEvent);
   } catch (error) {
-    console.error('Error creating event:', error);
-    return NextResponse.json(
-      { error: 'Failed to create event' },
-      { status: 500 }
-    );
+    console.error("Error creating event:", error);
+    return NextResponse.json({ error: "Failed to create event" }, { status: 500 });
   }
-} 
+}

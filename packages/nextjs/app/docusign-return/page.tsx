@@ -1,24 +1,24 @@
-"use client"
+"use client";
 
-import { useEffect } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 export default function DocuSignReturn() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
   useEffect(() => {
-    const event = searchParams.get('event')
-    if (event === 'signing_complete') {
+    const event = searchParams.get("event");
+    if (event === "signing_complete") {
       // Close the window/redirect
       if (window.opener) {
-        window.opener.postMessage({ type: 'DOCUSIGN_SIGNING_COMPLETE' }, '*')
-        window.close()
+        window.opener.postMessage({ type: "DOCUSIGN_SIGNING_COMPLETE" }, "*");
+        window.close();
       } else {
-        router.push('/')
+        router.push("/");
       }
     }
-  }, [router, searchParams])
+  }, [router, searchParams]);
 
   return (
     <div className="flex items-center justify-center min-h-screen">
@@ -27,5 +27,5 @@ export default function DocuSignReturn() {
         <p>Please wait while we complete the signing process.</p>
       </div>
     </div>
-  )
-} 
+  );
+}

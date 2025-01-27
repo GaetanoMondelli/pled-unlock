@@ -20,7 +20,7 @@ const CustomEthApp = ({ children }: { children: React.ReactNode }) => {
   return (
     <div className="flex flex-col h-screen">
       <Navbar />
-        <main>{children}</main>
+      <main>{children}</main>
     </div>
   );
 };

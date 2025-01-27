@@ -1,4 +1,4 @@
-import { Check, Clock, AlertTriangle } from "lucide-react";
+import { AlertTriangle, Check, Clock } from "lucide-react";
 
 interface ActionExecutionListProps {
   expectedActions: any[];
@@ -6,16 +6,10 @@ interface ActionExecutionListProps {
   pendingActions: any[];
 }
 
-export const ActionExecutionList = ({ 
-  expectedActions, 
-  executedActions, 
-  pendingActions 
-}: ActionExecutionListProps) => {
+export const ActionExecutionList = ({ expectedActions, executedActions, pendingActions }: ActionExecutionListProps) => {
   if (!expectedActions?.length) {
     return (
-      <div className="mt-4 p-4 bg-gray-50 rounded-lg text-gray-500 text-center">
-        No actions should be executed
-      </div>
+      <div className="mt-4 p-4 bg-gray-50 rounded-lg text-gray-500 text-center">No actions should be executed</div>
     );
   }
 
@@ -35,32 +29,22 @@ export const ActionExecutionList = ({
           <tbody className="divide-y divide-gray-100">
             {expectedActions.map((action, index) => {
               const isPending = pendingActions.some(
-                p => p.actionId === action.actionId && 
-                     p.state === action.state && 
-                     p.trigger === action.trigger
+                p => p.actionId === action.actionId && p.state === action.state && p.trigger === action.trigger,
               );
               const isExecuted = executedActions.some(
-                e => e.actionId === action.actionId && 
-                     e.state === action.state && 
-                     e.trigger === action.trigger
+                e => e.actionId === action.actionId && e.state === action.state && e.trigger === action.trigger,
               );
 
               return (
-                <tr 
+                <tr
                   key={`${action.actionId}_${action.state}_${action.trigger}_${index}`}
                   className={`
-                    ${isExecuted ? 'bg-green-50' : isPending ? 'bg-orange-50' : 'bg-white'}
+                    ${isExecuted ? "bg-green-50" : isPending ? "bg-orange-50" : "bg-white"}
                   `}
                 >
-                  <td className="px-4 py-2">
-                    {action.type || action.name || action.actionId || 'Unknown Action'}
-                  </td>
-                  <td className="px-4 py-2">
-                    {action.state}
-                  </td>
-                  <td className="px-4 py-2">
-                    {action.trigger}
-                  </td>
+                  <td className="px-4 py-2">{action.type || action.name || action.actionId || "Unknown Action"}</td>
+                  <td className="px-4 py-2">{action.state}</td>
+                  <td className="px-4 py-2">{action.trigger}</td>
                   <td className="px-4 py-2 text-center">
                     {isExecuted ? (
                       <div className="inline-flex items-center text-green-600">
@@ -86,10 +70,8 @@ export const ActionExecutionList = ({
         </table>
       </div>
       {pendingActions.length > 0 && (
-        <div className="mt-2 text-xs text-orange-600">
-          * Pending actions will be stored after refresh
-        </div>
+        <div className="mt-2 text-xs text-orange-600">* Pending actions will be stored after refresh</div>
       )}
     </div>
   );
-}; 
+};

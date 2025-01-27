@@ -28,20 +28,16 @@ export default function ProcedurePage({ params }: { params: { id: string } }) {
     async function loadData() {
       try {
         const fullData = await fetchFromDb();
-        const instance = fullData.procedureInstances?.find(
-          (p: any) => p.instanceId === params.id
-        );
-        const template = fullData.procedureTemplates?.find(
-          (t: any) => t.templateId === instance?.templateId
-        );
+        const instance = fullData.procedureInstances?.find((p: any) => p.instanceId === params.id);
+        const template = fullData.procedureTemplates?.find((t: any) => t.templateId === instance?.templateId);
 
         if (!instance || !template) {
-          throw new Error('Procedure not found');
+          throw new Error("Procedure not found");
         }
 
         setData({ template, instance });
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load procedure data');
+        setError(err instanceof Error ? err.message : "Failed to load procedure data");
       } finally {
         setLoading(false);
       }
@@ -66,12 +62,8 @@ export default function ProcedurePage({ params }: { params: { id: string } }) {
 
   return (
     <div>
-      <VariablesSection 
-        procedureId={params.id}
-        template={template}
-        instance={instance}
-      />
+      <VariablesSection procedureId={params.id} template={template} instance={instance} />
       {/* Other components */}
     </div>
   );
-} 
+}

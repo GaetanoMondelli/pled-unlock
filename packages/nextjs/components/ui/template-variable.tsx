@@ -1,17 +1,12 @@
-"use client"
+"use client";
 
-import React, { useState } from "react"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
-import { Variable } from "lucide-react"
+import React, { useState } from "react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Variable } from "lucide-react";
 
 interface TemplateVariableProps {
-  text: string
-  variables: Record<string, any>
+  text: string;
+  variables: Record<string, any>;
 }
 
 export const TemplateVariable = ({ text, variables }: TemplateVariableProps) => {
@@ -19,7 +14,7 @@ export const TemplateVariable = ({ text, variables }: TemplateVariableProps) => 
   const renderText = (text: string) => {
     const parts = text.split(/(\{\{[^}]+\}\})/g);
     return parts.map((part, index) => {
-      if (part.startsWith('{{') && part.endsWith('}}')) {
+      if (part.startsWith("{{") && part.endsWith("}}")) {
         const path = part.slice(2, -2).trim();
         return <TemplateValue key={index} path={path} variables={variables} />;
       }
@@ -31,21 +26,21 @@ export const TemplateVariable = ({ text, variables }: TemplateVariableProps) => 
 };
 
 interface TemplateValueProps {
-  path: string
-  variables: Record<string, any>
+  path: string;
+  variables: Record<string, any>;
 }
 
 const TemplateValue = ({ path, variables }: TemplateValueProps) => {
   const [showValue, setShowValue] = useState(false);
 
   const resolveValue = (path: string, obj: Record<string, any>): string => {
-    const parts = path.split('.');
+    const parts = path.split(".");
     let value = obj;
     for (const part of parts) {
       value = value?.[part];
       if (value === undefined) return path;
     }
-    return typeof value === 'string' ? value : path;
+    return typeof value === "string" ? value : path;
   };
 
   const value = resolveValue(path, variables);
@@ -65,11 +60,9 @@ const TemplateValue = ({ path, variables }: TemplateValueProps) => {
           </span>
         </TooltipTrigger>
         <TooltipContent>
-          <p className="text-xs">
-            {showValue ? `Template: {{${path}}}` : `Value: ${value}`}
-          </p>
+          <p className="text-xs">{showValue ? `Template: {{${path}}}` : `Value: ${value}`}</p>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
   );
-}; 
+};

@@ -8,11 +8,11 @@ export interface DocuSignConfig {
 
 export const getDefaultConfig = async (): Promise<DocuSignConfig> => {
   try {
-    const response = await fetch('/api/docusign/config');
+    const response = await fetch("/api/docusign/config");
     const config = await response.json();
     return config;
   } catch (error) {
-    console.error('Error loading config:', error);
+    console.error("Error loading config:", error);
     throw error;
   }
-}; 
+};

@@ -1,7 +1,7 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { Settings } from "lucide-react"
+import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,33 +9,27 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Switch } from "@/components/ui/switch"
-import { Button } from "@/components/ui/button"
+} from "@/components/ui/dropdown-menu";
+import { Switch } from "@/components/ui/switch";
+import { Settings } from "lucide-react";
 
 export function SettingsMenu() {
-  const [debugMode, setDebugMode] = useState(false)
+  const [debugMode, setDebugMode] = useState(false);
 
   useEffect(() => {
     // Load debug mode preference from localStorage
-    const savedDebugMode = localStorage.getItem("debugMode")
-    setDebugMode(savedDebugMode === "true")
+    const savedDebugMode = localStorage.getItem("debugMode");
+    setDebugMode(savedDebugMode === "true");
 
     // Update CSS variable based on saved preference
-    document.documentElement.style.setProperty(
-      "--debug-visibility", 
-      savedDebugMode === "true" ? "visible" : "hidden"
-    )
-  }, [])
+    document.documentElement.style.setProperty("--debug-visibility", savedDebugMode === "true" ? "visible" : "hidden");
+  }, []);
 
   const handleDebugModeChange = (enabled: boolean) => {
-    setDebugMode(enabled)
-    localStorage.setItem("debugMode", String(enabled))
-    document.documentElement.style.setProperty(
-      "--debug-visibility", 
-      enabled ? "visible" : "hidden"
-    )
-  }
+    setDebugMode(enabled);
+    localStorage.setItem("debugMode", String(enabled));
+    document.documentElement.style.setProperty("--debug-visibility", enabled ? "visible" : "hidden");
+  };
 
   return (
     <DropdownMenu>
@@ -50,13 +44,9 @@ export function SettingsMenu() {
         <DropdownMenuSeparator />
         <DropdownMenuItem className="flex items-center justify-between cursor-pointer">
           Debug Mode
-          <Switch
-            checked={debugMode}
-            onCheckedChange={handleDebugModeChange}
-            className="ml-2"
-          />
+          <Switch checked={debugMode} onCheckedChange={handleDebugModeChange} className="ml-2" />
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
-  )
-} 
+  );
+}

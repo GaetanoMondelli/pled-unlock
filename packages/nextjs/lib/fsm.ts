@@ -1,4 +1,4 @@
-import { sm } from 'jssm'
+import { sm } from "jssm";
 
 interface Message {
   id: string;
@@ -35,7 +35,7 @@ interface ActionLog {
 interface ActionExecution {
   actionId: string;
   state: string;
-  trigger: string;  // The event that caused this state
+  trigger: string; // The event that caused this state
   timestamp: string;
   eventId: string;
 }
@@ -45,14 +45,14 @@ export function createStateMachine(definition: string): StateMachine {
   const states = new Set<string>();
 
   // Parse the definition
-  definition.split(';').forEach(line => {
+  definition.split(";").forEach(line => {
     line = line.trim();
     if (!line) return;
 
     const match = line.match(/(\w+)\s+'([^']+)'\s*->\s*(\w+)/);
     if (match) {
       const [, source, event, target] = match;
-      
+
       // Add states to set
       states.add(source);
       states.add(target);
@@ -65,13 +65,13 @@ export function createStateMachine(definition: string): StateMachine {
     }
   });
 
-  const currentState = Array.from(states).find(state => state === 'idle') || Array.from(states)[0];
+  const currentState = Array.from(states).find(state => state === "idle") || Array.from(states)[0];
 
   return {
     states: Array.from(states).map(id => ({
       id,
-      isInitial: id === 'idle',
-      isWarning: id === 'failure'
+      isInitial: id === "idle",
+      isWarning: id === "failure",
     })),
     currentState,
     transitions,
@@ -92,16 +92,13 @@ export function createStateMachine(definition: string): StateMachine {
     },
     state() {
       return this.currentState;
-    }
+    },
   };
 }
 
-export const calculateCurrentState = (
-  definition: string,
-  messages: Message[]
-): string => {
+export const calculateCurrentState = (definition: string, messages: Message[]): string => {
   const machine = createStateMachine(definition);
-  let processedState = 'idle';
+  let processedState = "idle";
   machine.go(processedState);
 
   for (const message of messages) {
@@ -117,17 +114,17 @@ export const calculateCurrentState = (
 };
 
 export const calculateStateAndExecuteActions = async (
-  definition: string, 
-  messages: Message[], 
+  definition: string,
+  messages: Message[],
   instance: any,
-  template: any
+  template: any,
 ): Promise<string> => {
   const machine = createStateMachine(definition);
-  const currentState = 'idle';
+  const currentState = "idle";
   machine.go(currentState);
 
   if (!instance) {
-    console.log('No instance provided to calculateCurrentState');
+    console.log("No instance provided to calculateCurrentState");
     return currentState;
   }
 
@@ -139,35 +136,33 @@ export const calculateStateAndExecuteActions = async (
     instance.history.executedActions = [];
   }
 
-  let processedState = 'idle';
-  
+  let processedState = "idle";
+
   for (const message of messages) {
     if (message.type) {
       const previousState = processedState;
       const actionResult = machine.action(message.type);
-      
+
       if (actionResult) {
         processedState = machine.state();
-        
+
         // Get actions that should be executed in this state
         const stateActions = template?.actions?.[processedState] || [];
-        
+
         // Find which actions haven't been executed for this state transition
         const pendingActions = stateActions.filter((action: any) => {
           const hasBeenExecuted = instance.history.executedActions.some(
-            (executed: ActionExecution) => 
-              executed.actionId === action.id && 
-              executed.state === processedState &&
-              executed.trigger === message.type
+            (executed: ActionExecution) =>
+              executed.actionId === action.id && executed.state === processedState && executed.trigger === message.type,
           );
           return !hasBeenExecuted && action.enabled;
         });
 
-        console.log('State transition:', {
+        console.log("State transition:", {
           from: previousState,
           to: processedState,
           trigger: message.type,
-          pendingActions: pendingActions.length
+          pendingActions: pendingActions.length,
         });
 
         // Execute pending actions
@@ -181,18 +176,18 @@ export const calculateStateAndExecuteActions = async (
               transition: {
                 from: previousState,
                 to: processedState,
-                trigger: message.type
-              }
+                trigger: message.type,
+              },
             };
 
-            const response = await fetch('/api/events', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+            const response = await fetch("/api/events", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 event,
-                action: 'add',
-                procedureId: instance.instanceId
-              })
+                action: "add",
+                procedureId: instance.instanceId,
+              }),
             });
 
             if (response.ok) {
@@ -202,20 +197,20 @@ export const calculateStateAndExecuteActions = async (
                 state: processedState,
                 trigger: message.type,
                 timestamp: new Date().toISOString(),
-                eventId: event.id
+                eventId: event.id,
               });
 
               // Update instance in database
-              await fetch('/api/procedures/' + instance.instanceId, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
+              await fetch("/api/procedures/" + instance.instanceId, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                  history: instance.history
-                })
+                  history: instance.history,
+                }),
               });
             }
           } catch (error) {
-            console.error('Error executing action:', error);
+            console.error("Error executing action:", error);
           }
         }
       }
@@ -223,4 +218,4 @@ export const calculateStateAndExecuteActions = async (
   }
 
   return processedState;
-}; 
+};

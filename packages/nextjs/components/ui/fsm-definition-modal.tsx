@@ -1,17 +1,11 @@
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "./dialog"
-import { Button } from "./button"
-import { Textarea } from "./textarea"
-import { Code2 } from "lucide-react"
+import { Button } from "./button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./dialog";
+import { Textarea } from "./textarea";
+import { Code2 } from "lucide-react";
 
 interface FSMDefinitionModalProps {
-  definition: string
-  onChange: (value: string) => void
+  definition: string;
+  onChange: (value: string) => void;
 }
 
 export const FSMDefinitionModal = ({ definition, onChange }: FSMDefinitionModalProps) => {
@@ -29,11 +23,11 @@ export const FSMDefinitionModal = ({ definition, onChange }: FSMDefinitionModalP
         </DialogHeader>
         <Textarea
           value={definition}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={e => onChange(e.target.value)}
           className="min-h-[300px] font-mono"
           placeholder="Enter state machine definition..."
         />
       </DialogContent>
     </Dialog>
-  )
-} 
+  );
+};
