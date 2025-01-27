@@ -251,7 +251,7 @@ export default function Home() {
                               <CardDescription className="flex items-center gap-2">
                                 <Building2 className="h-4 w-4" />
                                 {instance.variables?.company?.department ||
-                                  Object.entries(instance.variables || {})[0]?.[1]?.department ||
+                                  ((Object.entries(instance.variables)[0]?.[1] as { department?: string })?.department) ||
                                   "No department"}
                               </CardDescription>
                             </div>
