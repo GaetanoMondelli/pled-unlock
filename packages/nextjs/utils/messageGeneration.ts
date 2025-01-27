@@ -10,18 +10,20 @@ interface MessageRule {
   };
   generates: {
     type: string;
-    template: Record<string, string>;
+    template: Partial<Record<string, string | undefined>>;
   };
   captures?: Record<string, string>;
 }
 
-// Add the formatTemplateContent function
-function formatTemplateContent(template: string, data: any): string {
+// Updated formatTemplateContent function
+function formatTemplateContent(template: string | undefined, data: any): string {
+  if (!template) return '';
+  
   return template.replace(/\{\{([^}]+)\}\}/g, (_, path) => {
-    const value = path.split('.').reduce((obj: any, key: string) => {
+    const value = path.trim().split('.').reduce((obj: any, key: string) => {
       return obj?.[key];
     }, data);
-    return value !== undefined ? String(value) : '';
+    return value ?? '';
   });
 }
 
@@ -35,7 +37,7 @@ export function generateMessages(events: any[], rules: any[], variables: any) {
         // Capture outputs if specified
         if (rule.captures) {
           outputs[rule.generates.type] = Object.entries(rule.captures).reduce((acc, [key, value]) => {
-            acc[key] = formatTemplateContent(value as string, {
+            acc[key] = formatTemplateContent(value, {
               event,
               ...variables
             });
@@ -43,24 +45,24 @@ export function generateMessages(events: any[], rules: any[], variables: any) {
           }, {} as Record<string, any>);
         }
 
-        // Generate message
+        // Generate message with null checks
         const message = {
           id: `msg_${event.id}`,
           type: rule.generates.type,
-          title: formatTemplateContent(rule.generates.template.title, {
+          title: formatTemplateContent(rule.generates.template?.title, {
             event,
             captures: outputs[rule.generates.type],
             ...variables
           }),
-          content: formatTemplateContent(rule.generates.template.content, {
+          content: formatTemplateContent(rule.generates.template?.content, {
             event,
             captures: outputs[rule.generates.type],
             ...variables
           }),
-          timestamp: event.data.time || event.timestamp, // Use event.data.time first, fall back to event.timestamp
+          timestamp: event.data?.time || event.timestamp,
           fromEvent: event.id,
           rule: rule.id,
-          event: event // Include the full event for reference
+          event: event
         };
 
         messages.push(message);

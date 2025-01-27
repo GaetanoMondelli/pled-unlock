@@ -6,42 +6,59 @@ const allowedUsernamesPasswordsArray: readonly [string, string | undefined][] = 
     ["docusign", process.env.AUTH_DOCUSIGN_PASSWORD],
     ["gmondelli", process.env.AUTH_GMONDELLI_PASSWORD],
 ];
+
 const allowedUsernamesPasswords = new Map<string, any>(
     allowedUsernamesPasswordsArray
 );
-const options : NextAuthOptions = {
+
+const options: NextAuthOptions = {
+    providers: [
+        CredentialsProvider({
+            id: "credentials",
+            name: "Credentials",
+            credentials: {
+                username: { label: "Username", type: "text" },
+                password: { label: "Password", type: "password" }
+            },
+            async authorize(credentials) {
+                if (!credentials?.username || !credentials?.password) {
+                    throw new Error("Missing username or password");
+                }
+
+                const password = allowedUsernamesPasswords.get(credentials.username);
+                if (!password || password !== credentials.password) {
+                    throw new Error("Invalid username or password");
+                }
+
+                return {
+                    id: credentials.username,
+                    name: credentials.username,
+                    email: `${credentials.username}@example.com`
+                };
+            }
+        })
+    ],
+    pages: {
+        signIn: '/auth/signin',
+    },
     session: {
         strategy: "jwt",
         maxAge: 24 * 60 * 60,
     },
-    
-    providers: [
-        CredentialsProvider({
-            type: "credentials",
-            async authorize(credentials, req) {
-                if (!credentials?.password || !credentials?.username) {
-                    return null;
-                }
-                const password = allowedUsernamesPasswords.get(credentials.username);
-                if (!password || password !== credentials.password) {
-                    return null;
-                }
+    callbacks: {
+        async jwt({ token, user }) {
+            if (user) {
+                token.id = user.id;
+            }
+            return token;
+        },
+        async session({ session, token }) {
+            if (session.user) {
+                session.user.id = token.id as string;
+            }
+            return session;
+        }
+    }
+};
 
-                const user = {
-                    id: allowedUsernamesPasswordsArray.findIndex(([username, _]) => username === credentials.username),
-                    name: credentials.username,
-                    email: "",
-                    image: "",
-                }
-    
-                return user as any;
-            },
-            credentials: {
-                username: { label: "Username", type: "text", placeholder: "Username" },
-                password: { label: "Password", type: "password" },
-            },
-        }),
-    ]
-}
-
-export {options, allowedUsernamesPasswords};
+export { options, allowedUsernamesPasswords };

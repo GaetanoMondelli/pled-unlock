@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button"
 import { RainbowKitCustomConnectButton } from "./scaffold-eth/RainbowKitCustomConnectButton"
 import { FaucetButton } from "./scaffold-eth/FaucetButton"
 import { SettingsMenu } from "./layout/SettingsMenu"
+import { signOut } from "next-auth/react";
 
 export function Navbar() {
     return (
@@ -23,6 +24,12 @@ export function Navbar() {
                     <SettingsMenu />
                     <RainbowKitCustomConnectButton />
                     <FaucetButton />
+                    <button
+                        className="btn btn-sm btn-error ml-2"
+                        onClick={() => signOut({ callbackUrl: "/auth/signin" })}
+                    >
+                        Logout
+                    </button>
                 </div>
             </div>
         </nav>

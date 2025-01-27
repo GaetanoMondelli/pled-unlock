@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { bucket } from "@/app/lib/firebase";
 const filePath = "pled.json";
-import { options, allowedUsernamesPasswords } from "@/app/api/configAuth";
-import { getServerSession } from "next-auth";
+
 
 export async function GET() {
   try {
