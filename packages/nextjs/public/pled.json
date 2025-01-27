@@ -421,7 +421,7 @@
               "body": "Dear {{candidate.name}},\n\nThis is a reminder about your upcoming interview..."
             },
             "executed": true,
-            "executedAt": "2025-01-26T12:31:05.777Z",
+            "executedAt": "2025-01-26T21:18:58.313Z",
             "trigger": "schedule_interview"
           }
         ],
@@ -453,8 +453,23 @@
               }
             },
             "executed": true,
-            "executedAt": "2025-01-25T22:43:32.026Z",
+            "executedAt": "2025-01-26T21:19:09.001Z",
             "trigger": "positive_feedback"
+          }
+        ],
+        "schedule_interview": [
+          {
+            "id": "action_1737921271615",
+            "type": " Calendar",
+            "enabled": true,
+            "template": {
+              "source": "action",
+              "data": {
+                "type": " Calendar",
+                "googleAPI": "calendar",
+                "sentCalendarInvite": true
+              }
+            }
           }
         ]
       }
@@ -880,6 +895,71 @@
         }
       },
       "received": false
+    },
+    "docusign_status_1737926838755": {
+      "id": "docusign_status_1737926838755",
+      "name": "DocuSign Status Event",
+      "description": "DocuSign envelope status check",
+      "type": "DOCUSIGN_STATUS",
+      "template": {
+        "source": "manual",
+        "data": {
+          "status": "completed",
+          "documentsUri": "/envelopes/37ea58bf-81fb-47dd-96a9-f8b47182a43f/documents",
+          "recipientsUri": "/envelopes/37ea58bf-81fb-47dd-96a9-f8b47182a43f/recipients",
+          "attachmentsUri": "/envelopes/37ea58bf-81fb-47dd-96a9-f8b47182a43f/attachments",
+          "envelopeUri": "/envelopes/37ea58bf-81fb-47dd-96a9-f8b47182a43f",
+          "emailSubject": "Please sign this document",
+          "emailBlurb": "Please review and sign this document at your earliest convenience.",
+          "envelopeId": "37ea58bf-81fb-47dd-96a9-f8b47182a43f",
+          "signingLocation": "online",
+          "customFieldsUri": "/envelopes/37ea58bf-81fb-47dd-96a9-f8b47182a43f/custom_fields",
+          "notificationUri": "/envelopes/37ea58bf-81fb-47dd-96a9-f8b47182a43f/notification",
+          "enableWetSign": "true",
+          "allowMarkup": "false",
+          "allowReassign": "true",
+          "createdDateTime": "2025-01-26T21:19:03.9670000Z",
+          "lastModifiedDateTime": "2025-01-26T21:19:03.9670000Z",
+          "deliveredDateTime": "2025-01-26T21:23:59.8470000Z",
+          "initialSentDateTime": "2025-01-26T21:19:05.6870000Z",
+          "sentDateTime": "2025-01-26T21:19:05.6870000Z",
+          "completedDateTime": "2025-01-26T21:25:27.1530000Z",
+          "statusChangedDateTime": "2025-01-26T21:25:27.1530000Z",
+          "documentsCombinedUri": "/envelopes/37ea58bf-81fb-47dd-96a9-f8b47182a43f/documents/combined",
+          "certificateUri": "/envelopes/37ea58bf-81fb-47dd-96a9-f8b47182a43f/documents/certificate",
+          "templatesUri": "/envelopes/37ea58bf-81fb-47dd-96a9-f8b47182a43f/templates",
+          "expireEnabled": "true",
+          "expireDateTime": "2025-05-26T21:19:05.6870000Z",
+          "expireAfter": "120",
+          "sender": {
+            "userName": "Gaetano Mondelli",
+            "userId": "3d75ee95-c9b7-4531-80e7-31ad925c641c",
+            "accountId": "a8c0cf58-75d0-422a-a7cd-1f7a88f15dd6",
+            "email": "gaetano.mondelli@gmail.com",
+            "ipAddress": "92.41.178.67"
+          },
+          "purgeState": "unpurged",
+          "envelopeIdStamping": "true",
+          "is21CFRPart11": "false",
+          "signerCanSignOnMobile": "true",
+          "autoNavigation": "true",
+          "isSignatureProviderEnvelope": "false",
+          "hasFormDataChanged": "false",
+          "allowComments": "true",
+          "hasComments": "false",
+          "allowViewHistory": "true",
+          "envelopeMetadata": {
+            "allowAdvancedCorrect": "true",
+            "enableSignWithNotary": "true",
+            "allowCorrect": "true"
+          },
+          "anySigner": null,
+          "envelopeLocation": "current_site",
+          "isDynamicEnvelope": "false",
+          "burnDefaultTabData": "false"
+        }
+      },
+      "received": true
     }
   },
   "procedureInstances": [
@@ -949,9 +1029,9 @@
             }
           },
           {
-            "id": "interview-done-1737834530789",
+            "id": "interview-done-1737925016283",
             "type": "INTERVIEW_EVENT",
-            "timestamp": "2025-01-25T19:48:50.789Z",
+            "timestamp": "2025-01-26T20:56:56.283Z",
             "data": {
               "type": "interview_completed",
               "candidateId": "CAND-123",
@@ -961,9 +1041,9 @@
             }
           },
           {
-            "id": "feedback-positive-1737835566474",
+            "id": "feedback-positive-1737925016284",
             "type": "FEEDBACK_EVENT",
-            "timestamp": "2025-01-25T20:06:06.474Z",
+            "timestamp": "2025-01-26T20:56:56.284Z",
             "data": {
               "type": "interview_feedback",
               "candidateId": "CAND-123",
@@ -972,9 +1052,365 @@
               "notes": "Strong technical skills and good culture fit",
               "recommendedAction": "proceed_to_offer"
             }
+          },
+          {
+            "id": "evt_1737926346365",
+            "name": "DocuSign Envelope Sent",
+            "description": "Envelope 37ea58bf-81fb-47dd-96a9-f8b47182a43f has been sent to recipients",
+            "type": "DOCUSIGN_SENT",
+            "template": {
+              "source": "action",
+              "data": {
+                "envelopeId": "37ea58bf-81fb-47dd-96a9-f8b47182a43f",
+                "status": "sent",
+                "timestamp": "2025-01-26T21:19:06.219Z",
+                "actionId": "action_1737835293132"
+              }
+            },
+            "data": {
+              "envelopeId": "37ea58bf-81fb-47dd-96a9-f8b47182a43f",
+              "status": "sent",
+              "timestamp": "2025-01-26T21:19:06.219Z",
+              "actionId": "action_1737835293132"
+            },
+            "timestamp": "2025-01-26T21:19:06.365Z",
+            "history": {
+              "events": [
+                {
+                  "id": "interview-request-1737640068838",
+                  "type": "EMAIL_RECEIVED",
+                  "timestamp": "2025-01-23T13:47:48.838Z",
+                  "data": {
+                    "from": "john@example.com",
+                    "to": "hr@company.com",
+                    "subject": "Interview request",
+                    "body": "I would like to schedule an interview",
+                    "time": "2024-01-17T10:00:00Z"
+                  },
+                  "transitions": [
+                    {
+                      "id": "interview-request-1737640068838",
+                      "timestamp": "2025-01-23T13:47:48.838Z",
+                      "message": "EMAIL_RECEIVED",
+                      "fromState": "idle",
+                      "toState": "processing"
+                    }
+                  ]
+                },
+                {
+                  "id": "role-discuss-1737641538864",
+                  "type": "EMAIL_RECEIVED",
+                  "timestamp": "2025-01-23T14:12:18.864Z",
+                  "data": {
+                    "from": "john@example.com",
+                    "to": "hr@company.com",
+                    "subject": "Role discussion",
+                    "body": "I would like to discuss the role details",
+                    "time": "2024-01-17T11:00:00Z"
+                  }
+                },
+                {
+                  "id": "schedule-interview-1737641550376",
+                  "type": "CALENDAR_EVENT",
+                  "timestamp": "2025-01-23T14:12:30.376Z",
+                  "data": {
+                    "type": "schedule_interview",
+                    "candidateEmail": "john@example.com",
+                    "interviewerEmail": "hr@company.com",
+                    "proposedTime": "2024-01-20T10:00:00Z",
+                    "duration": "60"
+                  }
+                },
+                {
+                  "id": "interview-done-1737925016283",
+                  "type": "INTERVIEW_EVENT",
+                  "timestamp": "2025-01-26T20:56:56.283Z",
+                  "data": {
+                    "type": "interview_completed",
+                    "candidateId": "CAND-123",
+                    "interviewerId": "INT-456",
+                    "duration": "55",
+                    "completedAt": "2024-01-20T11:00:00Z"
+                  }
+                },
+                {
+                  "id": "feedback-positive-1737925016284",
+                  "type": "FEEDBACK_EVENT",
+                  "timestamp": "2025-01-26T20:56:56.284Z",
+                  "data": {
+                    "type": "interview_feedback",
+                    "candidateId": "CAND-123",
+                    "decision": "positive",
+                    "rating": 4.5,
+                    "notes": "Strong technical skills and good culture fit",
+                    "recommendedAction": "proceed_to_offer"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "id": "evt_1737926348106",
+            "name": "DocuSign Status Update",
+            "description": "Envelope 37ea58bf-81fb-47dd-96a9-f8b47182a43f status is now: sent",
+            "type": "DOCUSIGN_STATUS",
+            "template": {
+              "source": "action",
+              "data": {
+                "envelopeId": "37ea58bf-81fb-47dd-96a9-f8b47182a43f",
+                "status": "sent",
+                "timestamp": "2025-01-26T21:19:07.923Z",
+                "actionId": "action_1737835293132"
+              }
+            },
+            "data": {
+              "envelopeId": "37ea58bf-81fb-47dd-96a9-f8b47182a43f",
+              "status": "sent",
+              "timestamp": "2025-01-26T21:19:07.923Z",
+              "actionId": "action_1737835293132"
+            },
+            "timestamp": "2025-01-26T21:19:08.106Z",
+            "history": {
+              "events": [
+                {
+                  "id": "interview-request-1737640068838",
+                  "type": "EMAIL_RECEIVED",
+                  "timestamp": "2025-01-23T13:47:48.838Z",
+                  "data": {
+                    "from": "john@example.com",
+                    "to": "hr@company.com",
+                    "subject": "Interview request",
+                    "body": "I would like to schedule an interview",
+                    "time": "2024-01-17T10:00:00Z"
+                  },
+                  "transitions": [
+                    {
+                      "id": "interview-request-1737640068838",
+                      "timestamp": "2025-01-23T13:47:48.838Z",
+                      "message": "EMAIL_RECEIVED",
+                      "fromState": "idle",
+                      "toState": "processing"
+                    }
+                  ]
+                },
+                {
+                  "id": "role-discuss-1737641538864",
+                  "type": "EMAIL_RECEIVED",
+                  "timestamp": "2025-01-23T14:12:18.864Z",
+                  "data": {
+                    "from": "john@example.com",
+                    "to": "hr@company.com",
+                    "subject": "Role discussion",
+                    "body": "I would like to discuss the role details",
+                    "time": "2024-01-17T11:00:00Z"
+                  }
+                },
+                {
+                  "id": "schedule-interview-1737641550376",
+                  "type": "CALENDAR_EVENT",
+                  "timestamp": "2025-01-23T14:12:30.376Z",
+                  "data": {
+                    "type": "schedule_interview",
+                    "candidateEmail": "john@example.com",
+                    "interviewerEmail": "hr@company.com",
+                    "proposedTime": "2024-01-20T10:00:00Z",
+                    "duration": "60"
+                  }
+                },
+                {
+                  "id": "interview-done-1737925016283",
+                  "type": "INTERVIEW_EVENT",
+                  "timestamp": "2025-01-26T20:56:56.283Z",
+                  "data": {
+                    "type": "interview_completed",
+                    "candidateId": "CAND-123",
+                    "interviewerId": "INT-456",
+                    "duration": "55",
+                    "completedAt": "2024-01-20T11:00:00Z"
+                  }
+                },
+                {
+                  "id": "feedback-positive-1737925016284",
+                  "type": "FEEDBACK_EVENT",
+                  "timestamp": "2025-01-26T20:56:56.284Z",
+                  "data": {
+                    "type": "interview_feedback",
+                    "candidateId": "CAND-123",
+                    "decision": "positive",
+                    "rating": 4.5,
+                    "notes": "Strong technical skills and good culture fit",
+                    "recommendedAction": "proceed_to_offer"
+                  }
+                },
+                {
+                  "id": "evt_1737926346365",
+                  "name": "DocuSign Envelope Sent",
+                  "description": "Envelope 37ea58bf-81fb-47dd-96a9-f8b47182a43f has been sent to recipients",
+                  "type": "DOCUSIGN_SENT",
+                  "template": {
+                    "source": "action",
+                    "data": {
+                      "envelopeId": "37ea58bf-81fb-47dd-96a9-f8b47182a43f",
+                      "status": "sent",
+                      "timestamp": "2025-01-26T21:19:06.219Z",
+                      "actionId": "action_1737835293132"
+                    }
+                  },
+                  "data": {
+                    "envelopeId": "37ea58bf-81fb-47dd-96a9-f8b47182a43f",
+                    "status": "sent",
+                    "timestamp": "2025-01-26T21:19:06.219Z",
+                    "actionId": "action_1737835293132"
+                  },
+                  "timestamp": "2025-01-26T21:19:06.365Z",
+                  "history": {
+                    "events": [
+                      {
+                        "id": "interview-request-1737640068838",
+                        "type": "EMAIL_RECEIVED",
+                        "timestamp": "2025-01-23T13:47:48.838Z",
+                        "data": {
+                          "from": "john@example.com",
+                          "to": "hr@company.com",
+                          "subject": "Interview request",
+                          "body": "I would like to schedule an interview",
+                          "time": "2024-01-17T10:00:00Z"
+                        },
+                        "transitions": [
+                          {
+                            "id": "interview-request-1737640068838",
+                            "timestamp": "2025-01-23T13:47:48.838Z",
+                            "message": "EMAIL_RECEIVED",
+                            "fromState": "idle",
+                            "toState": "processing"
+                          }
+                        ]
+                      },
+                      {
+                        "id": "role-discuss-1737641538864",
+                        "type": "EMAIL_RECEIVED",
+                        "timestamp": "2025-01-23T14:12:18.864Z",
+                        "data": {
+                          "from": "john@example.com",
+                          "to": "hr@company.com",
+                          "subject": "Role discussion",
+                          "body": "I would like to discuss the role details",
+                          "time": "2024-01-17T11:00:00Z"
+                        }
+                      },
+                      {
+                        "id": "schedule-interview-1737641550376",
+                        "type": "CALENDAR_EVENT",
+                        "timestamp": "2025-01-23T14:12:30.376Z",
+                        "data": {
+                          "type": "schedule_interview",
+                          "candidateEmail": "john@example.com",
+                          "interviewerEmail": "hr@company.com",
+                          "proposedTime": "2024-01-20T10:00:00Z",
+                          "duration": "60"
+                        }
+                      },
+                      {
+                        "id": "interview-done-1737925016283",
+                        "type": "INTERVIEW_EVENT",
+                        "timestamp": "2025-01-26T20:56:56.283Z",
+                        "data": {
+                          "type": "interview_completed",
+                          "candidateId": "CAND-123",
+                          "interviewerId": "INT-456",
+                          "duration": "55",
+                          "completedAt": "2024-01-20T11:00:00Z"
+                        }
+                      },
+                      {
+                        "id": "feedback-positive-1737925016284",
+                        "type": "FEEDBACK_EVENT",
+                        "timestamp": "2025-01-26T20:56:56.284Z",
+                        "data": {
+                          "type": "interview_feedback",
+                          "candidateId": "CAND-123",
+                          "decision": "positive",
+                          "rating": 4.5,
+                          "notes": "Strong technical skills and good culture fit",
+                          "recommendedAction": "proceed_to_offer"
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "id": "docusign_status_1737926838755-1737926846973",
+            "type": "DOCUSIGN_STATUS",
+            "timestamp": "2025-01-26T21:27:26.973Z",
+            "data": {
+              "status": "completed",
+              "documentsUri": "/envelopes/37ea58bf-81fb-47dd-96a9-f8b47182a43f/documents",
+              "recipientsUri": "/envelopes/37ea58bf-81fb-47dd-96a9-f8b47182a43f/recipients",
+              "attachmentsUri": "/envelopes/37ea58bf-81fb-47dd-96a9-f8b47182a43f/attachments",
+              "envelopeUri": "/envelopes/37ea58bf-81fb-47dd-96a9-f8b47182a43f",
+              "emailSubject": "Please sign this document",
+              "emailBlurb": "Please review and sign this document at your earliest convenience.",
+              "envelopeId": "37ea58bf-81fb-47dd-96a9-f8b47182a43f",
+              "signingLocation": "online",
+              "customFieldsUri": "/envelopes/37ea58bf-81fb-47dd-96a9-f8b47182a43f/custom_fields",
+              "notificationUri": "/envelopes/37ea58bf-81fb-47dd-96a9-f8b47182a43f/notification",
+              "enableWetSign": "true",
+              "allowMarkup": "false",
+              "allowReassign": "true",
+              "createdDateTime": "2025-01-26T21:19:03.9670000Z",
+              "lastModifiedDateTime": "2025-01-26T21:19:03.9670000Z",
+              "deliveredDateTime": "2025-01-26T21:23:59.8470000Z",
+              "initialSentDateTime": "2025-01-26T21:19:05.6870000Z",
+              "sentDateTime": "2025-01-26T21:19:05.6870000Z",
+              "completedDateTime": "2025-01-26T21:25:27.1530000Z",
+              "statusChangedDateTime": "2025-01-26T21:25:27.1530000Z",
+              "documentsCombinedUri": "/envelopes/37ea58bf-81fb-47dd-96a9-f8b47182a43f/documents/combined",
+              "certificateUri": "/envelopes/37ea58bf-81fb-47dd-96a9-f8b47182a43f/documents/certificate",
+              "templatesUri": "/envelopes/37ea58bf-81fb-47dd-96a9-f8b47182a43f/templates",
+              "expireEnabled": "true",
+              "expireDateTime": "2025-05-26T21:19:05.6870000Z",
+              "expireAfter": "120",
+              "sender": {
+                "userName": "Gaetano Mondelli",
+                "userId": "3d75ee95-c9b7-4531-80e7-31ad925c641c",
+                "accountId": "a8c0cf58-75d0-422a-a7cd-1f7a88f15dd6",
+                "email": "gaetano.mondelli@gmail.com",
+                "ipAddress": "92.41.178.67"
+              },
+              "purgeState": "unpurged",
+              "envelopeIdStamping": "true",
+              "is21CFRPart11": "false",
+              "signerCanSignOnMobile": "true",
+              "autoNavigation": "true",
+              "isSignatureProviderEnvelope": "false",
+              "hasFormDataChanged": "false",
+              "allowComments": "true",
+              "hasComments": "false",
+              "allowViewHistory": "true",
+              "envelopeMetadata": {
+                "allowAdvancedCorrect": "true",
+                "enableSignWithNotary": "true",
+                "allowCorrect": "true"
+              },
+              "anySigner": null,
+              "envelopeLocation": "current_site",
+              "isDynamicEnvelope": "false",
+              "burnDefaultTabData": "false"
+            }
           }
         ],
-        "executedActions": []
+        "executedActions": [
+          {
+            "actionId": "action_1737835293132",
+            "state": "contract_prepared",
+            "type": "DOCUSIGN_SEND",
+            "trigger": "positive_feedback",
+            "timestamp": "2025-01-26T21:19:08.106Z"
+          }
+        ]
       },
       "startDate": "2024-03-20T10:00:00Z",
       "events": [

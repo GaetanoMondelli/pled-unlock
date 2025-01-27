@@ -203,7 +203,7 @@ const renderMessageRule = (rule: any) => {
         <h4 className="font-medium text-sm">When</h4>
         <div className="bg-white rounded p-2 text-sm">
           <span className="text-blue-600">Event type:</span> {rule.matches.type}
-          {Object.entries(rule.matches.conditions).map(([key, value]) => (
+          {rule.matches.conditions && Object.entries(rule.matches.conditions).map(([key, value]) => (
             <div key={key} className="ml-4">
               <span className="text-gray-600">{key}:</span> {String(value)}
             </div>
@@ -224,16 +224,24 @@ const renderMessageRule = (rule: any) => {
         </div>
       )}
 
-      <div className="space-y-2">
-        <h4 className="font-medium text-sm">Generate Message</h4>
-        <div className="bg-white rounded p-2 text-sm">
-          <div><span className="text-blue-600">Type:</span> {rule.generates.type}</div>
-          <div className="ml-4">
-            <div><span className="text-gray-600">Title:</span> {rule.generates.template.title}</div>
-            <div><span className="text-gray-600">Content:</span> {rule.generates.template.content}</div>
+      {rule.generates && (
+        <div className="space-y-2">
+          <h4 className="font-medium text-sm">Generate Message</h4>
+          <div className="bg-white rounded p-2 text-sm">
+            <div><span className="text-blue-600">Type:</span> {rule.generates.type}</div>
+            {rule.generates.template && (
+              <div className="ml-4">
+                {rule.generates.template.title && (
+                  <div><span className="text-gray-600">Title:</span> {rule.generates.template.title}</div>
+                )}
+                {rule.generates.template.content && (
+                  <div><span className="text-gray-600">Content:</span> {rule.generates.template.content}</div>
+                )}
+              </div>
+            )}
           </div>
         </div>
-      </div>
+      )}
 
       {rule.transition && (
         <div className="space-y-2">

@@ -1,4 +1,26 @@
-export function getNotMatchingReason(event: any, rule: any): string {
+async function isQuestion(text: string): Promise<boolean> {
+  try {
+    const response = await fetch('/api/check-question', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ text }),
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to check question');
+    }
+
+    const result = await response.json();
+    return result.isQuestion;
+  } catch (error) {
+    console.error('Error checking if text is question:', error);
+    return false;
+  }
+}
+
+export async function getNotMatchingReason(event: any, rule: any): Promise<string> {
   // First check if event type matches
   if (rule.type !== event.type) {
     return `Event type '${event.type}' doesn't match rule type '${rule.type}'`;
@@ -9,8 +31,8 @@ export function getNotMatchingReason(event: any, rule: any): string {
     return 'No conditions defined';
   }
 
-  const failedConditions = Object.entries(rule.conditions)
-    .map(([path, pattern]) => {
+  const failedConditions = await Promise.all(Object.entries(rule.conditions)
+    .map(async ([path, pattern]) => {
       const value = path.split('.')
         .reduce((obj: any, key: string) => obj?.[key], event.data);
       
@@ -30,7 +52,14 @@ export function getNotMatchingReason(event: any, rule: any): string {
       }
 
       if (pattern.startsWith('(llm-prompt)')) {
-        return null; // Always matches
+        // Only process if NEXT_PUBLIC_ENABLE_LLM_RULES is enabled
+        if (process.env.NEXT_PUBLIC_ENABLE_LLM_RULES !== 'true') {
+          return null; 
+        }
+
+        const isQuestionResult = await isQuestion(String(value));
+        return isQuestionResult ? null : 
+          `Text '${value}' is not a question according to LLM`;
       }
 
       if (pattern.includes('{{')) {
@@ -39,8 +68,7 @@ export function getNotMatchingReason(event: any, rule: any): string {
 
       return value !== pattern ? 
         `Expected '${pattern}' at path '${path}', but got '${value}'` : null;
-    })
-    .filter(Boolean);
+    }));
 
-  return failedConditions.join(', ');
+  return failedConditions.filter(Boolean).join(', ');
 } 

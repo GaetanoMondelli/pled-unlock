@@ -23,7 +23,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useSearchParams } from 'next/navigation';
 import { Event } from "../../types/events";
 import { CreateEventModal } from "../events/CreateEventModal";
-import { matchEventToRule } from "../../utils/eventMatching";
+import { matchEventToRule, getMatchingRules } from "../../utils/eventMatching";
 import { getValueByPath } from "../../utils/eventMatching";
 import { fetchFromDb, updateDb } from "../../utils/api";
 
@@ -208,7 +208,7 @@ export default function EventList({ procedureId }: EventListProps) {
     }
   };
 
-  const getMatchingRules = (event: any) => {
+  const getMatchingRules = async (event: any) => {
     const template = pledData.procedureTemplates.find(
       (t: any) => t.templateId === "hiring_process"
     );
@@ -228,16 +228,15 @@ export default function EventList({ procedureId }: EventListProps) {
       data: event.template.data
     } : event;
 
-    return template.messageRules.filter((rule: any) => 
-      matchEventToRule(
-        eventToMatch,
-        {
-          type: rule.matches.type,
-          conditions: rule.matches.conditions
-        },
-        variables
-      )
-    );
+    const rules = template.messageRules.map((rule: any) => ({
+      ...rule,
+      matches: {
+        type: rule.matches.type,
+        conditions: rule.matches.conditions
+      }
+    }));
+
+    return await getMatchingRules(eventToMatch, rules, variables);
   };
 
   const renderTransition = (transition: any) => {
