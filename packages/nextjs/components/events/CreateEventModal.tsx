@@ -500,6 +500,7 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
           //   await fetchClickwraps();
           //   return;
           // }
+          return;
         }
         setIsAuthenticating(true);
         console.log("Authenticating navigator");
