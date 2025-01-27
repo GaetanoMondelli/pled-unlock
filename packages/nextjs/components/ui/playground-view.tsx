@@ -19,7 +19,7 @@ interface DocuSignConfig {
   oAuthServer: string;
 }
 
-interface TabPosition {
+export interface TabPosition {
   pageNumber: string;
   xPosition: string;
   yPosition: string;
