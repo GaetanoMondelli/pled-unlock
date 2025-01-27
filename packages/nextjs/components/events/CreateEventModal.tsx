@@ -383,6 +383,68 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
     console.log("Importing from Gmail");
   };
 
+  const authenticateNavigator = async () => {
+    try {
+
+      // Check for code in URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const code = urlParams.get("code");
+      const error = urlParams.get("error");
+
+      if (error) {
+        throw new Error(`Authentication failed: ${error}`);
+      }
+
+      const response = await fetch("/api/docusign/navigator/authenticate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          code,
+          scopes: ["signature", "impersonation", "click.manage", "click.send", "extended"],
+        }),
+      });
+
+      const data = await response.json();
+      console.log("Authentication response:", data);
+
+      if (data.error === "consent_required" && data.consentUrl) {
+        // Save current state if needed
+        localStorage.setItem(
+          "preAuthState",
+          JSON.stringify({
+            returnTo: window.location.pathname,
+          }),
+        );
+
+        // Redirect to consent URL
+        window.location.href = data.consentUrl;
+        return;
+      }
+
+      if (!response.ok || !data.baseUrl) {
+        throw new Error(data.error || "Failed to authenticate");
+      }
+
+      // Clear URL parameters
+      window.history.replaceState({}, "", window.location.pathname);
+
+      const authData = {
+        accessToken: data.accessToken,
+        accountId: data.accountId,
+        baseUrl: data.baseUrl,
+        type: "navigator",
+        scopes: data.scopes,
+      };
+
+      localStorage.setItem("navigatorAuth", JSON.stringify(authData));
+
+    } catch (error: any) {
+      console.error("Authentication error:", error);
+    }
+  };
+
   // Update handleTabChange to handle separate auth flows correctly
   const handleTabChange = async (tab: string) => {
     if (tab === "docusign") {
@@ -398,47 +460,50 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
             tokenStart: authData.accessToken.substring(0, 20) + "...",
           });
 
-          // Test the stored auth
-          let authResponse = await fetch("/api/docusign/navigator/proxy", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              url: `${authData.baseUrl}/accounts/${authData.accountId}/agreements`,
-              token: authData.accessToken,
-            }),
-          });
+          // // Test the stored auth
+          // let authResponse = await fetch("/api/docusign/navigator/proxy", {
+          //   method: "POST",
+          //   headers: {
+          //     "Content-Type": "application/json",
+          //   },
+          //   body: JSON.stringify({
+          //     url: `${authData.baseUrl}/accounts/${authData.accountId}/agreements`,
+          //     token: authData.accessToken,
+          //   }),
+          // });
 
-          const data = await authResponse.json();
+          // const data = await authResponse.json();
 
-          // If we need new consent, clear stored auth and redirect
-          if (authResponse.status === 401 && data.needsConsent) {
-            console.log("Need new consent, clearing stored auth...");
-            localStorage.removeItem("navigatorAuth");
-            localStorage.removeItem("navigatorConsent");
+          // // If we need new consent, clear stored auth and redirect
+          // if (authResponse.status === 401 && data.needsConsent) {
+          //   console.log("Need new consent, clearing stored auth...");
+          //   localStorage.removeItem("navigatorAuth");
+          //   localStorage.removeItem("navigatorConsent");
 
-            // Redirect to get fresh auth
-            authResponse = await fetch("/api/docusign/navigator?useMock=false", {
-              method: "POST",
-            });
-            const freshData = await authResponse.json();
+          //   // Redirect to get fresh auth
+          //   authResponse = await fetch("/api/docusign/navigator?useMock=false", {
+          //     method: "POST",
+          //   });
+          //   const freshData = await authResponse.json();
 
-            if (freshData.consentUrl) {
-              window.location.href = freshData.consentUrl;
-              return;
-            }
-          }
+          //   if (freshData.consentUrl) {
+          //     window.location.href = freshData.consentUrl;
+          //     return;
+          //   }
+          // }
+
 
           // If auth is valid, fetch data
-          if (authResponse.ok) {
-            await fetchEnvelopes();
-            await fetchNavigatorAgreements();
-            await fetchClickwraps();
-            return;
-          }
+          // if (authResponse.ok) {
+          //   await fetchEnvelopes();
+          //   await fetchNavigatorAgreements();
+          //   await fetchClickwraps();
+          //   return;
+          // }
         }
-
+        setIsAuthenticating(true);
+        console.log("Authenticating navigator");
+        await authenticateNavigator();
         // No stored auth or invalid auth, get fresh auth
         const response = await fetch("/api/docusign/navigator?useMock=false", {
           method: "POST",

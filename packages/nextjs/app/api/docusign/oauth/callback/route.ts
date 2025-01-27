@@ -1,10 +1,15 @@
 import { redirect } from "next/navigation";
 import { NextRequest } from "next/server";
+import { headers } from "next/headers";
+
+export const dynamic = 'force-dynamic'; // This marks the route as dynamic
 
 export async function GET(req: NextRequest) {
   try {
-    // Get the authorization code and state from the URL
-    const searchParams = new URL(req.url).searchParams;
+    // Get the authorization code and state from the headers
+    const headersList = headers();
+    const url = headersList.get("x-url") || req.url;
+    const searchParams = new URL(url).searchParams;
     const code = searchParams.get("code");
     const state = searchParams.get("state");
 

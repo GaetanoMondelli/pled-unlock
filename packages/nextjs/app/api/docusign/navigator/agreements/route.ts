@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { headers } from "next/headers";
+
+export const dynamic = 'force-dynamic'; // Mark route as dynamic
 
 export async function GET(req: NextRequest) {
   try {
-    // Get auth header from request
-    const authHeader = req.headers.get("authorization");
-    const accountId = req.headers.get("account-id");
+    // Get auth header from request using headers() API
+    const headersList = headers();
+    const authHeader = headersList.get("authorization");
+    const accountId = headersList.get("account-id");
 
     if (!authHeader || !accountId) {
       return NextResponse.json({ error: "Missing authorization or account ID" }, { status: 401 });

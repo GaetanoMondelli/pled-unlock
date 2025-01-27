@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { headers } from "next/headers";
+
+export const dynamic = 'force-dynamic'; // Mark route as dynamic
 
 const BASE_URL = "https://demo.docusign.net/restapi/v2.1";
 
@@ -17,21 +20,22 @@ export async function POST(req: NextRequest) {
     const recipients = JSON.parse(formData.get("recipients") as string);
     const tabPositions = JSON.parse(formData.get("tabPositions") as string);
 
+    // Get auth headers using headers() API
+    const headersList = headers();
+    const accessToken = headersList.get("Authorization");
+    const accountId = headersList.get("Account-Id");
+    const baseUrl = headersList.get("Base-Url");
+
     // Add debug logs
     console.log("Headers:", {
-      auth: req.headers.get("Authorization"),
-      accountId: req.headers.get("Account-Id"),
+      auth: accessToken,
+      accountId: accountId,
     });
-
-    // Get auth headers - don't try to parse Bearer prefix
-    const accessToken = req.headers.get("Authorization");
-    const accountId = req.headers.get("Account-Id");
-    const baseUrl = req.headers.get("Base-Url");
 
     if (!accessToken || !accountId) {
       console.log("Missing auth:", { accessToken, accountId, baseUrl }); // Debug log
       return NextResponse.json(
-        { error: "Missing authentication headers", headers: Object.fromEntries(req.headers) },
+        { error: "Missing authentication headers" },
         { status: 403 },
       );
     }
