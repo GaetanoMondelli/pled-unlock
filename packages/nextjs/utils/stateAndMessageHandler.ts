@@ -37,7 +37,7 @@ export function handleEventAndGenerateMessages(
       console.log('Processing message for transition:', {
         message,
         currentState,
-        availableActions: stateMachine.actions()
+        // availableActions: 
       });
 
       stateMachine.go(currentState);

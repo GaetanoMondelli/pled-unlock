@@ -104,11 +104,11 @@ export const NodeDetailsDialog: React.FC<NodeDetailsDialogProps> = ({
         </DialogHeader>
 
         <div className="space-y-6">
-          {node.metadata?.actions?.length > 0 && (
+          {(node.metadata?.actions?.length ?? 0) > 0 && (
             <div className="space-y-4">
               <h4 className="font-medium">Actions</h4>
               <div className="space-y-2">
-                {node.metadata.actions.map((action: any, index: number) => {
+                {node.metadata?.actions?.map((action: any, index: number) => {
                   const ActionIcon = getActionIcon(action);
                   return (
                     <div key={index} className="flex items-center justify-between p-2 bg-accent/50 rounded">

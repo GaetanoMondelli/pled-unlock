@@ -7,7 +7,7 @@ import { BookOpen, File, FileText } from "lucide-react";
 
 export const EnvelopeView = ({ procedureId, template }: { procedureId: string; template: any }) => {
   const searchParams = useSearchParams();
-  const selectedDoc = searchParams.get("doc");
+  const selectedDoc = searchParams?.get("doc");
 
   const documents = template?.documents?.contracts || [];
 

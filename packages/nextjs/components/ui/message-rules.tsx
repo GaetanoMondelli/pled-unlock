@@ -42,7 +42,7 @@ export const MessageRules: React.FC<MessageRulesProps> = ({
   const [expandedEvents, setExpandedEvents] = useState<string[]>([]);
   const searchParams = useSearchParams();
   const router = useRouter();
-  const highlightedMessageId = searchParams.get("highlight");
+  const highlightedMessageId = searchParams?.get("highlight");
   const [localSelectedMessageId, setLocalSelectedMessageId] = useState<string | null>(null);
 
   const toggleRule = (ruleId: string) => {

@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { Button } from "./button";
 import { Card } from "./card";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./collapsible";
+// import { Collapsible, CollapsibleContent } from "./collapsible";
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./dialog";
 import { Input } from "./input";
 import { ScrollArea } from "./scroll-area";
@@ -182,6 +183,28 @@ type AuthType = {
   scopes?: string[];
 };
 
+interface TestResult {
+  success: boolean;
+  message: string;
+  details: {
+    action?: JSX.Element;
+    rawData?: {
+      parties?: Array<{ id: string; name_in_agreement: string }>;
+      provisions?: Record<string, any>;
+      metadata?: {
+        created_at?: string;
+        modified_at?: string;
+      };
+      languages?: string[];
+      source_name?: string;
+      source_id?: string;
+      source_account_id?: string;
+      [key: string]: any;
+    };
+    [key: string]: any;
+  } | null;
+}
+
 export const PlaygroundView = () => {
   const [config, setConfig] = useState<DocuSignConfig>({
     integrationKey: "",
@@ -205,12 +228,10 @@ export const PlaygroundView = () => {
   const [showSigningDialog, setShowSigningDialog] = useState(false);
   const [tabPositions, setTabPositions] = useState<TabPosition[]>([]);
   const [templateVariables, setTemplateVariables] = useState<Record<string, string>>({});
+  const [isLoadingClickwraps, setIsLoadingClickwraps] = useState(false);
+  const ALL_SCOPES = ["signature", "impersonation", "click.manage", "click.send"];
 
-  const [testResult, setTestResult] = useState<{
-    success: boolean;
-    message: string;
-    details: any;
-  } | null>(null);
+  const [testResult, setTestResult] = useState<TestResult | null>(null);
 
   // Add Click API operations
   const clickOperations = {
@@ -500,14 +521,15 @@ export const PlaygroundView = () => {
     },
 
     checkUsers: async () => {
+      const authData = auth;
       try {
         setIsLoadingClickwraps(true);
         const response = await fetch("/api/docusign/click/users", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: authData.accessToken,
-            "Account-Id": authData.accountId,
+            Authorization: `Bearer ${authData?.accessToken}`,
+            "Account-Id": authData?.accountId || '', 
           },
           body: JSON.stringify({
             clickwrapId,
@@ -519,7 +541,7 @@ export const PlaygroundView = () => {
         }
 
         const data = await response.json();
-        setClickwrapStatus(prev => ({
+        setClickwrapStatus((prev: any) => ({
           ...prev,
           users: data,
         }));
@@ -1016,7 +1038,7 @@ export const PlaygroundView = () => {
 
         const details = await detailsResponse.json();
 
-        setTestResult(prev => ({
+        setTestResult((prev: any) => ({
           ...prev,
           details: {
             ...details,
@@ -1097,7 +1119,7 @@ export const PlaygroundView = () => {
         };
 
         localStorage.setItem("navigatorAuth", JSON.stringify(authData));
-        setAuth(authData);
+        setAuth(authData as AuthType);
         setAuthenticated(true);
         setStatus(
           `✅ Authentication Successful\n` +
@@ -1722,7 +1744,7 @@ export const PlaygroundView = () => {
                               </div>
                               <div>
                                 <p className="font-medium">Languages</p>
-                                <p className="text-sm">{testResult.details.rawData.languages?.join(", ") || "N/A"}</p>
+                                <p className="text-sm">{testResult.details.rawData?.languages?.join(", ") || "N/A"}</p>
                               </div>
                             </div>
 
@@ -1732,27 +1754,27 @@ export const PlaygroundView = () => {
                               <div className="grid grid-cols-2 gap-4">
                                 <div>
                                   <p className="font-medium text-sm">Source Name</p>
-                                  <p className="text-sm">{testResult.details.rawData.source_name || "N/A"}</p>
+                                  <p className="text-sm">{testResult.details.rawData?.source_name || "N/A"}</p>
                                 </div>
                                 <div>
                                   <p className="font-medium text-sm">Source ID</p>
-                                  <p className="text-sm font-mono">{testResult.details.rawData.source_id || "N/A"}</p>
+                                  <p className="text-sm font-mono">{testResult.details.rawData?.source_id || "N/A"}</p>
                                 </div>
                                 <div>
                                   <p className="font-medium text-sm">Source Account ID</p>
                                   <p className="text-sm font-mono">
-                                    {testResult.details.rawData.source_account_id || "N/A"}
+                                    {testResult.details.rawData?.source_account_id || "N/A"}
                                   </p>
                                 </div>
                               </div>
                             </div>
 
                             {/* Parties */}
-                            {testResult.details.rawData.parties && (
+                            {testResult.details?.rawData?.parties && (
                               <div className="border-t pt-4">
                                 <h4 className="font-medium mb-2">Parties</h4>
                                 <div className="space-y-2">
-                                  {testResult.details.rawData.parties.map((party: any) => (
+                                  {testResult.details?.rawData?.parties.map((party: any) => (
                                     <div key={party.id} className="bg-background p-3 rounded-lg">
                                       <p className="text-sm font-mono mb-1">ID: {party.id}</p>
                                       <p className="text-sm">Name: {party.name_in_agreement}</p>
@@ -1763,11 +1785,11 @@ export const PlaygroundView = () => {
                             )}
 
                             {/* Provisions */}
-                            {testResult.details.rawData.provisions && (
+                            {testResult.details?.rawData?.provisions && (
                               <div className="border-t pt-4">
                                 <h4 className="font-medium mb-2">Provisions</h4>
                                 <div className="bg-background p-3 rounded-lg">
-                                  {Object.entries(testResult.details.rawData.provisions).map(([key, value]) => (
+                                  {Object.entries(testResult.details?.rawData?.provisions || {}).map(([key, value]) => (
                                     <div key={key} className="mb-2 last:mb-0">
                                       <p className="text-sm">
                                         <span className="font-medium">
@@ -1777,7 +1799,7 @@ export const PlaygroundView = () => {
                                             .join(" ")}
                                           :
                                         </span>{" "}
-                                        {typeof value === "boolean" ? (value ? "Yes" : "No") : value}
+                                        {typeof value === "boolean" ? (value ? "Yes" : "No") : value} 
                                       </p>
                                     </div>
                                   ))}
@@ -1792,7 +1814,7 @@ export const PlaygroundView = () => {
                                 <div>
                                   <p className="font-medium text-sm">Created At</p>
                                   <p className="text-sm">
-                                    {testResult.details.rawData.metadata?.created_at
+                                    {testResult.details.rawData?.metadata?.created_at
                                       ? new Date(testResult.details.rawData.metadata.created_at).toLocaleString()
                                       : "N/A"}
                                   </p>
@@ -1800,7 +1822,7 @@ export const PlaygroundView = () => {
                                 <div>
                                   <p className="font-medium text-sm">Modified At</p>
                                   <p className="text-sm">
-                                    {testResult.details.rawData.metadata?.modified_at
+                                    {testResult.details.rawData?.metadata?.modified_at
                                       ? new Date(testResult.details.rawData.metadata.modified_at).toLocaleString()
                                       : "N/A"}
                                   </p>
@@ -1810,7 +1832,7 @@ export const PlaygroundView = () => {
 
                             {/* Raw Data (Collapsible) */}
                             <div className="border-t pt-4">
-                              <Collapsible>
+                              {/* <Collapsible>
                                 <CollapsibleTrigger asChild>
                                   <Button variant="ghost" className="flex items-center gap-2 mb-2">
                                     <ChevronRight className="h-4 w-4" />
@@ -1822,7 +1844,8 @@ export const PlaygroundView = () => {
                                     {JSON.stringify(testResult.details.rawData, null, 2)}
                                   </pre>
                                 </CollapsibleContent>
-                              </Collapsible>
+                              </Collapsible> */}
+                              {JSON.stringify(testResult.details.rawData, null, 2)}
                             </div>
                           </div>
                         )}
@@ -1855,3 +1878,5 @@ export const PlaygroundView = () => {
     </>
   );
 };
+
+

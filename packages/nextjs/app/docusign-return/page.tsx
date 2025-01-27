@@ -8,7 +8,7 @@ export default function DocuSignReturn() {
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    const event = searchParams.get("event");
+    const event = searchParams?.get("event");
     if (event === "signing_complete") {
       // Close the window/redirect
       if (window.opener) {
