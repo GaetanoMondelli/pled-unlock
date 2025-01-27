@@ -6,7 +6,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function replaceTemplateVariables(template: any, variables: any) {
-  let result = { ...template };
+  const result = { ...template };
   
   for (const key of Object.keys(result)) {
     if (typeof result[key] === 'string') {

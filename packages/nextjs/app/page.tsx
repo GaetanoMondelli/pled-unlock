@@ -353,8 +353,3 @@ function getStateBadgeVariant(
   // In-progress states - green
   return 'success';
 }
-
-function formatDistanceToNow(arg0: Date) {
-  
-}
-

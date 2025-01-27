@@ -276,7 +276,7 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
               // Add detailed condition comparison with interpolated values
               const conditionDetails = Object.entries(rule.matches.conditions || {}).map(([field, condition]: [string, any]) => {
                 const actualValue = field.split('.').reduce((obj, key) => obj?.[key], event.data);
-                let expectedTemplate = condition.toString();
+                const expectedTemplate = condition.toString();
                 const interpolated = expectedTemplate.replace(/\{\{([^}]+)\}\}/g, (match: string, path: string) => {
                   return path.split('.')
                     .reduce((obj: any, key: string) => obj?.[key], instanceVariables) || match;
@@ -838,7 +838,7 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
             } else {
               const conditionDetails = Object.entries(rule.matches.conditions || {}).map(([field, condition]: [string, any]) => {
                 const actualValue = field.split('.').reduce((obj, key) => obj?.[key], data);
-                let expectedTemplate = condition.toString();
+                const expectedTemplate = condition.toString();
                 const interpolated = expectedTemplate.replace(/\{\{([^}]+)\}\}/g, (match: string, path: string) => {
                   return path.split('.')
                     .reduce((obj: any, key: string) => obj?.[key], instanceVariables) || match;

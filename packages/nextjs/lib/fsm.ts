@@ -65,7 +65,7 @@ export function createStateMachine(definition: string): StateMachine {
     }
   });
 
-  let currentState = Array.from(states).find(state => state === 'idle') || Array.from(states)[0];
+  const currentState = Array.from(states).find(state => state === 'idle') || Array.from(states)[0];
 
   return {
     states: Array.from(states).map(id => ({
@@ -123,7 +123,7 @@ export const calculateStateAndExecuteActions = async (
   template: any
 ): Promise<string> => {
   const machine = createStateMachine(definition);
-  let currentState = 'idle';
+  const currentState = 'idle';
   machine.go(currentState);
 
   if (!instance) {

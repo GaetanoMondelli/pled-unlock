@@ -630,7 +630,7 @@ export function CreateTemplateModal() {
     
     const actionType = 'DOCUSIGN_NAVIGATOR_GET_AGREEMENTS' as ActionType ; // This should be selected by user
     
-    let newAction: StateAction = {
+    const newAction: StateAction = {
       type: actionType,
       config: {}
     };
@@ -1086,7 +1086,7 @@ export function CreateTemplateModal() {
           <div className="space-y-4">
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
               <p className="text-sm text-yellow-800">
-                Please review your template configuration carefully. Once created, you'll be able to use this template to create new procedures.
+                Please review your template configuration carefully. Once created, you&apos;ll be able to use this template to create new procedures.
               </p>
             </div>
 

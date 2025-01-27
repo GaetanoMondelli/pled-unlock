@@ -225,8 +225,8 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
         setCurrentState(processedState)
 
         // Process messages and transitions for history display
-        let allMessages = []
-        let allTransitions = []
+        const allMessages = []
+        const allTransitions = []
 
         // Reset machine for history processing
         machine.go('idle')
@@ -677,7 +677,7 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
       };
 
       // Calculate all actions that should have been executed
-      let expectedActions = [];
+      const expectedActions = [];
       let currentState = 'idle';
       const machine = createStateMachine(definition);
       machine.go(currentState);

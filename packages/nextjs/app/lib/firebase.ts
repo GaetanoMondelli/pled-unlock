@@ -1,4 +1,4 @@
-var admin = require("firebase-admin");
+import * as admin from 'firebase-admin';
 
 // var serviceAccount = require("./serviceAccountKey.json");
 // console.log('FIREBASE_SERVICE_ACCOUNT:', process.env.FIREBASE_SERVICE_ACCOUNT);
