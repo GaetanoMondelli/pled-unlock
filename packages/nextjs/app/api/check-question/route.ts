@@ -30,4 +30,23 @@ export async function POST(request: Request) {
     console.error('Error:', error);
     return NextResponse.json({ error: 'Failed to check question' }, { status: 500 });
   }
+}
+
+export async function GET(request: Request) {
+  try {
+    // Simple health check to verify the API and OpenAI connection
+    await openai.models.list();
+    return NextResponse.json({ 
+      status: 'ok',
+      message: 'Question checking service is running'
+    });
+  } catch (error) {
+    console.error('Error:', error);
+    return NextResponse.json({ 
+      status: 'error',
+      message: 'Service is running but OpenAI connection failed'
+    }, { 
+      status: 500 
+    });
+  }
 } 
