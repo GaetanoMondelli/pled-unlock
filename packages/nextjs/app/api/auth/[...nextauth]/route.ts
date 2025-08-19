@@ -1,5 +1,5 @@
-import { allowedUsernamesPasswords, options } from "@/app/api/configAuth";
-import NextAuth, { NextAuthOptions } from "next-auth";
+import { options } from "@/app/api/configAuth";
+import NextAuth from "next-auth";
 
 const authhandler = NextAuth(options);
 

@@ -1,341 +1,550 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
-import { fetchFromDb } from "../utils/api";
-import { CreateProcedureModal } from "@/components/procedures/CreateProcedureModal";
-import { CreateTemplateModal } from "@/components/templates/CreateTemplateModal";
-import { Badge } from "@/components/ui/badge";
+import { RequestDemoDialog } from "@/components/marketing/RequestDemoDialog";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { calculateCurrentState, createStateMachine } from "@/lib/fsm";
-import { handleEventAndGenerateMessages } from "@/utils/stateAndMessageHandler";
-import { format } from "date-fns";
-import { Activity, Building2, Calendar, GitBranch, MessageCircle, PlusCircle, Timer, User } from "lucide-react";
-
-// Add these types at the top of the file
-interface StateMetadata {
-  actions?: string[];
-  description?: string;
-  documents?: string[];
-}
-
-interface DebugInfo {
-  instanceId: string;
-  currentState: string;
-  eventCount: number;
-  messageCount: number;
-  transitionCount: number;
-  lastTransition?: any;
-  lastMessage?: any;
-  isInitialState: boolean;
-  isFinalState: boolean;
-  stateMetadata: StateMetadata;
-}
-
-interface Template {
-  templateId: string;
-  name: string;
-  description: string;
-  stateMachine: {
-    fsl: string;
-    initial: string;
-    final: string[];
-    states: Record<string, StateMetadata>;
-  };
-  messageRules: any[];
-  variables: Record<string, any>;
-}
-
-interface Instance {
-  instanceId: string;
-  templateId: string;
-  variables: Record<string, any>;
-  history: {
-    events: Event[];
-    messages: any[];
-  };
-  startDate: string;
-}
-
-// Add the date formatting helper
-const formatDate = (dateString?: string) => {
-  if (!dateString) return "No date";
-  try {
-    return format(new Date(dateString), "MMM d, yyyy");
-  } catch (error) {
-    console.error("Error formatting date:", error);
-    return "Invalid date";
-  }
-};
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { motion, useReducedMotion } from "framer-motion";
+import {
+  Activity,
+  Boxes,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Cloud,
+  CreditCard,
+  FileSignature,
+  FileText,
+  Layers,
+  Link2,
+  Mail,
+  Shield,
+  Workflow,
+  Zap,
+} from "lucide-react";
 
 export default function Home() {
-  const [templates, setTemplates] = useState<any[]>([]);
-  const [instances, setInstances] = useState<any[]>([]);
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  return <Landing />;
+}
 
-  useEffect(() => {
-    const loadData = async () => {
-      const data = await fetchFromDb();
-      setTemplates(data.procedureTemplates || []);
-      setInstances(data.procedureInstances || []);
-    };
-    loadData();
-  }, []);
+// Render landing content without server components by keeping this client component simple
+function Landing() {
+  useReducedMotion();
 
-  const handleCreateProcedure = async (data: any) => {
-    try {
-      const response = await fetch("/api/procedures", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) throw new Error("Failed to create procedure");
-
-      // Refresh the data
-      const newData = await fetchFromDb();
-      setTemplates(newData.procedureTemplates || []);
-      setInstances(newData.procedureInstances || []);
-    } catch (error) {
-      console.error("Error creating procedure:", error);
-    }
+  const fadeUp = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0 },
+  };
+  const stagger = {
+    hidden: {},
+    show: { transition: { staggerChildren: 0.08 } },
   };
 
   return (
-    <div className="flex flex-col items-center gap-8 py-8 px-4">
-      <div className="flex gap-4">
-        <CreateProcedureModal
-          open={showCreateModal}
-          onClose={() => setShowCreateModal(false)}
-          onSave={handleCreateProcedure}
-        />
-        <CreateTemplateModal />
-      </div>
-      <div className="container mx-auto p-6">
-        {/* Header with Create Button */}
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">Procedures</h1>
-          <Button onClick={() => setShowCreateModal(true)} size="lg" className="gap-2">
-            <PlusCircle className="h-5 w-5" />
-            New Procedure
-          </Button>
+    <div className="min-h-[calc(100vh-80px)]">
+      {/* SECTION 1: Hero */}
+      <section className="relative overflow-hidden bg-gradient-to-b from-white to-slate-50 dark:from-gray-950 dark:to-black">
+        <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
+          <div className="absolute -top-40 -right-24 h-96 w-96 rounded-full bg-teal-400/25 blur-3xl" />
+          <div className="absolute -bottom-40 -left-24 h-96 w-96 rounded-full bg-blue-400/20 blur-3xl" />
         </div>
-
-        {templates.map(template => (
-          <div key={template.templateId} className="mb-8">
-            <h2 className="text-2xl font-bold mb-4">{template.name}</h2>
-            <p className="text-muted-foreground mb-4">{template.description}</p>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {instances
-                .filter(instance => instance.templateId === template.templateId)
-                .map((instance: any) => {
-                  // Get history data with proper null checks
-                  const history = instance.history || {};
-                  const events = history.events || [];
-
-                  // Process events to generate messages and transitions (like in procedure-state.tsx)
-                  let currentState = "idle";
-                  const generatedMessages: any[] = [];
-                  const allTransitions: any[] = [];
-
-                  // Process each event to generate messages
-                  for (const event of events) {
-                    const result = handleEventAndGenerateMessages(
-                      event,
-                      template.messageRules || [],
-                      instance.variables || {},
-                      currentState,
-                      template.stateMachine.fsl,
-                    );
-
-                    generatedMessages.push(...result.messages);
-                    allTransitions.push(...result.transitions);
-                    currentState = result.finalState;
-                  }
-
-                  // Calculate current state using generated messages
-                  currentState = calculateCurrentState(template.stateMachine.fsl, generatedMessages);
-
-                  // Extract nodes to get state metadata
-                  const stateSet = new Set<string>();
-                  template.stateMachine.fsl.split(";").forEach((line: string) => {
-                    line = line.trim();
-                    if (line) {
-                      const sourceState = line.split(/\s+/)[0];
-                      const targetState = line.split("->")[1]?.trim();
-
-                      if (sourceState) stateSet.add(sourceState);
-                      if (targetState) stateSet.add(targetState);
-                    }
-                  });
-
-                  // Find final states (states with no outgoing transitions)
-                  const finalStates = new Set(Array.from(stateSet));
-                  template.stateMachine.fsl.split(";").forEach((line: string) => {
-                    line = line.trim();
-                    if (line) {
-                      const sourceState = line.split(/\s+/)[0];
-                      finalStates.delete(sourceState);
-                    }
-                  });
-
-                  // Get state metadata and status
-                  const stateMetadata = template.stateMachine.states?.[currentState] || {};
-
-                  // Check initial state more explicitly
-                  const isInitialState =
-                    currentState === "idle" ||
-                    currentState === template.stateMachine.initial ||
-                    // Also check if it's the first state in FSL
-                    template.stateMachine.fsl.trim().startsWith(currentState);
-                  const isFinalState = finalStates.has(currentState);
-
-                  // Update debug info to use generated messages
-                  const debugInfo = {
-                    instanceId: instance.instanceId,
-                    currentState,
-                    history: {
-                      events: {
-                        count: events.length,
-                        items: events.map((e: any) => ({
-                          type: e.type,
-                          timestamp: e.timestamp,
-                          data: e.data,
-                        })),
-                      },
-                      generatedMessages: {
-                        count: generatedMessages.length,
-                        items: generatedMessages,
-                      },
-                      transitions: {
-                        count: allTransitions.length,
-                        items: allTransitions,
-                      },
-                    },
-                    state: {
-                      current: currentState,
-                      isInitial: isInitialState,
-                      isFinal: isFinalState,
-                      metadata: stateMetadata,
-                      possibleTransitions: template.stateMachine.fsl
-                        .split(";")
-                        .map((line: string) => line.trim())
-                        .filter((line: string) => line.startsWith(currentState))
-                        .map((line: string) => {
-                          const match = line.match(/(\w+)\s+'([^']+)'\s*->\s*(\w+)/);
-                          return match ? { action: match[2], target: match[3] } : null;
-                        })
-                        .filter(Boolean),
-                    },
-                    lastActivity:
-                      generatedMessages[generatedMessages.length - 1]?.timestamp ||
-                      events[events.length - 1]?.timestamp,
-                    startDate: instance.startDate,
-                  };
-
-                  console.debug("Instance Debug:", debugInfo);
-
-                  return (
-                    <Link key={instance.instanceId} href={`/procedures/${instance.instanceId}`}>
-                      <Card className="hover:shadow-lg transition-shadow group">
-                        <CardHeader>
-                          <div className="flex justify-between items-start">
-                            <div className="space-y-1">
-                              <CardTitle className="flex items-center gap-2">
-                                <User className="h-4 w-4" />
-                                {instance.variables?.candidate?.name ||
-                                  Object.entries(instance.variables || {})[0]?.[0] ||
-                                  "Unnamed"}
-                              </CardTitle>
-                              <CardDescription className="flex items-center gap-2">
-                                <Building2 className="h-4 w-4" />
-                                {instance.variables?.company?.department ||
-                                  ((Object.entries(instance.variables)[0]?.[1] as { department?: string })?.department) ||
-                                  "No department"}
-                              </CardDescription>
-                            </div>
-                            <Badge
-                              variant={getStateBadgeVariant(currentState, isInitialState, isFinalState)}
-                              className="capitalize"
-                            >
-                              {currentState}
-                            </Badge>
-                          </div>
-
-                          {/* Add debug section that shows on hover */}
-                          <div
-                            data-debug
-                            className="hidden group-hover:block absolute right-2 top-2 z-10 bg-black/90 text-white p-2 rounded text-xs"
-                          >
-                            <pre className="whitespace-pre-wrap">{JSON.stringify(debugInfo, null, 2)}</pre>
-                          </div>
-                        </CardHeader>
-
-                        <CardContent className="space-y-4">
-                          {/* Stats Grid */}
-                          <div className="grid grid-cols-3 gap-2 text-sm">
-                            <div className="flex items-center gap-1">
-                              <MessageCircle className="h-4 w-4 text-muted-foreground" />
-                              <span>{generatedMessages.length} msgs</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <Activity className="h-4 w-4 text-muted-foreground" />
-                              <span>{events.length} events</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <GitBranch className="h-4 w-4 text-muted-foreground" />
-                              <span>{template.templateId}</span>
-                            </div>
-                          </div>
-
-                          {/* Timeline */}
-                          <div className="flex items-center justify-between text-sm text-muted-foreground">
-                            <div className="flex items-center gap-1">
-                              <Calendar className="h-4 w-4" />
-                              <span>
-                                Started:{" "}
-                                {instance.startDate
-                                  ? format(new Date(instance.startDate), "MMM d, yyyy")
-                                  : "Not started"}
-                              </span>
-                            </div>
-                            {debugInfo.lastActivity && (
-                              <div className="flex items-center gap-1">
-                                <Timer className="h-4 w-4" />
-                                <span>Last activity: {format(new Date(debugInfo.lastActivity), "MMM d")}</span>
-                              </div>
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </Link>
-                  );
-                })}
+        <div className="container mx-auto px-6 py-24 sm:py-32">
+          <div className="grid lg:grid-cols-2 gap-10 items-center">
+            <motion.div variants={stagger} initial="hidden" animate="show">
+              <motion.h1 variants={fadeUp} className="text-4xl sm:text-5xl font-extrabold tracking-tight leading-tight">
+                Intelligent Tokenization for Verifiable Processes
+              </motion.h1>
+              <motion.p variants={fadeUp} className="mt-5 text-lg text-muted-foreground max-w-2xl">
+                PLED is a patented protocol that transforms your most critical contracts, supply chains, and compliance
+                workflows into living, auditable digital assets. We provide the single source of truth for the next
+                economy.
+              </motion.p>
+              <motion.div variants={fadeUp} className="mt-8 flex flex-wrap gap-3">
+                <RequestDemoDialog trigger={<Button size="lg">Request a Demo</Button>} />
+                <Link href="/architecture">
+                  <Button size="lg" variant="outline">
+                    View the Architecture
+                  </Button>
+                </Link>
+              </motion.div>
+            </motion.div>
+            <div className="relative h-64 sm:h-80 lg:h-full min-h-72">
+              <div className="absolute inset-0 rounded-xl bg-white/70 dark:bg-white/5 ring-1 ring-black/5 shadow-2xl" />
+              <div className="absolute inset-0 p-4">
+                <Image src="/architecture.png" alt="PLED architecture" fill className="object-contain" priority />
+              </div>
             </div>
           </div>
-        ))}
-      </div>
+          {/* proof strip */}
+          <div className="mt-10 flex flex-wrap gap-2 text-sm text-muted-foreground">
+            <span className="inline-flex items-center gap-1 rounded-full border bg-background px-3 py-1">
+              <Link2 className="h-3.5 w-3.5" /> On‑chain + Off‑chain
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full border bg-background px-3 py-1">
+              <Layers className="h-3.5 w-3.5" /> Composable FSM
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full border bg-background px-3 py-1">
+              <FileSignature className="h-3.5 w-3.5" /> Signed evidence
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full border bg-background px-3 py-1">
+              <Shield className="h-3.5 w-3.5" /> Audit‑ready
+            </span>
+          </div>
+        </div>
+      </section>
+
+      {/* SECTION 2: Core Value Propositions */}
+      <section className="border-t">
+        <div className="container mx-auto px-6 py-20">
+          <motion.h2
+            className="text-2xl font-bold mb-3"
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.4 }}
+            transition={{ duration: 0.5 }}
+          >
+            From Raw Data to Intelligent Assets
+          </motion.h2>
+          <motion.p
+            className="text-muted-foreground max-w-2xl"
+            initial={{ opacity: 0, y: 12 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.5 }}
+            transition={{ duration: 0.45, delay: 0.05 }}
+          >
+            Ingest files, transactions, API/webhooks, emails, and IoT telemetry. PLED normalizes heterogeneous inputs
+            into verifiable events that drive trustworthy automation.
+          </motion.p>
+          <motion.div
+            className="mt-4 mb-6 flex flex-wrap gap-2 text-sm text-muted-foreground"
+            initial={{ opacity: 0, y: 10 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.5 }}
+            transition={{ duration: 0.45, delay: 0.1 }}
+          >
+            <span className="inline-flex items-center gap-1 rounded-full border bg-background px-3 py-1">
+              <FileText className="h-3.5 w-3.5" /> Files
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full border bg-background px-3 py-1">
+              <CreditCard className="h-3.5 w-3.5" /> Transactions
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full border bg-background px-3 py-1">
+              <Cloud className="h-3.5 w-3.5" /> API / Webhooks
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full border bg-background px-3 py-1">
+              <Mail className="h-3.5 w-3.5" /> Emails
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full border bg-background px-3 py-1">
+              <Activity className="h-3.5 w-3.5" /> IoT telemetry
+            </span>
+          </motion.div>
+          <PipelineMini />
+          <RawDataExplainer />
+          <motion.div
+            className="grid md:grid-cols-3 gap-8"
+            variants={stagger}
+            initial="hidden"
+            whileInView="show"
+            viewport={{ once: true, amount: 0.2 }}
+          >
+            <motion.div variants={fadeUp}>
+              <ValueCard
+                icon={<Workflow className="h-6 w-6" />}
+                title="Build Unbreakable Workflows"
+                desc="Model any complex process as an intelligent state machine. Eliminate ambiguity and enforce rules automatically, ensuring procedures run exactly as designed, every time."
+              />
+            </motion.div>
+            <motion.div variants={fadeUp}>
+              <ValueCard
+                icon={<Shield className="h-6 w-6" />}
+                title="Create an Immutable Chain of Evidence"
+                desc="Every step, decision, and event is cryptographically signed and recorded. Produce a complete, tamper-proof audit trail on demand for regulators, partners, and customers."
+              />
+            </motion.div>
+            <motion.div variants={fadeUp}>
+              <ValueCard
+                icon={<Zap className="h-6 w-6" />}
+                title="Automate with Confidence"
+                desc="Trigger on-chain and off-chain actions from a state of verifiable truth. From milestone payments to compliance alerts, automate critical tasks with unprecedented safety and predictability."
+              />
+            </motion.div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* SECTION 3: Use Cases */}
+      <section className="border-t bg-muted/30">
+        <div className="container mx-auto px-6 py-20">
+          <motion.h2
+            className="text-2xl font-bold mb-6"
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.4 }}
+            transition={{ duration: 0.5 }}
+          >
+            A Foundational Layer for Any Verifiable Process
+          </motion.h2>
+          <UseCasesCarousel />
+          <div className="mt-10">
+            <Link href="/procedures">
+              <Button size="lg" className="gap-2">
+                <Boxes className="h-4 w-4" />
+                Browse tokenization templates
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* SECTION 4: The Architecture - A Patented Foundation */}
+      <section className="border-t">
+        <div className="container mx-auto px-6 py-20">
+          <div className="grid lg:grid-cols-2 gap-8 items-start">
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.4 }}
+              transition={{ duration: 0.5 }}
+            >
+              <h2 className="text-2xl font-bold">The Architecture of Trust: A Patented Protocol.</h2>
+              <p className="mt-3 text-muted-foreground">
+                Our unique, event-driven architecture is the subject of a comprehensive WIPO patent application. It is
+                composed of specialized, interconnected modules that create a verifiable bridge between the unstructured
+                real world and the digital economy.
+              </p>
+              <ul className="mt-4 space-y-2 text-sm text-muted-foreground list-disc list-inside">
+                <li>The Representation Module — formal state machine blueprint</li>
+                <li>The Event Reception Module — ingest and classify raw data</li>
+                <li>
+                  The Event Interpretation & Validation Module — patented AI &quot;brain&quot; generating Messages
+                </li>
+                <li>The State Update Module — applies Messages to progress the process</li>
+                <li>The Action Module — triggers real-world outcomes (APIs, on-chain)</li>
+              </ul>
+              <div className="mt-6">
+                <Link href="/architecture">
+                  <Button variant="outline">Learn more about the protocol</Button>
+                </Link>
+              </div>
+            </motion.div>
+            <motion.div
+              className="relative h-64 sm:h-80 lg:h-full min-h-72"
+              initial={{ opacity: 0, scale: 0.98 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              viewport={{ once: true, amount: 0.3 }}
+              transition={{ duration: 0.6, ease: "easeOut" }}
+            >
+              <Image src="/architecture.png" alt="PLED architecture overview" fill className="object-contain" />
+            </motion.div>
+          </div>
+        </div>
+      </section>
+
+      {/* SECTION 5: Final Reinforcement & CTA */}
+      <section className="border-t">
+        <div className="container mx-auto px-6 py-20">
+          <div className="grid gap-6 items-start">
+            <div>
+              <motion.h2
+                className="text-2xl font-bold"
+                initial={{ opacity: 0, y: 12 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.5 }}
+                transition={{ duration: 0.45 }}
+              >
+                Powered by a Comprehensive Tokenization Protocol.
+              </motion.h2>
+              <motion.p
+                className="mt-3 text-muted-foreground max-w-2xl"
+                initial={{ opacity: 0, y: 12 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.5 }}
+                transition={{ duration: 0.45, delay: 0.05 }}
+              >
+                A general, end-to-end framework for modeling, verifying, and automating real-world processes as digital
+                assets. PLED turns diverse inputs into a verifiable state and safe actions to scale tokenization.
+              </motion.p>
+            </div>
+            <motion.div
+              className="mt-4 flex flex-wrap gap-3"
+              initial={{ opacity: 0, y: 12 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.5 }}
+              transition={{ duration: 0.45, delay: 0.1 }}
+            >
+              <Link href="/architecture">
+                <Button size="lg">Explore our Technology</Button>
+              </Link>
+              <RequestDemoDialog
+                trigger={
+                  <Button size="lg" variant="outline">
+                    Partner with Us
+                  </Button>
+                }
+              />
+            </motion.div>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
 
-// Update the state badge helper function
-function getStateBadgeVariant(
-  state: string,
-  isInitial: boolean,
-  isFinal: boolean,
-): "default" | "secondary" | "destructive" | "outline" | "success" {
-  // Initial states - blue
-  if (isInitial) {
-    return "secondary";
-  }
+function ValueCard({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) {
+  return (
+    <Card className="transition-transform duration-300 will-change-transform hover:-translate-y-0.5">
+      <CardHeader className="p-6 flex flex-row items-start gap-4">
+        <div className="p-2 rounded-md bg-primary/10 text-primary">{icon}</div>
+        <div>
+          <CardTitle>{title}</CardTitle>
+          <CardDescription className="mt-2 leading-relaxed">{desc}</CardDescription>
+        </div>
+      </CardHeader>
+    </Card>
+  );
+}
 
-  // Final states - red
-  if (isFinal) {
-    return "destructive";
-  }
+function UseCaseCard({ title, desc, img }: { title: string; desc: string; img?: string }) {
+  return (
+    <Card className="transition-transform duration-300 will-change-transform hover:-translate-y-0.5">
+      {img ? (
+        <div className="relative h-28 w-full overflow-hidden rounded-t-xl">
+          <Image src={img} alt="use case" fill className="object-cover" />
+        </div>
+      ) : null}
+      <CardHeader className="p-6">
+        <CardTitle className="flex items-center gap-2">
+          <CheckCircle2 className="h-5 w-5 text-primary" /> {title}
+        </CardTitle>
+        <CardDescription className="mt-2 leading-relaxed">{desc}</CardDescription>
+      </CardHeader>
+    </Card>
+  );
+}
 
-  // In-progress states - green
-  return "success";
+function PipelineMini() {
+  return (
+    <motion.div
+      className="mt-2 mb-8 flex items-center gap-2 md:gap-3"
+      initial={{ opacity: 0, y: 8 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.5 }}
+      transition={{ duration: 0.4 }}
+    >
+      <PipelineStep icon={<FileText className="h-3.5 w-3.5" />} label="Inputs" />
+      <PipelineConnector />
+      <PipelineStep icon={<Layers className="h-3.5 w-3.5" />} label="Normalization" />
+      <PipelineConnector />
+      <PipelineStep icon={<Workflow className="h-3.5 w-3.5" />} label="Verifiable State" />
+      <PipelineConnector />
+      <PipelineStep icon={<Zap className="h-3.5 w-3.5" />} label="Actions / Tokens" />
+    </motion.div>
+  );
+}
+
+function RawDataExplainer() {
+  const items = [
+    { label: "PDFs", icon: <FileText className="h-3.5 w-3.5" /> },
+    { label: "TXs", icon: <CreditCard className="h-3.5 w-3.5" /> },
+    { label: "APIs", icon: <Cloud className="h-3.5 w-3.5" /> },
+    { label: "Emails", icon: <Mail className="h-3.5 w-3.5" /> },
+    { label: "IoT", icon: <Activity className="h-3.5 w-3.5" /> },
+  ];
+
+  return (
+    <div className="mt-6 mb-8">
+      <motion.div
+        className="relative mx-auto grid max-w-3xl grid-cols-1 items-center gap-6 sm:grid-cols-3"
+        initial="hidden"
+        whileInView="show"
+        viewport={{ once: true, amount: 0.4 }}
+        variants={{ hidden: {}, show: { transition: { staggerChildren: 0.08 } } }}
+      >
+        {/* implode: raw inputs converge into events */}
+        <motion.div className="flex flex-wrap justify-center gap-2" variants={{}}>
+          {items.map((it, i) => (
+            <motion.span
+              key={i}
+              className="inline-flex items-center gap-1 rounded-full border bg-background px-3 py-1 text-xs text-muted-foreground"
+              initial={{ opacity: 0, y: 6, scale: 0.95 }}
+              whileInView={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ duration: 0.45, delay: i * 0.05 }}
+            >
+              {it.icon}
+              {it.label}
+            </motion.span>
+          ))}
+        </motion.div>
+
+        <div className="hidden sm:block" />
+
+        {/* explode: events branch to various actions */}
+        <motion.div className="flex flex-wrap justify-center gap-2" variants={{}}>
+          {["Signatures", "Ledger", "APIs", "Alerts"].map((label, i) => (
+            <motion.span
+              key={label}
+              className="inline-flex items-center gap-1 rounded-full border bg-background px-3 py-1 text-xs text-muted-foreground"
+              initial={{ opacity: 0, y: 6, scale: 0.95 }}
+              whileInView={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ duration: 0.45, delay: i * 0.06 }}
+            >
+              {label}
+            </motion.span>
+          ))}
+        </motion.div>
+
+        {/* animated connector between groups */}
+        <div className="pointer-events-none absolute left-1/2 top-1/2 hidden h-1 w-2/3 -translate-x-1/2 -translate-y-1/2 items-center sm:flex">
+          <div className="relative h-1 flex-1 overflow-hidden rounded">
+            <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-primary/15 to-primary/10" />
+            <motion.div
+              className="absolute inset-y-0 w-16 bg-primary/40 blur-sm"
+              initial={{ x: "-10%" }}
+              whileInView={{ x: "110%" }}
+              viewport={{ once: false, amount: 0.5 }}
+              transition={{ repeat: Infinity, duration: 2.4, ease: "linear" }}
+            />
+          </div>
+        </div>
+      </motion.div>
+      <p className="mt-3 text-center text-xs text-muted-foreground">
+        Raw data can be anything. PLED turns it into verifiable events and safe actions.
+      </p>
+    </div>
+  );
+}
+
+function PipelineStep({ icon, label }: { icon: React.ReactNode; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border bg-background px-3 py-1 text-xs text-muted-foreground">
+      {icon}
+      {label}
+    </span>
+  );
+}
+
+function PipelineConnector() {
+  return (
+    <div className="relative hidden h-1 flex-1 overflow-hidden rounded sm:block">
+      <div className="absolute inset-0 bg-gradient-to-r from-primary/30 via-primary/20 to-primary/10" />
+      <motion.div
+        className="absolute inset-y-0 w-16 bg-primary/40 blur-sm"
+        initial={{ x: "-20%" }}
+        whileInView={{ x: "120%" }}
+        viewport={{ once: false, amount: 0.5 }}
+        transition={{ repeat: Infinity, duration: 2.6, ease: "linear" }}
+      />
+    </div>
+  );
+}
+
+// (Deprecated) Stat card used in previous design; retained for reference.
+
+function UseCasesCarousel() {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const [index, setIndex] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+  const slides: { title: string; desc: string; img?: string }[] = [
+    {
+      title: "Contract Lifecycle Management",
+      desc: "Tokenize legal agreements to automate obligation tracking, manage milestones, and ensure compliance from execution to settlement.",
+      img: "/review-wizard.png",
+    },
+    {
+      title: "Verifiable Supply Chains",
+      desc: "Create digital passports for goods to prove origin, custody, and compliance (including cold chain integrity).",
+      img: "/neweventconsent2.png",
+    },
+    {
+      title: "High-Integrity Carbon Credits",
+      desc: "Tokenize end-to-end measurement and verification to eliminate greenwashing and enable auditable credits.",
+      img: "/state_machine_ai.png",
+    },
+    {
+      title: "Public Equities",
+      desc: "Embed listing criteria and automate corporate actions with transparent tokens.",
+      img: "/playground.png",
+    },
+    {
+      title: "Fixed Income",
+      desc: "Streamline issuance and lifecycle management of bonds with fractional access and automated workflows.",
+      img: "/ai-actions.png",
+    },
+    {
+      title: "Private Equity",
+      desc: "Increase transparency and lower minimums by representing private market interests as verifiable tokens.",
+      img: "/comparison-navigator.png",
+    },
+    {
+      title: "Private Debt",
+      desc: "Move private credit on-chain for real-time settlement and reduced back-office friction via smart rules.",
+      img: "/run-machine.png",
+    },
+    {
+      title: "Real Estate",
+      desc: "Enable fractional ownership and a unified record of title, cash flows, and covenants across assets.",
+      img: "/newprocedure.png",
+    },
+    {
+      title: "Commodities",
+      desc: "Improve access and collateralization for assets like gold with traceable, fractional digital representations.",
+      img: "/actionPolicy.png",
+    },
+  ];
+
+  const scrollBy = (dir: "prev" | "next") => {
+    const el = ref.current;
+    if (!el) return;
+    const amount = el.clientWidth * 0.9;
+    el.scrollBy({ left: dir === "next" ? amount : -amount, behavior: "smooth" });
+    setIndex(prev => {
+      const next = dir === "next" ? prev + 1 : prev - 1;
+      return (next + slides.length) % slides.length;
+    });
+  };
+
+  // Auto-advance slides slowly
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const id = setInterval(() => {
+      if (isPaused) return;
+      const first = el.children[0] as HTMLElement | undefined;
+      const slideWidth = first?.clientWidth ?? el.clientWidth * 0.9;
+      const nextIdx = (index + 1) % slides.length;
+      el.scrollTo({ left: nextIdx * slideWidth, behavior: "smooth" });
+      setIndex(nextIdx);
+    }, 4500);
+    return () => clearInterval(id);
+  }, [index, isPaused, slides.length]);
+
+  return (
+    <div>
+      <div className="relative">
+        <div className="flex justify-end gap-2 mb-3">
+          <Button variant="outline" size="icon" onClick={() => scrollBy("prev")} aria-label="Previous">
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <Button onClick={() => scrollBy("next")} size="icon" aria-label="Next">
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+        <div
+          ref={ref}
+          className="scrollbar-none -mx-2 flex snap-x snap-mandatory overflow-x-auto px-2 py-1"
+          style={{ scrollBehavior: "smooth" }}
+          onMouseEnter={() => setIsPaused(true)}
+          onMouseLeave={() => setIsPaused(false)}
+        >
+          {slides.map((s, i) => (
+            <div key={i} className="min-w-[300px] sm:min-w-[340px] lg:min-w-[380px] pr-4 snap-start">
+              <UseCaseCard title={s.title} desc={s.desc} img={s.img} />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 }

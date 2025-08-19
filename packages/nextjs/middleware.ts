@@ -1,15 +1,12 @@
 import { withAuth } from "next-auth/middleware";
 
-// Export withAuth with simpler configuration
+// Protect only the app sections that require auth. Homepage and static assets are public.
 export default withAuth({
   callbacks: {
-    authorized: ({ token }) => !!token
-  }
+    authorized: ({ token }) => !!token,
+  },
 });
 
 export const config = {
-  matcher: [
-    // Match everything except api/auth routes and static assets
-    '/((?!api/auth|auth/signin|_next/static|_next/image|favicon.ico).*)'
-  ],
-}; 
+  matcher: ["/procedures/:path*", "/debug/:path*", "/blockexplorer/:path*", "/docusign-return/:path*"],
+};
