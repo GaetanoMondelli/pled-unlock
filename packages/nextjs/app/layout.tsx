@@ -17,7 +17,7 @@ const ScaffoldEthApp = ({ children }: { children: React.ReactNode }) => {
         <CustomEthAppWithProviders>
           <div className="flex min-h-screen flex-col">
             <div className="flex-1">{children}</div>
-            <footer className="bg-black text-white py-6 text-center text-sm">PLED © 2024</footer>
+            <footer className="bg-black text-white py-6 text-center text-sm">PLED © 2025</footer>
           </div>
         </CustomEthAppWithProviders>
       </body>

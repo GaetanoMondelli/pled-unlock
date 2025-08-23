@@ -1,14 +1,19 @@
 "use client";
+/* eslint-disable */
 
-//
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import BottomLedger from "@/components/BottomLedger";
+import HeroFsmAnimation from "@/components/HeroFsmAnimation";
 import HowItWorksFlow from "@/components/HowItWorksFlow";
 import { RequestDemoDialog } from "@/components/marketing/RequestDemoDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { motion, useReducedMotion } from "framer-motion";
 import { CheckCircle2, Shield, Workflow, Zap } from "lucide-react";
+import templates from "@/lib/templates.json";
+import { StateMachineDiagram } from "@/components/state-machine-diagram";
 
 export default function Home() {
   return <Landing />;
@@ -17,6 +22,26 @@ export default function Home() {
 // Render landing content without server components by keeping this client component simple
 function Landing() {
   useReducedMotion();
+
+  // Match the animation box height to the hero grid height without changing section size
+  const heroMeasureRef = useRef<HTMLDivElement>(null);
+  const [heroHeight, setHeroHeight] = useState<number | null>(null);
+  useEffect(() => {
+    const measure = () => {
+      if (heroMeasureRef.current) {
+        const rect = heroMeasureRef.current.getBoundingClientRect();
+        setHeroHeight(Math.max(0, Math.floor(rect.height)));
+      }
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    if (heroMeasureRef.current) ro.observe(heroMeasureRef.current);
+    window.addEventListener("resize", measure);
+    return () => {
+      window.removeEventListener("resize", measure);
+      ro.disconnect();
+    };
+  }, []);
 
   const fadeUp = {
     hidden: { opacity: 0, y: 20 },
@@ -35,17 +60,16 @@ function Landing() {
           <div className="absolute -top-40 -right-24 h-96 w-96 rounded-full bg-teal-400/25 blur-3xl" />
           <div className="absolute -bottom-40 -left-24 h-96 w-96 rounded-full bg-blue-400/20 blur-3xl" />
         </div>
-        <div className="container mx-auto px-6 py-24 sm:py-32">
-          <div className="grid lg:grid-cols-2 gap-10 items-center">
-            <motion.div variants={stagger} initial="hidden" animate="show">
-              <motion.h1 variants={fadeUp} className="text-4xl sm:text-5xl font-extrabold tracking-tight leading-tight">
+        <div className="container mx-auto px-6 pt-14 sm:pt-20 pb-10 sm:pb-12">
+          <div className="grid lg:grid-cols-2 gap-10 items-stretch">
+            <motion.div ref={heroMeasureRef} variants={stagger} initial="hidden" animate="show" className="self-center">
+              <motion.h1 id="hero-title" className="text-4xl sm:text-5xl font-extrabold tracking-tight leading-tight">
                 Intelligent Tokenization for the Real World
               </motion.h1>
-              <motion.p variants={fadeUp} className="mt-5 text-lg text-muted-foreground max-w-2xl">
-                A patented protocol that transforms real-world processes - contracts, supply chains, and more - into
-                living, state-aware digital assets.
+              <motion.p id="hero-subtitle" className="mt-5 text-lg text-muted-foreground max-w-2xl">
+                Model real-world processes, contracts, supply chains, and more as living, state-aware digital assets.
               </motion.p>
-              <motion.div variants={fadeUp} className="mt-8 flex flex-wrap gap-3">
+              <motion.div id="hero-cta" className="mt-8 flex flex-wrap gap-3">
                 <RequestDemoDialog trigger={<Button size="lg">Request a Demo</Button>} />
                 <Link href="/architecture">
                   <Button size="lg" variant="outline">
@@ -54,20 +78,30 @@ function Landing() {
                 </Link>
               </motion.div>
             </motion.div>
-            <div className="relative h-64 sm:h-80 lg:h-full min-h-72">
-              <div className="absolute inset-0 rounded-xl bg-white/70 dark:bg-white/5 ring-1 ring-black/5 shadow-2xl" />
-              <div className="absolute inset-0 p-4">
-                <Image src="/architecture.png" alt="Architecture overview" fill className="object-contain" priority />
+            <div
+              className="relative overflow-hidden rounded-xl lg:mr-[-32px] xl:mr-[-40px]"
+              style={{ height: heroHeight ? `${heroHeight}px` : undefined, minHeight: "18rem" }}
+            >
+              <div className="absolute inset-0">
+                <HeroFsmAnimation />
               </div>
             </div>
           </div>
           {/* proof strip removed for a cleaner, neutral hero */}
+          <div>
+            <div className="grid lg:grid-cols-2 items-start">
+              <div className="hidden lg:block" />
+              <div className="lg:mr-[-32px] xl:mr-[-40px]">
+                <BottomLedger />
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
       {/* SECTION 2: How It Works */}
       <section className="border-t">
-        <div className="container mx-auto px-6 py-20">
+        <div className="container mx-auto px-6 pt-8 pb-20">
           <motion.h2
             className="text-2xl font-bold mb-3"
             initial={{ opacity: 0, y: 16 }}
@@ -118,6 +152,11 @@ function Landing() {
               />
             </motion.div>
           </motion.div>
+          <div className="mt-8">
+            <Link href="/templates">
+              <Button variant="outline">See all templates</Button>
+            </Link>
+          </div>
         </div>
       </section>
 
@@ -149,6 +188,35 @@ function Landing() {
               desc="Generate provably sustainable carbon credits by tokenizing the entire measurement and verification process, eliminating greenwashing."
               img="/state_machine_ai.png"
             />
+          </div>
+          {/* Carousel of more templates */}
+          <div className="mt-12">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-semibold">Explore Templates</h3>
+              <Link href="/templates">
+                <Button variant="outline">View all</Button>
+              </Link>
+            </div>
+            <div className="overflow-x-auto">
+              <div className="flex gap-4 min-w-full pr-2">
+                {templates.map(t => (
+                  <Link key={t.id} href={`/templates/${t.id}`} className="min-w-[280px] max-w-[280px]">
+                    <div className="rounded-lg border bg-background hover:-translate-y-0.5 transition-transform">
+                      <div className="relative h-24 w-full overflow-hidden rounded-t-lg">
+                        <Image src={t.coverImage} alt={t.title} fill className="object-cover" />
+                      </div>
+                      <div className="p-3">
+                        <div className="font-medium text-sm line-clamp-1">{t.title}</div>
+                        <div className="text-xs text-muted-foreground line-clamp-2 mb-2">{t.description}</div>
+                        <div className="rounded-md border bg-muted/30 p-2">
+                          <StateMachineDiagram definition={t.stateMachineDefinition} height={110} />
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </section>

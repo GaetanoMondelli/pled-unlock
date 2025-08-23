@@ -90,7 +90,7 @@ export const Header = () => {
             </ul>
           )}
         </div>
-  {/* Brand/logo removed for a cleaner, neutral header */}
+        {/* Brand/logo removed for a cleaner, neutral header */}
         <ul className="hidden lg:flex lg:flex-nowrap menu menu-horizontal px-1 gap-2">
           <HeaderMenuLinks />
         </ul>

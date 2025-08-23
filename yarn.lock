@@ -4183,6 +4183,7 @@ __metadata:
     eslint-plugin-prettier: ~5.2.1
     firebase-admin: ^13.0.2
     framer-motion: ^11.3.15
+    gsap: ^3.12.5
     jssm: ^5.104.1
     jssm-viz: ^5.104.1
     lucide-react: ^0.471.1
@@ -12659,6 +12660,13 @@ __metadata:
   dependencies:
     lodash: ^4.17.15
   checksum: 1e0db4dea1c8187d59103d5582ecf32008845ebe2103959a51d22cb6dae495e81fb9263e22c922bca3aaecb56064a45cd53424e15a4626cfb5a0c52d0aff61a8
+  languageName: node
+  linkType: hard
+
+"gsap@npm:^3.12.5":
+  version: 3.13.0
+  resolution: "gsap@npm:3.13.0"
+  checksum: 40884726718b5bed8cdd6faa621b3eaec64541b6fc163a0af810d3626d750e5d010f7300f4b106327d4474623a9fd5f915a48081d7744eec38c57a1fce20fb62
   languageName: node
   linkType: hard
 

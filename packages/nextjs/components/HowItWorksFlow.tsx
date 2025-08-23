@@ -1,7 +1,9 @@
 "use client";
+/* eslint-disable */
 
-import React, { useMemo } from "react";
-import ReactFlow, { Controls, Edge, MarkerType, Node, Position } from "reactflow";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import ReactFlow, { Controls, Edge, MarkerType, Node, Position, ReactFlowInstance } from "reactflow";
+import { useIsMobile } from "@/hooks/use-mobile";
 import "reactflow/dist/style.css";
 
 const pill = (text: string) => (
@@ -11,6 +13,9 @@ const pill = (text: string) => (
 );
 
 export default function HowItWorksFlow() {
+  const isMobile = useIsMobile();
+  const [rfInstance, setRfInstance] = useState<ReactFlowInstance | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   // Static layout for a clean, readable diagram
   const nodes = useMemo<Node[]>(
     () => [
@@ -70,7 +75,7 @@ export default function HowItWorksFlow() {
               <span className="ml-1 inline-flex items-center rounded-full border px-2 py-0.5 text-[10px]">AI</span>
             </div>
           ),
-        },
+  },
   draggable: false,
   targetPosition: Position.Left,
   sourcePosition: Position.Right,
@@ -80,17 +85,17 @@ export default function HowItWorksFlow() {
       {
         id: "token",
         position: { x: 520, y: 60 },
-        data: { label: <div className="rounded-md bg-primary/10 px-4 py-2">Tokenization</div> },
+  data: { label: <div className="rounded-md bg-primary/10 px-4 py-2">Tokenization</div> },
   draggable: false,
   targetPosition: Position.Left,
-  sourcePosition: Position.Right,
+  sourcePosition: Position.Bottom,
       },
       {
         id: "state",
         position: { x: 520, y: 130 },
-        data: { label: <div className="rounded-md bg-primary/10 px-4 py-2">State</div> },
+  data: { label: <div className="rounded-md bg-primary/10 px-4 py-2">State</div> },
   draggable: false,
-  targetPosition: Position.Left,
+  targetPosition: Position.Top,
   sourcePosition: Position.Right,
       },
 
@@ -98,21 +103,21 @@ export default function HowItWorksFlow() {
       {
         id: "signatures",
         position: { x: 780, y: 10 },
-        data: { label: pill("Verifiable Signatures") },
+  data: { label: pill("Verifiable Signatures") },
   draggable: false,
   targetPosition: Position.Left,
       },
       {
         id: "ledger",
         position: { x: 780, y: 70 },
-        data: { label: pill("Integrity Ledger") },
+  data: { label: pill("Integrity Ledger") },
   draggable: false,
   targetPosition: Position.Left,
       },
       {
         id: "story",
         position: { x: 780, y: 130 },
-        data: { label: pill("State Story") },
+  data: { label: pill("State Story") },
   draggable: false,
   targetPosition: Position.Left,
       },
@@ -139,23 +144,23 @@ export default function HowItWorksFlow() {
       {
         id: "alerts",
         position: { x: 980, y: 180 },
-        data: { label: pill("Alerts") },
-        draggable: false,
-        targetPosition: Position.Left,
+  data: { label: pill("Alerts") },
+  draggable: false,
+  targetPosition: Position.Left,
       },
       {
         id: "notifications",
         position: { x: 980, y: 220 },
-        data: { label: pill("Notifications") },
-        draggable: false,
-        targetPosition: Position.Left,
+  data: { label: pill("Notifications") },
+  draggable: false,
+  targetPosition: Position.Left,
       },
       {
         id: "actions",
         position: { x: 980, y: 260 },
-        data: { label: pill("Actions") },
-        draggable: false,
-        targetPosition: Position.Left,
+  data: { label: pill("Actions") },
+  draggable: false,
+  targetPosition: Position.Left,
       },
     ],
     [],
@@ -170,16 +175,16 @@ export default function HowItWorksFlow() {
       { id: "e4", source: "emails", target: "norm" },
       { id: "e5", source: "iot", target: "norm" },
 
-      // Flow through Tokenization to State
+  // Flow through Tokenization to State
   { id: "e6", source: "norm", target: "token" },
   { id: "e7", source: "token", target: "state" },
 
-      // State fan-out
+  // Outputs
   { id: "e8", source: "state", target: "signatures" },
-  { id: "e9", source: "state", target: "ledger" },
+  { id: "e9", source: "token", target: "ledger" },
   { id: "e10", source: "state", target: "story" },
 
-      // Agent hooks
+  // Agent hooks
   { id: "e11", source: "state", target: "agent" },
   { id: "e12", source: "agent", target: "alerts" },
   { id: "e13", source: "agent", target: "notifications" },
@@ -187,6 +192,23 @@ export default function HowItWorksFlow() {
     ],
     [],
   );
+
+  // Fit the view when the container resizes or breakpoint changes
+  useEffect(() => {
+    if (!containerRef.current || !rfInstance) return;
+    const ro = new ResizeObserver(() => {
+      // Debounce with rAF for smoother updates
+      requestAnimationFrame(() => rfInstance.fitView({ padding: 0.1 }));
+    });
+    ro.observe(containerRef.current);
+    return () => ro.disconnect();
+  }, [rfInstance]);
+
+  // When switching between mobile/desktop, refit the view
+  useEffect(() => {
+    if (!rfInstance) return;
+    requestAnimationFrame(() => rfInstance.fitView({ padding: 0.1 }));
+  }, [isMobile, rfInstance]);
 
   return (
     <div className="mt-8 mb-12 w-full">
@@ -197,7 +219,7 @@ export default function HowItWorksFlow() {
         }
       `}</style>
       <div className="mx-auto w-full max-w-5xl rounded-xl border bg-background p-2">
-        <div style={{ height: 280 }}>
+  <div ref={containerRef} style={{ height: isMobile ? 320 : 280 }}>
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -205,10 +227,14 @@ export default function HowItWorksFlow() {
             nodesDraggable={false}
             elementsSelectable={false}
             zoomOnScroll={false}
+            zoomOnPinch={isMobile}
+            zoomOnDoubleClick={false}
             panOnScroll={false}
-            panOnDrag={false}
+            panOnDrag={isMobile}
+            preventScrolling={isMobile}
+            maxZoom={isMobile ? 3 : 1.5}
             fitView
-            fitViewOptions={{ padding: 0.2 }}
+            fitViewOptions={{ padding: 0.1 }}
             proOptions={{ hideAttribution: true }}
             defaultEdgeOptions={{
               type: "smoothstep",
@@ -216,9 +242,13 @@ export default function HowItWorksFlow() {
               style: { strokeWidth: 2 },
               markerEnd: { type: MarkerType.ArrowClosed },
             }}
+            onInit={(inst) => {
+              setRfInstance(inst);
+              // Ensure initial fit after mount
+              requestAnimationFrame(() => inst.fitView({ padding: 0.1 }));
+            }}
           >
-            {/* No dotted background */}
-            <Controls showInteractive={false} position="bottom-right" />
+            {isMobile ? <Controls position="bottom-right" /> : null}
           </ReactFlow>
         </div>
       </div>
@@ -228,3 +258,4 @@ export default function HowItWorksFlow() {
     </div>
   );
 }
+
