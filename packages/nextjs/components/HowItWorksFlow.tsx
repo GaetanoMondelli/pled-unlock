@@ -1,9 +1,8 @@
 "use client";
 /* eslint-disable */
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import ReactFlow, { Controls, Edge, MarkerType, Node, Position, ReactFlowInstance } from "reactflow";
-import { useIsMobile } from "@/hooks/use-mobile";
+import React, { useMemo } from "react";
+import ReactFlow, { Controls, Edge, MarkerType, Node, Position } from "reactflow";
 import "reactflow/dist/style.css";
 
 const pill = (text: string) => (
@@ -13,9 +12,6 @@ const pill = (text: string) => (
 );
 
 export default function HowItWorksFlow() {
-  const isMobile = useIsMobile();
-  const [rfInstance, setRfInstance] = useState<ReactFlowInstance | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
   // Static layout for a clean, readable diagram
   const nodes = useMemo<Node[]>(
     () => [
@@ -88,14 +84,14 @@ export default function HowItWorksFlow() {
   data: { label: <div className="rounded-md bg-primary/10 px-4 py-2">Tokenization</div> },
   draggable: false,
   targetPosition: Position.Left,
-  sourcePosition: Position.Bottom,
+  sourcePosition: Position.Right,
       },
       {
         id: "state",
         position: { x: 520, y: 130 },
   data: { label: <div className="rounded-md bg-primary/10 px-4 py-2">State</div> },
   draggable: false,
-  targetPosition: Position.Top,
+  targetPosition: Position.Left,
   sourcePosition: Position.Right,
       },
 
@@ -179,9 +175,9 @@ export default function HowItWorksFlow() {
   { id: "e6", source: "norm", target: "token" },
   { id: "e7", source: "token", target: "state" },
 
-  // Outputs
+  // State fan-out
   { id: "e8", source: "state", target: "signatures" },
-  { id: "e9", source: "token", target: "ledger" },
+  { id: "e9", source: "state", target: "ledger" },
   { id: "e10", source: "state", target: "story" },
 
   // Agent hooks
@@ -193,23 +189,6 @@ export default function HowItWorksFlow() {
     [],
   );
 
-  // Fit the view when the container resizes or breakpoint changes
-  useEffect(() => {
-    if (!containerRef.current || !rfInstance) return;
-    const ro = new ResizeObserver(() => {
-      // Debounce with rAF for smoother updates
-      requestAnimationFrame(() => rfInstance.fitView({ padding: 0.1 }));
-    });
-    ro.observe(containerRef.current);
-    return () => ro.disconnect();
-  }, [rfInstance]);
-
-  // When switching between mobile/desktop, refit the view
-  useEffect(() => {
-    if (!rfInstance) return;
-    requestAnimationFrame(() => rfInstance.fitView({ padding: 0.1 }));
-  }, [isMobile, rfInstance]);
-
   return (
     <div className="mt-8 mb-12 w-full">
       <style jsx>{`
@@ -219,7 +198,7 @@ export default function HowItWorksFlow() {
         }
       `}</style>
       <div className="mx-auto w-full max-w-5xl rounded-xl border bg-background p-2">
-  <div ref={containerRef} style={{ height: isMobile ? 320 : 280 }}>
+        <div style={{ height: 280 }}>
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -227,14 +206,10 @@ export default function HowItWorksFlow() {
             nodesDraggable={false}
             elementsSelectable={false}
             zoomOnScroll={false}
-            zoomOnPinch={isMobile}
-            zoomOnDoubleClick={false}
             panOnScroll={false}
-            panOnDrag={isMobile}
-            preventScrolling={isMobile}
-            maxZoom={isMobile ? 3 : 1.5}
+            panOnDrag={false}
             fitView
-            fitViewOptions={{ padding: 0.1 }}
+            fitViewOptions={{ padding: 0.2 }}
             proOptions={{ hideAttribution: true }}
             defaultEdgeOptions={{
               type: "smoothstep",
@@ -242,13 +217,9 @@ export default function HowItWorksFlow() {
               style: { strokeWidth: 2 },
               markerEnd: { type: MarkerType.ArrowClosed },
             }}
-            onInit={(inst) => {
-              setRfInstance(inst);
-              // Ensure initial fit after mount
-              requestAnimationFrame(() => inst.fitView({ padding: 0.1 }));
-            }}
           >
-            {isMobile ? <Controls position="bottom-right" /> : null}
+            {/* No dotted background */}
+            <Controls showInteractive={false} position="bottom-right" />
           </ReactFlow>
         </div>
       </div>
@@ -258,4 +229,3 @@ export default function HowItWorksFlow() {
     </div>
   );
 }
-

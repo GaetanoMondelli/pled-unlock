@@ -7,13 +7,12 @@ import Link from "next/link";
 import BottomLedger from "@/components/BottomLedger";
 import HeroFsmAnimation from "@/components/HeroFsmAnimation";
 import HowItWorksFlow from "@/components/HowItWorksFlow";
+import PhotoStillLife from "@/components/PhotoStillLife";
 import { RequestDemoDialog } from "@/components/marketing/RequestDemoDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { motion, useReducedMotion } from "framer-motion";
 import { CheckCircle2, Shield, Workflow, Zap } from "lucide-react";
-import templates from "@/lib/templates.json";
-import { StateMachineDiagram } from "@/components/state-machine-diagram";
 
 export default function Home() {
   return <Landing />;
@@ -99,6 +98,16 @@ function Landing() {
         </div>
       </section>
 
+  {/* SECTION 1.5: GSAP Still Life (constant table+apples; background crossfades EU/UK with CET/LBS captions) */}
+      <section className="border-t">
+        <div className="container mx-auto px-6 py-10">
+          <h2 className="sr-only">Still Life</h2>
+          <div className="lg:mr-[-32px] xl:mr-[-40px]">
+    {/* <PhotoStillLife /> */}
+          </div>
+        </div>
+      </section>
+
       {/* SECTION 2: How It Works */}
       <section className="border-t">
         <div className="container mx-auto px-6 pt-8 pb-20">
@@ -160,7 +169,7 @@ function Landing() {
         </div>
       </section>
 
-      {/* SECTION 3: Use Cases */}
+    {/* SECTION 3: Use Cases */}
       <section className="border-t bg-muted/30">
         <div className="container mx-auto px-6 py-20">
           <motion.h2
@@ -172,52 +181,7 @@ function Landing() {
           >
             Powering the Next Generation of Verifiable Assets
           </motion.h2>
-          <div className="grid md:grid-cols-3 gap-6">
-            <UseCaseCard
-              title="Contract Lifecycle Management"
-              desc="Tokenize legal agreements to automate obligation tracking, manage milestones, and ensure compliance from execution to settlement."
-              img="/review-wizard.png"
-            />
-            <UseCaseCard
-              title="Verifiable Supply Chains"
-              desc="Create auditable digital passports for goods, proving origin, chain of custody, and compliance with standards like cold chain integrity."
-              img="/neweventconsent2.png"
-            />
-            <UseCaseCard
-              title="High-Integrity Carbon Credits"
-              desc="Generate provably sustainable carbon credits by tokenizing the entire measurement and verification process, eliminating greenwashing."
-              img="/state_machine_ai.png"
-            />
-          </div>
-          {/* Carousel of more templates */}
-          <div className="mt-12">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-semibold">Explore Templates</h3>
-              <Link href="/templates">
-                <Button variant="outline">View all</Button>
-              </Link>
-            </div>
-            <div className="overflow-x-auto">
-              <div className="flex gap-4 min-w-full pr-2">
-                {templates.map(t => (
-                  <Link key={t.id} href={`/templates/${t.id}`} className="min-w-[280px] max-w-[280px]">
-                    <div className="rounded-lg border bg-background hover:-translate-y-0.5 transition-transform">
-                      <div className="relative h-24 w-full overflow-hidden rounded-t-lg">
-                        <Image src={t.coverImage} alt={t.title} fill className="object-cover" />
-                      </div>
-                      <div className="p-3">
-                        <div className="font-medium text-sm line-clamp-1">{t.title}</div>
-                        <div className="text-xs text-muted-foreground line-clamp-2 mb-2">{t.description}</div>
-                        <div className="rounded-md border bg-muted/30 p-2">
-                          <StateMachineDiagram definition={t.stateMachineDefinition} height={110} />
-                        </div>
-                      </div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          </div>
+      {/* Additional content can go here */}
         </div>
       </section>
 
