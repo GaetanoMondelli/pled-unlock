@@ -7,12 +7,11 @@ import Link from "next/link";
 import BottomLedger from "@/components/BottomLedger";
 import HeroFsmAnimation from "@/components/HeroFsmAnimation";
 import HowItWorksFlow from "@/components/HowItWorksFlow";
-import PhotoStillLife from "@/components/PhotoStillLife";
 import { RequestDemoDialog } from "@/components/marketing/RequestDemoDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { motion, useReducedMotion } from "framer-motion";
-import { CheckCircle2, Shield, Workflow, Zap } from "lucide-react";
+import { Shield, Workflow, Zap } from "lucide-react";
 
 export default function Home() {
   return <Landing />;
@@ -289,24 +288,6 @@ function ValueCard({ icon, title, desc }: { icon: React.ReactNode; title: string
           </div>
         </div>
         <div className="mt-auto" />
-      </CardHeader>
-    </Card>
-  );
-}
-
-function UseCaseCard({ title, desc, img }: { title: string; desc: string; img?: string }) {
-  return (
-    <Card className="transition-transform duration-300 will-change-transform hover:-translate-y-0.5">
-      {img ? (
-        <div className="relative h-28 w-full overflow-hidden rounded-t-xl">
-          <Image src={img} alt="use case" fill className="object-cover" />
-        </div>
-      ) : null}
-      <CardHeader className="p-6">
-        <CardTitle className="flex items-center gap-2">
-          <CheckCircle2 className="h-5 w-5 text-primary" /> {title}
-        </CardTitle>
-        <CardDescription className="mt-2 leading-relaxed">{desc}</CardDescription>
       </CardHeader>
     </Card>
   );
