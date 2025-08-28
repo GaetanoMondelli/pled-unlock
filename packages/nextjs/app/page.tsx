@@ -7,11 +7,13 @@ import Link from "next/link";
 import BottomLedger from "@/components/BottomLedger";
 import HeroFsmAnimation from "@/components/HeroFsmAnimation";
 import HowItWorksFlow from "@/components/HowItWorksFlow";
+import PhotoStillLife from "@/components/PhotoStillLife";
 import { RequestDemoDialog } from "@/components/marketing/RequestDemoDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { motion, useReducedMotion } from "framer-motion";
 import { Shield, Workflow, Zap } from "lucide-react";
+import templates from "@/lib/templates.json";
 
 export default function Home() {
   return <Landing />;
@@ -97,15 +99,7 @@ function Landing() {
         </div>
       </section>
 
-  {/* SECTION 1.5: GSAP Still Life (constant table+apples; background crossfades EU/UK with CET/LBS captions) */}
-      <section className="border-t">
-        <div className="container mx-auto px-6 py-10">
-          <h2 className="sr-only">Still Life</h2>
-          <div className="lg:mr-[-32px] xl:mr-[-40px]">
-    {/* <PhotoStillLife /> */}
-          </div>
-        </div>
-      </section>
+  {/* SECTION 1.5 removed; moved PhotoStillLife into How It Works */}
 
       {/* SECTION 2: How It Works */}
       <section className="border-t">
@@ -130,6 +124,39 @@ function Landing() {
             state and history, and by acting as a token agent that can transform, compose, and trigger actions safely.
           </motion.p>
           {/* Removed chips/pills and pipeline badges for clarity */}
+          {/* Photograph animation + explanatory copy: animation comes right after the title */}
+          <div className="mt-10">
+            <h3 className="mt-2 text-xl font-semibold">From Static Snapshots to Living Tokens</h3>
+            <div className="mt-8 lg:mr-[-32px] xl:mr-[-40px]">
+              <div className="relative max-w-[768px] w-full mx-auto">
+                <PhotoStillLife />
+              </div>
+            </div>
+            <div className="mt-10 space-y-3 text-sm leading-relaxed text-muted-foreground">
+              <p>
+                Most tokenization solutions work like a photograph — capturing an asset and its context in a single, rigid snapshot. But real-world context — regulations, compliance rules, contracts — is never fixed. It evolves. And when the background changes, the snapshot no longer reflects reality.
+              </p>
+              <p>
+                Pled solves this with a new architecture.
+                We separate facts (events, transactions, sensor data, signed documents) from the rules and models that interpret them. Facts are anchored in a tamper-proof, timestamped ledger, while interpretation layers remain flexible and upgradeable.
+              </p>
+              <p>This separation brings three breakthroughs:</p>
+              <ul className="list-disc list-inside space-y-1">
+                <li>
+                  <span className="font-medium text-foreground">Flexibility</span> — interpretation rules and models can evolve without rewriting history.
+                </li>
+                <li>
+                  <span className="font-medium text-foreground">Seamless onboarding</span> — any data source can be plugged in immediately, the context layer adapts later.
+                </li>
+                <li>
+                  <span className="font-medium text-foreground">Smart tokens</span> — no longer passive records, tokens become aware of their state and can trigger or suggest actions to reach desired outcomes.
+                </li>
+              </ul>
+              <p>
+                This is how Pled transforms tokenization from static and fragile… into smart, interoperable, and scalable digital assets.
+              </p>
+            </div>
+          </div>
           <HowItWorksFlow />
           <motion.div
             className="grid md:grid-cols-3 gap-8 items-stretch"
@@ -160,11 +187,7 @@ function Landing() {
               />
             </motion.div>
           </motion.div>
-          <div className="mt-8">
-            <Link href="/templates">
-              <Button variant="outline">See all templates</Button>
-            </Link>
-          </div>
+          {/* Browse all templates CTA moved to the Use Cases section below */}
         </div>
       </section>
 
@@ -180,7 +203,41 @@ function Landing() {
           >
             Powering the Next Generation of Verifiable Assets
           </motion.h2>
-      {/* Additional content can go here */}
+          <motion.div
+            className="relative"
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.2 }}
+            transition={{ duration: 0.6, ease: "easeOut" }}
+          >
+            <div className="overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none]" style={{ WebkitOverflowScrolling: "touch" }}>
+              <div className="flex gap-4 snap-x snap-mandatory">
+                {(templates as any[]).slice(0, 10).map(t => (
+                  <Card key={t.id} className="min-w-[260px] sm:min-w-[300px] snap-start overflow-hidden">
+                    {t.coverImage ? (
+                      <div className="relative h-24 w-full">
+                        <Image src={t.coverImage} alt={t.title} fill className="object-cover" />
+                      </div>
+                    ) : null}
+                    <CardHeader className="p-4">
+                      <CardTitle className="text-sm sm:text-base">{t.title}</CardTitle>
+                      <CardDescription className="mt-1 text-xs sm:text-sm line-clamp-2">{t.description}</CardDescription>
+                      <div className="mt-3">
+                        <Link href={`/templates/${encodeURIComponent(t.id)}`}>
+                          <Button size="sm" variant="outline">Details</Button>
+                        </Link>
+                      </div>
+                    </CardHeader>
+                  </Card>
+                ))}
+              </div>
+            </div>
+            <div className="mt-6">
+              <Link href="/templates">
+                <Button>Browse all templates</Button>
+              </Link>
+            </div>
+          </motion.div>
         </div>
       </section>
 

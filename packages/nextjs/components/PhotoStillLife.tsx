@@ -169,8 +169,12 @@ export default function PhotoStillLife() {
   const modelY = Math.max(M, (canvasH - modelH) / 2);
   const tokensStartY = Math.max(M, (canvasH - TOKENS_TOTAL_H) / 2);
 
-  // Events ledger should be constant with epoch timestamps (no scene dependency)
-  const baseEpoch = useMemo(() => Math.floor(Date.now() / 1000), []);
+  // Events ledger should avoid SSR/CSR mismatch: compute on client after mount
+  const [baseEpoch, setBaseEpoch] = useState<number | null>(null);
+  useEffect(() => {
+    // Defer to client to keep server and initial client render identical
+    setBaseEpoch(Math.floor(Date.now() / 1000));
+  }, []);
 
   // Per-apple variants
   const deltas = [-0.02, 0, 0.02];
@@ -710,7 +714,8 @@ z"
           </g>
           {/* Rows (constant; epoch timestamps) */}
           {(() => {
-            const epochs = [baseEpoch, baseEpoch + 60, baseEpoch + 120];
+            // Use placeholder until client computes baseEpoch to prevent hydration errors
+            const epochs = baseEpoch !== null ? [baseEpoch, baseEpoch + 60, baseEpoch + 120] : [0, 60, 120];
             return weightsKg.map((w, i) => {
               const rowY = eventsY + 16 + HEADER_H + i * (ROW_H + ROW_GAP) + Math.floor(ROW_H / 2);
               return (
@@ -725,7 +730,13 @@ z"
                     stroke="#e5e7eb"
                   />
                   <text x={12} y={8} fontSize={12} fill="#374151">
-                    Apple {String.fromCharCode(65 + i)} • ts {epochs[i]} • {w.toFixed(2)} kg • sig
+                    {"Apple "}
+                    {String.fromCharCode(65 + i)}
+                    {" • ts "}
+                    {baseEpoch === null ? "—" : epochs[i]}
+                    {" • "}
+                    {w.toFixed(2)}
+                    {" kg • sig"}
                     <tspan fontSize={10} fill="#6b7280">
                       {" "}
                       {sigs[i]}
