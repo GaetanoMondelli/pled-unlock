@@ -1,12 +1,11 @@
 import Link from "next/link";
 import { SettingsMenu } from "./layout/SettingsMenu";
 import { FaucetButton } from "./scaffold-eth/FaucetButton";
-import { RainbowKitCustomConnectButton } from "./scaffold-eth/RainbowKitCustomConnectButton";
 import { Button } from "@/components/ui/button";
 import { signOut, useSession } from "next-auth/react";
 
 export function Navbar() {
-  const { status } = useSession();
+  const { data: session, status } = useSession();
   return (
     <nav className="bg-white border-b border-gray-200 px-4 py-2.5 dark:bg-gray-800 dark:border-gray-700">
       <div className="flex flex-wrap justify-between items-center">
@@ -16,21 +15,19 @@ export function Navbar() {
           </Link>
         </div>
         <div className="flex items-center lg:order-2 gap-2">
-          <Link href="/architecture">
-            <Button variant="ghost" size="sm">
-              Architecture
-            </Button>
-          </Link>
-
           {status === "authenticated" ? (
             <>
               <Link href="/procedures">
                 <Button variant="ghost" size="sm">
-                  Procedures
+                  Dashboard
+                </Button>
+              </Link>
+              <Link href="/profile">
+                <Button variant="ghost" size="sm" className="text-sm text-gray-600 dark:text-gray-300">
+                  {session?.user?.name || 'User'}
                 </Button>
               </Link>
               <SettingsMenu />
-              <RainbowKitCustomConnectButton />
               <FaucetButton />
               <button className="btn btn-sm btn-error ml-2" onClick={() => signOut({ callbackUrl: "/auth/signin" })}>
                 Logout

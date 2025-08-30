@@ -25,7 +25,8 @@ export default function SignIn() {
       if (response?.error) {
         setError("Invalid username or password");
       } else {
-        router.push("/");
+        // After successful login, go to procedures page instead of the landing page
+        router.push("/procedures");
         router.refresh();
       }
     } catch (err) {

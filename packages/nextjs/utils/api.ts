@@ -75,6 +75,34 @@ export async function getProcedureData(id: string) {
   return { instance, template };
 }
 
+// Delete procedure instance
+export async function deleteProcedureInstance(instanceId: string) {
+  const data = await fetchFromDb();
+  const updatedInstances = data.procedureInstances?.filter((p: any) => p.instanceId !== instanceId) || [];
+  
+  const updatedDb = {
+    ...data,
+    procedureInstances: updatedInstances,
+  };
+
+  return updateDb(updatedDb);
+}
+
+// Delete template and all its instances
+export async function deleteTemplate(templateId: string) {
+  const data = await fetchFromDb();
+  const updatedTemplates = data.procedureTemplates?.filter((t: any) => t.templateId !== templateId) || [];
+  const updatedInstances = data.procedureInstances?.filter((p: any) => p.templateId !== templateId) || [];
+  
+  const updatedDb = {
+    ...data,
+    procedureTemplates: updatedTemplates,
+    procedureInstances: updatedInstances,
+  };
+
+  return updateDb(updatedDb);
+}
+
 // Add helper function for sleep
 function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));

@@ -13,6 +13,8 @@ export default function HeroFsmAnimation({ onComplete }: { onComplete?: () => vo
   const revealedRef = useRef(false);
 
   useEffect(() => {
+    if (!containerRef.current || !svgRef.current) return;
+
     const ctx = gsap.context(() => {
       const tl = gsap.timeline({ defaults: { ease: "power2.out" }, repeat: -1, repeatDelay: 1.2 });
 
@@ -258,7 +260,15 @@ export default function HeroFsmAnimation({ onComplete }: { onComplete?: () => vo
       });
     }, containerRef);
 
-    return () => ctx.revert();
+    return () => {
+      try {
+        if (ctx && typeof ctx.revert === 'function') {
+          ctx.revert();
+        }
+      } catch (error) {
+        console.warn('Error during GSAP context cleanup:', error);
+      }
+    };
   }, [onComplete]);
 
   return (

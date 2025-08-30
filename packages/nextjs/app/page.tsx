@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import BottomLedger from "@/components/BottomLedger";
-import HeroFsmAnimation from "@/components/HeroFsmAnimation";
+import SafeHeroFsmAnimation from "@/components/SafeHeroFsmAnimation";
 import HowItWorksFlow from "@/components/HowItWorksFlow";
 import PhotoStillLife from "@/components/PhotoStillLife";
 import { RequestDemoDialog } from "@/components/marketing/RequestDemoDialog";
@@ -14,6 +14,7 @@ import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/ca
 import { motion, useReducedMotion } from "framer-motion";
 import { Shield, Workflow, Zap } from "lucide-react";
 import templates from "@/lib/templates.json";
+// import SafeTurbineScene from "@/components/SafeTurbineScene";
 
 export default function Home() {
   return <Landing />;
@@ -83,7 +84,7 @@ function Landing() {
               style={{ height: heroHeight ? `${heroHeight}px` : undefined, minHeight: "18rem" }}
             >
               <div className="absolute inset-0">
-                <HeroFsmAnimation />
+                <SafeHeroFsmAnimation />
               </div>
             </div>
           </div>
@@ -99,6 +100,7 @@ function Landing() {
         </div>
       </section>
 
+      {/* SECTION 1.25: Renewable flow (turbine -> graph -> certificate) */}
   {/* SECTION 1.5 removed; moved PhotoStillLife into How It Works */}
 
       {/* SECTION 2: How It Works */}

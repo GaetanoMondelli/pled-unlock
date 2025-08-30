@@ -707,6 +707,514 @@
           "failed"
         ]
       }
+    },
+    {
+      "templateId": "carbon-credit-hydro",
+      "name": "Carbon Credit Tokenization - Hydro Power", 
+      "description": "Complete workflow for converting hydro power measurements into verified carbon credit certificates using IoT devices",
+      "category": "carbon",
+      "variables": {
+        "project": {
+          "projectId": { "type": "string", "required": true },
+          "projectName": { "type": "string", "required": true },
+          "geography": { "type": "string", "required": true },
+          "technology": { "type": "string", "required": true },
+          "vintage": { "type": "string", "required": true },
+          "additionality": { "type": "string", "required": true }
+        },
+        "device": {
+          "deviceId": { "type": "string", "required": true },
+          "deviceType": { "type": "string", "required": true },
+          "location": { "type": "string", "required": true },
+          "certificateId": { "type": "string", "required": true }
+        },
+        "config": {
+          "conversionRate": { "type": "number", "required": true },
+          "batchSize": { "type": "number", "required": true },
+          "tokenStandard": { "type": "string", "required": true },
+          "certificateSize": { "type": "number", "required": true },
+          "qualityThreshold": { "type": "number", "required": true }
+        }
+      },
+      "eventTypes": [
+        {
+          "type": "IOT_MEASUREMENT",
+          "schema": {
+            "deviceId": "string",
+            "timestamp": "string", 
+            "value": "number",
+            "unit": "string",
+            "signature": "string",
+            "metadata": "object"
+          }
+        },
+        {
+          "type": "TOKEN_CREATED",
+          "schema": {
+            "tokenId": "string",
+            "credits": "number", 
+            "metadata": "object",
+            "qualityScore": "number"
+          }
+        },
+        {
+          "type": "CERTIFICATE_GENERATED",
+          "schema": {
+            "certificateId": "string",
+            "tokenIds": "array",
+            "totalCredits": "number",
+            "issueDate": "string",
+            "expiryDate": "string"
+          }
+        }
+      ],
+      "messageRules": [
+        {
+          "id": "iot_measurement_validation",
+          "priority": 1,
+          "matches": {
+            "type": "IOT_MEASUREMENT",
+            "conditions": {
+              "deviceId": "{{device.deviceId}}",
+              "signature": "(verified)",
+              "value": "(positive)"
+            }
+          },
+          "captures": {
+            "measurementValue": "{{event.data.value}}",
+            "measurementTime": "{{event.data.timestamp}}",
+            "deviceLocation": "{{device.location}}"
+          },
+          "generates": {
+            "type": "validated_measurement",
+            "template": {
+              "title": "New hydro measurement from {{device.deviceType}}",
+              "content": "Received {{captures.measurementValue}} {{event.data.unit}} from device {{device.deviceId}} at {{device.location}}",
+              "timestamp": "{{captures.measurementTime}}"
+            }
+          },
+          "transition": {
+            "to": "processing_measurement",
+            "conditions": {
+              "measurementTime": "(after) {{previousState.time}}"
+            }
+          }
+        },
+        {
+          "id": "batch_accumulation_rule",
+          "priority": 2,
+          "matches": {
+            "type": "IOT_MEASUREMENT",
+            "conditions": {
+              "deviceId": "{{device.deviceId}}", 
+              "signature": "(verified)"
+            }
+          },
+          "generates": {
+            "type": "batch_progress",
+            "template": {
+              "title": "Batch accumulation progress",
+              "content": "Collected measurement {{event.data.value}} for batch processing. Batch size: {{config.batchSize}}"
+            }
+          },
+          "transition": {
+            "to": "accumulating_measurements",
+            "conditions": {
+              "batchCount": "(less_than) {{config.batchSize}}"
+            }
+          }
+        },
+        {
+          "id": "batch_ready_rule",
+          "priority": 3,
+          "matches": {
+            "type": "IOT_MEASUREMENT",
+            "conditions": {
+              "batchCount": "{{config.batchSize}}"
+            }
+          },
+          "generates": {
+            "type": "batch_ready",
+            "template": {
+              "title": "Measurement batch ready for token creation",
+              "content": "Collected {{config.batchSize}} measurements, ready to create carbon tokens"
+            }
+          },
+          "transition": {
+            "to": "creating_tokens",
+            "conditions": {
+              "batchCount": "(equals) {{config.batchSize}}"
+            }
+          }
+        },
+        {
+          "id": "token_creation_rule",
+          "priority": 4,
+          "matches": {
+            "type": "TOKEN_CREATED",
+            "conditions": {
+              "qualityScore": "(greater_than) {{config.qualityThreshold}}"
+            }
+          },
+          "generates": {
+            "type": "quality_token",
+            "template": {
+              "title": "High-quality carbon token created",
+              "content": "Created token {{event.data.tokenId}} with {{event.data.credits}} credits (quality: {{event.data.qualityScore}}%)"
+            }
+          },
+          "transition": {
+            "to": "accumulating_tokens",
+            "conditions": {
+              "qualityScore": "(greater_than) {{config.qualityThreshold}}"
+            }
+          }
+        },
+        {
+          "id": "certificate_completion_rule",
+          "priority": 5,
+          "matches": {
+            "type": "CERTIFICATE_GENERATED",
+            "conditions": {
+              "totalCredits": "(greater_than) 0"
+            }
+          },
+          "generates": {
+            "type": "certificate_ready",
+            "template": {
+              "title": "Certificate {{event.data.certificateId}} ready",
+              "content": "Generated certificate with {{event.data.totalCredits}} carbon credits for project {{project.projectName}}"
+            }
+          },
+          "transition": {
+            "to": "certificate_generated",
+            "conditions": {
+              "issueDate": "(valid_date)"
+            }
+          }
+        }
+      ],
+      "stateMachine": {
+        "fsl": "/* IoT Validator Component */ idle 'measurement_received' -> validating; validating 'signature_valid' -> measurement_validated; validating 'signature_invalid' -> validation_error; validation_error 'retry' -> idle; /* Measurement Queue Component */ measurement_validated 'batch_progress' -> accumulating_measurements; accumulating_measurements 'measurement_received' -> accumulating_measurements; accumulating_measurements 'batch_ready' -> batch_processed; /* Token Creator Component */ batch_processed 'token_creation_start' -> creating_tokens; creating_tokens 'tokens_created' -> tokens_ready; /* Quality Splitter Component */ tokens_ready 'quality_check' -> quality_evaluation; quality_evaluation 'high_quality' -> quality_approved; quality_evaluation 'low_quality' -> quality_review; quality_review 'manual_approval' -> quality_approved; quality_review 'rejected' -> idle; /* Token Accumulator Component */ quality_approved 'token_accumulate' -> accumulating_tokens; accumulating_tokens 'more_tokens' -> accumulating_tokens; accumulating_tokens 'threshold_reached' -> tokens_accumulated; /* Certificate Generator Component */ tokens_accumulated 'generate_certificate' -> generating_certificate; generating_certificate 'certificate_created' -> certificate_generated;",
+        "initial": "idle",
+        "components": {
+          "iot_validator": {
+            "states": ["idle", "validating", "measurement_validated", "validation_error"],
+            "purpose": "Validates IoT measurements with cryptographic signatures"
+          },
+          "measurement_queue": {
+            "states": ["measurement_validated", "accumulating_measurements", "batch_processed"],
+            "purpose": "Accumulates measurements until batch threshold is reached"
+          },
+          "token_creator": {
+            "states": ["batch_processed", "creating_tokens", "tokens_ready"],
+            "purpose": "Converts measurement batches into carbon tokens"
+          },
+          "quality_splitter": {
+            "states": ["tokens_ready", "quality_evaluation", "quality_approved", "quality_review"],
+            "purpose": "Routes tokens based on quality threshold"
+          },
+          "token_accumulator": {
+            "states": ["quality_approved", "accumulating_tokens", "tokens_accumulated"],
+            "purpose": "Accumulates tokens until certificate threshold"
+          },
+          "certificate_generator": {
+            "states": ["tokens_accumulated", "generating_certificate", "certificate_generated"],
+            "purpose": "Generates carbon credit certificates from token pools"
+          }
+        }
+      },
+      "states": {
+        "validating": {
+          "description": "Validating IoT measurement signature and data integrity",
+          "actions": ["validate_signature", "verify_device"]
+        },
+        "processing_measurement": {
+          "description": "Processing validated measurement for batch accumulation", 
+          "actions": ["log_measurement", "check_batch_size"]
+        },
+        "accumulating_measurements": {
+          "description": "Accumulating measurements until batch size is reached",
+          "actions": ["add_to_batch", "update_progress"]
+        },
+        "creating_tokens": {
+          "description": "Converting measurement batch into carbon tokens",
+          "actions": ["mint_tokens", "calculate_quality"]
+        },
+        "accumulating_tokens": {
+          "description": "Accumulating tokens until certificate threshold is reached",
+          "actions": ["add_to_token_pool", "check_certificate_threshold"]
+        },
+        "generating_certificate": {
+          "description": "Generating carbon credit certificate from accumulated tokens",
+          "actions": ["create_certificate", "update_registry", "notify_stakeholders"]
+        },
+        "certificate_generated": {
+          "description": "Carbon credit certificate has been successfully generated",
+          "actions": ["send_notification", "archive_data"]
+        },
+        "quality_review": {
+          "description": "Manual review required for low-quality tokens",
+          "actions": ["request_review", "await_approval"]
+        },
+        "workflow_error": {
+          "description": "Error in the workflow that requires attention",
+          "actions": ["log_error", "notify_admin"]
+        }
+      },
+      "actions": {
+        "validate_signature": {
+          "id": "validate_signature",
+          "name": "Validate IoT Signature",
+          "type": "IOT_VALIDATION",
+          "description": "Validate cryptographic signature from IoT device",
+          "template": {
+            "endpoint": "https://api.renewable-registry.org/validate",
+            "deviceId": "{{device.deviceId}}",
+            "signature": "{{event.data.signature}}",
+            "publicKey": "{{device.publicKey}}"
+          }
+        },
+        "mint_tokens": {
+          "id": "mint_tokens", 
+          "name": "Mint Carbon Tokens",
+          "type": "TOKEN_MINT",
+          "description": "Create carbon tokens from verified measurements",
+          "template": {
+            "standard": "{{config.tokenStandard}}",
+            "conversionRate": "{{config.conversionRate}}",
+            "measurements": "{{batch.measurements}}",
+            "projectMetadata": "{{project}}"
+          }
+        },
+        "create_certificate": {
+          "id": "create_certificate",
+          "name": "Create Certificate", 
+          "type": "CERTIFICATE_GENERATION",
+          "description": "Generate carbon credit certificate from token pool",
+          "template": {
+            "tokens": "{{tokenPool}}",
+            "projectId": "{{project.projectId}}",
+            "issuer": "Renewable Energy Registry",
+            "standard": "{{config.tokenStandard}}"
+          }
+        }
+      },
+      "documents": {
+        "certificates": [
+          {
+            "id": "carbon_credit_certificate",
+            "name": "Carbon Credit Certificate",
+            "type": "certificate",
+            "content": "Verified Carbon Credit Certificate for {{project.projectName}}",
+            "linkedStates": ["generating_certificate", "certificate_generated"]
+          }
+        ]
+      }
+    },
+    {
+      "templateId": "carbon-credit-solar",
+      "name": "Carbon Credit Tokenization - Solar Power",
+      "description": "Complete workflow for converting solar power measurements into verified carbon credit certificates using IoT devices with higher frequency data collection",
+      "category": "carbon",
+      "variables": {
+        "project": {
+          "projectId": { "type": "string", "required": true },
+          "projectName": { "type": "string", "required": true },
+          "geography": { "type": "string", "required": true },
+          "technology": { "type": "string", "required": true, "defaultValue": "Solar PV" },
+          "vintage": { "type": "string", "required": true },
+          "additionality": { "type": "string", "required": true }
+        },
+        "device": {
+          "deviceId": { "type": "string", "required": true },
+          "deviceType": { "type": "string", "required": true, "defaultValue": "solar-meter" },
+          "location": { "type": "string", "required": true },
+          "certificateId": { "type": "string", "required": true }
+        },
+        "config": {
+          "conversionRate": { "type": "number", "required": true, "defaultValue": 2000 },
+          "batchSize": { "type": "number", "required": true, "defaultValue": 48 },
+          "tokenStandard": { "type": "string", "required": true, "defaultValue": "GS" },
+          "certificateSize": { "type": "number", "required": true, "defaultValue": 50 },
+          "qualityThreshold": { "type": "number", "required": true, "defaultValue": 85 }
+        }
+      },
+      "eventTypes": [
+        {
+          "type": "IOT_MEASUREMENT",
+          "schema": {
+            "deviceId": "string",
+            "timestamp": "string", 
+            "value": "number",
+            "unit": "string",
+            "signature": "string",
+            "weather": "object",
+            "irradiance": "number"
+          }
+        },
+        {
+          "type": "TOKEN_CREATED",
+          "schema": {
+            "tokenId": "string",
+            "credits": "number", 
+            "metadata": "object",
+            "qualityScore": "number",
+            "weatherAdjustment": "number"
+          }
+        },
+        {
+          "type": "CERTIFICATE_GENERATED",
+          "schema": {
+            "certificateId": "string",
+            "tokenIds": "array",
+            "totalCredits": "number",
+            "issueDate": "string",
+            "expiryDate": "string",
+            "standard": "string"
+          }
+        }
+      ],
+      "messageRules": [
+        {
+          "id": "solar_measurement_validation",
+          "priority": 1,
+          "matches": {
+            "type": "IOT_MEASUREMENT",
+            "conditions": {
+              "deviceId": "{{device.deviceId}}",
+              "signature": "(verified)",
+              "value": "(positive)",
+              "irradiance": "(greater_than) 100"
+            }
+          },
+          "generates": {
+            "type": "validated_measurement",
+            "template": {
+              "title": "New solar measurement from {{device.deviceType}}",
+              "content": "Received {{event.data.value}} {{event.data.unit}} with {{event.data.irradiance}}W/m² irradiance"
+            }
+          },
+          "transition": {
+            "to": "measurement_validated"
+          }
+        },
+        {
+          "id": "solar_batch_processing",
+          "priority": 2,
+          "matches": {
+            "type": "IOT_MEASUREMENT",
+            "conditions": {
+              "batchCount": "{{config.batchSize}}"
+            }
+          },
+          "generates": {
+            "type": "batch_ready",
+            "template": {
+              "title": "Solar measurement batch ready",
+              "content": "Collected {{config.batchSize}} measurements over {{calculatedDuration}} for tokenization"
+            }
+          },
+          "transition": {
+            "to": "batch_processed"
+          }
+        }
+      ],
+      "stateMachine": {
+        "fsl": "/* Solar IoT Validator Component */ idle 'measurement_received' -> validating; validating 'signature_valid' -> irradiance_check; irradiance_check 'sufficient_light' -> measurement_validated; irradiance_check 'insufficient_light' -> measurement_discarded; measurement_discarded 'retry' -> idle; validating 'signature_invalid' -> validation_error; validation_error 'retry' -> idle; /* Solar Measurement Queue Component */ measurement_validated 'batch_progress' -> accumulating_measurements; accumulating_measurements 'measurement_received' -> accumulating_measurements; accumulating_measurements 'batch_ready' -> weather_adjustment; weather_adjustment 'adjustment_applied' -> batch_processed; /* Solar Token Creator Component */ batch_processed 'token_creation_start' -> creating_tokens; creating_tokens 'weather_factor_applied' -> tokens_ready; /* Quality Splitter Component */ tokens_ready 'quality_check' -> quality_evaluation; quality_evaluation 'high_quality' -> quality_approved; quality_evaluation 'low_quality' -> weather_review; weather_review 'weather_approved' -> quality_approved; weather_review 'weather_rejected' -> idle; /* Token Accumulator Component */ quality_approved 'token_accumulate' -> accumulating_tokens; accumulating_tokens 'more_tokens' -> accumulating_tokens; accumulating_tokens 'threshold_reached' -> tokens_accumulated; /* Certificate Generator Component */ tokens_accumulated 'generate_certificate' -> generating_certificate; generating_certificate 'certificate_created' -> certificate_generated;",
+        "initial": "idle",
+        "components": {
+          "solar_iot_validator": {
+            "states": ["idle", "validating", "irradiance_check", "measurement_validated", "measurement_discarded", "validation_error"],
+            "purpose": "Validates solar IoT measurements with signature and irradiance checks"
+          },
+          "solar_measurement_queue": {
+            "states": ["measurement_validated", "accumulating_measurements", "weather_adjustment", "batch_processed"],
+            "purpose": "Accumulates solar measurements with weather adjustment factors"
+          },
+          "solar_token_creator": {
+            "states": ["batch_processed", "creating_tokens", "tokens_ready"],
+            "purpose": "Creates solar carbon tokens with weather compensation"
+          },
+          "solar_quality_splitter": {
+            "states": ["tokens_ready", "quality_evaluation", "quality_approved", "weather_review"],
+            "purpose": "Routes solar tokens based on quality and weather factors"
+          },
+          "token_accumulator": {
+            "states": ["quality_approved", "accumulating_tokens", "tokens_accumulated"],
+            "purpose": "Accumulates tokens until certificate threshold"
+          },
+          "certificate_generator": {
+            "states": ["tokens_accumulated", "generating_certificate", "certificate_generated"],
+            "purpose": "Generates Gold Standard compliant certificates"
+          }
+        }
+      },
+      "states": {
+        "validating": {
+          "description": "Validating solar IoT measurement signature and data integrity",
+          "actions": ["validate_signature", "verify_solar_device"]
+        },
+        "irradiance_check": {
+          "description": "Checking solar irradiance levels for measurement quality",
+          "actions": ["check_irradiance_threshold", "validate_weather_data"]
+        },
+        "weather_adjustment": {
+          "description": "Applying weather compensation factors to measurements",
+          "actions": ["apply_weather_factor", "calculate_efficiency"]
+        },
+        "creating_tokens": {
+          "description": "Converting solar measurement batch into carbon tokens with weather adjustment",
+          "actions": ["mint_solar_tokens", "apply_solar_efficiency", "calculate_quality"]
+        }
+      },
+      "actions": {
+        "validate_signature": {
+          "id": "validate_solar_signature",
+          "name": "Validate Solar IoT Signature",
+          "type": "IOT_VALIDATION",
+          "description": "Validate cryptographic signature from solar IoT device",
+          "template": {
+            "endpoint": "https://api.solar-registry.org/validate",
+            "deviceId": "{{device.deviceId}}",
+            "signature": "{{event.data.signature}}"
+          }
+        },
+        "check_irradiance_threshold": {
+          "id": "check_irradiance",
+          "name": "Check Solar Irradiance",
+          "type": "THRESHOLD_CHECK",
+          "description": "Verify minimum solar irradiance for valid measurement",
+          "template": {
+            "threshold": 100,
+            "irradiance": "{{event.data.irradiance}}",
+            "unit": "W/m²"
+          }
+        },
+        "mint_solar_tokens": {
+          "id": "mint_solar_tokens", 
+          "name": "Mint Solar Carbon Tokens",
+          "type": "TOKEN_MINT",
+          "description": "Create solar carbon tokens with weather compensation",
+          "template": {
+            "standard": "GS",
+            "conversionRate": "{{config.conversionRate}}",
+            "weatherFactor": "{{calculated_weather_factor}}",
+            "projectMetadata": "{{project}}"
+          }
+        }
+      },
+      "documents": {
+        "certificates": [
+          {
+            "id": "solar_carbon_certificate",
+            "name": "Solar Carbon Credit Certificate",
+            "type": "certificate",
+            "content": "Verified Solar Carbon Credit Certificate for {{project.projectName}} - Gold Standard Compliant",
+            "linkedStates": ["generating_certificate", "certificate_generated"]
+          }
+        ]
+      }
     }
   ],
   "eventTemplates": {
@@ -1569,6 +2077,14 @@
         }
       },
       "received": false
+    }
+  },
+  "users": {
+    "gmondelli": {
+      "firstName": "Gaetano",
+      "lastName": "Mondelli",
+      "updatedAt": "2025-08-30T19:38:06.305Z",
+      "walletAddress": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
     }
   }
 }

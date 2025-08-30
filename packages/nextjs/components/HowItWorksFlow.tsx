@@ -196,9 +196,26 @@ export default function HowItWorksFlow() {
         .react-flow__edge-path {
           stroke: hsl(var(--primary));
         }
+        /* Ensure ReactFlow doesn't capture scroll events */
+        .react-flow {
+          pointer-events: none;
+        }
+        /* Re-enable pointer events only for the controls */
+        .react-flow__controls {
+          pointer-events: auto;
+        }
+        /* Prevent wheel events from being captured */
+        .react-flow__pane {
+          pointer-events: none !important;
+        }
+        /* Ensure the container doesn't interfere with scrolling */
+        .flow-container {
+          overflow: visible;
+          position: relative;
+        }
       `}</style>
       <div className="mx-auto w-full max-w-5xl rounded-xl border bg-background p-2">
-        <div style={{ height: 280 }}>
+        <div className="flow-container" style={{ height: 280 }}>
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -208,6 +225,7 @@ export default function HowItWorksFlow() {
             zoomOnScroll={false}
             panOnScroll={false}
             panOnDrag={false}
+            preventScrolling={false}
             fitView
             fitViewOptions={{ padding: 0.2 }}
             proOptions={{ hideAttribution: true }}
