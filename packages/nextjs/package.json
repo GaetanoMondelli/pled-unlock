@@ -47,6 +47,7 @@
     "dagre-d3": "^0.6.4",
     "daisyui": "4.12.10",
     "docusign-esign": "^8.0.1",
+    "expr-eval": "^2.0.2",
     "firebase-admin": "^13.0.2",
     "framer-motion": "^11.3.15",
     "gsap": "^3.12.5",

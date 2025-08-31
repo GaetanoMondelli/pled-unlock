@@ -1414,6 +1414,249 @@
           }
         ]
       }
+    },
+    {
+      "templateId": "advanced-carbon-tokenization",
+      "name": "Advanced Multi-Standard Carbon Tokenization",
+      "description": "Enterprise-grade tokenization workflow supporting VCS, Gold Standard, and CDM with parallel processing, compliance auditing, and real-time monitoring",
+      "category": "carbon",
+      "variables": {
+        "project": {
+          "projectId": {
+            "type": "string",
+            "required": true
+          },
+          "projectName": {
+            "type": "string",
+            "required": true
+          },
+          "standards": {
+            "type": "array",
+            "required": true,
+            "defaultValue": ["VCS", "GS", "CDM"]
+          },
+          "complianceLevel": {
+            "type": "string",
+            "required": true,
+            "defaultValue": "enterprise"
+          }
+        },
+        "monitoring": {
+          "alertThresholds": {
+            "type": "object",
+            "required": true,
+            "defaultValue": {
+              "errorRate": 0.05,
+              "qualityScore": 85,
+              "processingTime": 300
+            }
+          },
+          "realTimeEnabled": {
+            "type": "boolean",
+            "required": true,
+            "defaultValue": true
+          }
+        }
+      },
+      "eventTypes": [
+        {
+          "type": "IOT_MEASUREMENT",
+          "schema": {
+            "deviceId": "string",
+            "timestamp": "string",
+            "value": "number",
+            "signature": "string",
+            "metadata": "object"
+          }
+        },
+        {
+          "type": "COMPLIANCE_CHECK",
+          "schema": {
+            "standard": "string",
+            "result": "boolean",
+            "auditTrail": "array"
+          }
+        },
+        {
+          "type": "QUALITY_ASSESSMENT",
+          "schema": {
+            "score": "number",
+            "mlConfidence": "number",
+            "expertReview": "boolean"
+          }
+        }
+      ],
+      "messageRules": [
+        {
+          "id": "enhanced_measurement_validation",
+          "priority": 1,
+          "matches": {
+            "type": "IOT_MEASUREMENT", 
+            "conditions": {
+              "signature": "(multi_verified)",
+              "deviceId": "(registered)"
+            }
+          },
+          "generates": {
+            "type": "validated_measurement_enhanced",
+            "template": {
+              "title": "Enhanced validation complete for {{event.data.deviceId}}",
+              "content": "Multi-signature validated measurement with fraud detection analysis"
+            }
+          },
+          "transition": {
+            "to": "measurement_preprocessing"
+          }
+        },
+        {
+          "id": "parallel_compliance_trigger",
+          "priority": 2,
+          "matches": {
+            "type": "COMPLIANCE_CHECK",
+            "conditions": {
+              "standard": "(any)",
+              "triggered": true
+            }
+          },
+          "generates": {
+            "type": "parallel_compliance_started",
+            "template": {
+              "title": "Parallel compliance validation initiated",
+              "content": "Starting {{project.standards.length}} standard compliance checks"
+            }
+          }
+        },
+        {
+          "id": "ai_quality_assessment",
+          "priority": 3,
+          "matches": {
+            "type": "QUALITY_ASSESSMENT",
+            "conditions": {
+              "mlConfidence": "(greater_than) 0.9"
+            }
+          },
+          "generates": {
+            "type": "high_confidence_approval",
+            "template": {
+              "title": "AI approved with high confidence: {{event.data.score}}%",
+              "content": "ML model confidence: {{event.data.mlConfidence}}"
+            }
+          }
+        }
+      ],
+      "stateMachine": {
+        "fsl": "/* Enhanced IoT Validator with Multi-Signature */ idle 'measurement_received' -> multi_signature_validation; multi_signature_validation 'all_signatures_valid' -> device_authentication; multi_signature_validation 'signature_failure' -> fraud_detection; device_authentication 'device_verified' -> measurement_preprocessing; device_authentication 'device_suspect' -> security_review; fraud_detection 'fraud_detected' -> security_incident; fraud_detection 'false_positive' -> measurement_preprocessing; security_review 'security_cleared' -> measurement_preprocessing; security_review 'security_breach' -> security_incident; security_incident 'incident_resolved' -> idle; measurement_preprocessing 'preprocessing_complete' -> parallel_standard_validation; /* Parallel Standard Compliance Validators */ parallel_standard_validation 'vcs_validation' -> vcs_compliance_check; parallel_standard_validation 'gs_validation' -> gs_compliance_check; parallel_standard_validation 'cdm_validation' -> cdm_compliance_check; vcs_compliance_check 'vcs_compliant' -> vcs_approved; vcs_compliance_check 'vcs_non_compliant' -> compliance_remediation; gs_compliance_check 'gs_compliant' -> gs_approved; gs_compliance_check 'gs_non_compliant' -> compliance_remediation; cdm_compliance_check 'cdm_compliant' -> cdm_approved; cdm_compliance_check 'cdm_non_compliant' -> compliance_remediation; compliance_remediation 'remediation_complete' -> parallel_standard_validation; /* Multi-Standard Token Creation */ vcs_approved 'create_vcs_tokens' -> vcs_tokens_created; gs_approved 'create_gs_tokens' -> gs_tokens_created; cdm_approved 'create_cdm_tokens' -> cdm_tokens_created; vcs_tokens_created 'quality_assessment' -> vcs_quality_check; gs_tokens_created 'quality_assessment' -> gs_quality_check; cdm_tokens_created 'quality_assessment' -> cdm_quality_check; /* Enhanced Quality Assessment with ML */ vcs_quality_check 'ml_analysis' -> vcs_ml_evaluation; gs_quality_check 'ml_analysis' -> gs_ml_evaluation; cdm_quality_check 'ml_analysis' -> cdm_ml_evaluation; vcs_ml_evaluation 'high_confidence' -> vcs_quality_approved; vcs_ml_evaluation 'low_confidence' -> expert_review; gs_ml_evaluation 'high_confidence' -> gs_quality_approved; gs_ml_evaluation 'low_confidence' -> expert_review; cdm_ml_evaluation 'high_confidence' -> cdm_quality_approved; cdm_ml_evaluation 'low_confidence' -> expert_review; expert_review 'expert_approved' -> quality_override_approved; expert_review 'expert_rejected' -> quality_rejected; quality_rejected 'retry_processing' -> measurement_preprocessing; /* Token Aggregation and Portfolio Management */ vcs_quality_approved 'aggregate_vcs' -> vcs_portfolio; gs_quality_approved 'aggregate_gs' -> gs_portfolio; cdm_quality_approved 'aggregate_cdm' -> cdm_portfolio; quality_override_approved 'route_to_portfolio' -> portfolio_routing; portfolio_routing 'vcs_route' -> vcs_portfolio; portfolio_routing 'gs_route' -> gs_portfolio; portfolio_routing 'cdm_route' -> cdm_portfolio; vcs_portfolio 'portfolio_threshold' -> vcs_certificate_ready; gs_portfolio 'portfolio_threshold' -> gs_certificate_ready; cdm_portfolio 'portfolio_threshold' -> cdm_certificate_ready; /* Multi-Certificate Generation with Audit Trails */ vcs_certificate_ready 'generate_vcs_certificate' -> vcs_certificate_generation; gs_certificate_ready 'generate_gs_certificate' -> gs_certificate_generation; cdm_certificate_ready 'generate_cdm_certificate' -> cdm_certificate_generation; vcs_certificate_generation 'audit_trail_complete' -> vcs_certificate_issued; gs_certificate_generation 'audit_trail_complete' -> gs_certificate_issued; cdm_certificate_generation 'audit_trail_complete' -> cdm_certificate_issued; /* Real-time Monitoring and Analytics */ vcs_certificate_issued 'performance_metrics' -> performance_analytics; gs_certificate_issued 'performance_metrics' -> performance_analytics; cdm_certificate_issued 'performance_metrics' -> performance_analytics; performance_analytics 'metrics_processed' -> monitoring_complete; monitoring_complete 'next_batch' -> idle;",
+        "initial": "idle",
+        "final": [
+          "security_incident",
+          "monitoring_complete"
+        ],
+        "components": {
+          "enhanced_iot_validator": {
+            "states": [
+              "idle",
+              "multi_signature_validation", 
+              "device_authentication",
+              "fraud_detection",
+              "security_review",
+              "security_incident",
+              "measurement_preprocessing"
+            ],
+            "purpose": "Enhanced IoT validation with multi-signature verification and fraud detection"
+          },
+          "parallel_compliance_engine": {
+            "states": [
+              "parallel_standard_validation",
+              "vcs_compliance_check",
+              "gs_compliance_check", 
+              "cdm_compliance_check",
+              "vcs_approved",
+              "gs_approved",
+              "cdm_approved",
+              "compliance_remediation"
+            ],
+            "purpose": "Parallel processing for multiple carbon credit standards compliance"
+          },
+          "multi_standard_tokenizer": {
+            "states": [
+              "vcs_tokens_created",
+              "gs_tokens_created",
+              "cdm_tokens_created"
+            ],
+            "purpose": "Creates tokens for different carbon credit standards simultaneously"
+          },
+          "ai_quality_assessor": {
+            "states": [
+              "vcs_quality_check",
+              "gs_quality_check",
+              "cdm_quality_check",
+              "vcs_ml_evaluation",
+              "gs_ml_evaluation", 
+              "cdm_ml_evaluation",
+              "expert_review",
+              "vcs_quality_approved",
+              "gs_quality_approved",
+              "cdm_quality_approved",
+              "quality_override_approved",
+              "quality_rejected"
+            ],
+            "purpose": "AI-powered quality assessment with expert review fallback"
+          },
+          "portfolio_manager": {
+            "states": [
+              "vcs_portfolio",
+              "gs_portfolio",
+              "cdm_portfolio",
+              "portfolio_routing",
+              "vcs_certificate_ready",
+              "gs_certificate_ready",
+              "cdm_certificate_ready"
+            ],
+            "purpose": "Manages token portfolios across different standards"
+          },
+          "audit_certificate_generator": {
+            "states": [
+              "vcs_certificate_generation",
+              "gs_certificate_generation",
+              "cdm_certificate_generation",
+              "vcs_certificate_issued",
+              "gs_certificate_issued", 
+              "cdm_certificate_issued"
+            ],
+            "purpose": "Generates certificates with complete audit trails"
+          },
+          "real_time_monitor": {
+            "states": [
+              "performance_analytics",
+              "monitoring_complete"
+            ],
+            "purpose": "Real-time monitoring and performance analytics"
+          }
+        }
+      },
+      "actions": {
+        "multi_signature_validation": [
+          {
+            "name": "Verify Multiple Signatures", 
+            "type": "CRYPTO_VERIFY",
+            "description": "Validates multiple cryptographic signatures on IoT measurement"
+          }
+        ],
+        "fraud_detection": [
+          {
+            "name": "AI Fraud Detection",
+            "type": "ML_ANALYSIS", 
+            "description": "Machine learning based fraud detection on measurement patterns"
+          }
+        ],
+        "performance_analytics": [
+          {
+            "name": "Real-time Analytics",
+            "type": "ANALYTICS_ENGINE",
+            "description": "Generates real-time performance metrics and alerts"
+          }
+        ]
+      }
     }
   ],
   "eventTemplates": {

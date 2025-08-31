@@ -209,15 +209,28 @@ function TemplateCard({ template, instances, view, onDeleteInstance, onInspectTe
           
           <div className="pt-2 border-t border-muted-foreground/20">
             <div className="flex gap-1">
-              <Button 
-                size="sm" 
-                variant="outline" 
-                className="flex-1 text-xs"
-                onClick={() => onInspectTemplate(template)}
-              >
-                <Eye className="h-3 w-3 mr-1" />
-                Inspect
-              </Button>
+              {templateInstances.length > 0 ? (
+                <Link href={`/procedures/${templateInstances[0].instanceId}`} className="flex-1">
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    className="w-full text-xs"
+                  >
+                    <Eye className="h-3 w-3 mr-1" />
+                    Inspect
+                  </Button>
+                </Link>
+              ) : (
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  className="flex-1 text-xs"
+                  onClick={() => onInspectTemplate(template)}
+                >
+                  <Eye className="h-3 w-3 mr-1" />
+                  Inspect Template
+                </Button>
+              )}
               <Link href={`/components-lab?template=${template.templateId}`} className="flex-1">
                 <Button size="sm" variant="outline" className="w-full text-xs">
                   <Cpu className="h-3 w-3 mr-1" />

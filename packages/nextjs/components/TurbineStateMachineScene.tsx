@@ -123,6 +123,31 @@ export default function TurbineStateMachineScene() {
 
     return () => {
       mounted = false;
+      
+      // Nuclear cleanup on unmount
+      console.log("🚨 TurbineStateMachineScene UNMOUNTING - NUCLEAR GSAP CLEANUP");
+      
+      // Immediate emergency cleanup
+      try {
+        if (typeof window !== "undefined" && (window as any).gsap) {
+          const gsap = (window as any).gsap;
+          if (gsap && typeof gsap.killTweensOf === "function") {
+            gsap.killTweensOf("*");
+          }
+        }
+      } catch (error) {
+        console.warn("TurbineStateMachineScene emergency GSAP cleanup failed:", error);
+      }
+
+      // Nuclear cleanup
+      (async () => {
+        try {
+          const { NUCLEAR_GSAP_CLEANUP } = await import("../lib/gsap-killer");
+          await NUCLEAR_GSAP_CLEANUP();
+        } catch (error) {
+          console.warn("TurbineStateMachineScene nuclear GSAP cleanup failed:", error);
+        }
+      })();
     };
   }, []);
 

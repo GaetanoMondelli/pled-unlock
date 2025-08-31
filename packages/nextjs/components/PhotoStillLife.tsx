@@ -107,11 +107,13 @@ export default function PhotoStillLife() {
     if (!bgParisRef.current || !bgLondonRef.current) return;
 
     let cleanup: (() => void) | null = null;
+    const paris = bgParisRef.current; // Capture refs for cleanup
+    const london = bgLondonRef.current;
 
     async function setupAnimation() {
       try {
         const gsap = await initializeGSAP();
-        if (!bgParisRef.current || !bgLondonRef.current) return;
+        if (!paris || !london) return;
 
         const tl = gsap.timeline({ repeat: -1, defaults: { ease: "sine.inOut" } });
 
@@ -119,8 +121,6 @@ export default function PhotoStillLife() {
         const slideDist = photoW * 1.2 + 200; // zoom-cover factor + safety margin
 
         // start with Paris in view, London to the right
-        const paris = bgParisRef.current;
-        const london = bgLondonRef.current;
         if (!paris || !london) return;
         gsap.set(paris, { x: 0, opacity: 1 });
         gsap.set(london, { x: slideDist, opacity: 1 });
@@ -138,7 +138,7 @@ export default function PhotoStillLife() {
 
         tlRef.current = tl;
         cleanup = () => {
-          tl.kill();
+          if (tl) tl.kill();
           tlRef.current = null;
         };
       } catch (error) {
@@ -223,20 +223,22 @@ export default function PhotoStillLife() {
     if (!gear1Ref.current || !gear2Ref.current) return;
 
     let cleanup: (() => void) | null = null;
+    const gear1 = gear1Ref.current; // Capture refs for cleanup
+    const gear2 = gear2Ref.current;
 
     async function setupGearAnimation() {
       try {
         const gsap = await initializeGSAP();
-        if (!gear1Ref.current || !gear2Ref.current) return;
+        if (!gear1 || !gear2) return;
 
-        const t1 = gsap.to(gear1Ref.current, {
+        const t1 = gsap.to(gear1, {
           rotation: 360,
           transformOrigin: "50% 50%",
           repeat: -1,
           duration: 6,
           ease: "none",
         });
-        const t2 = gsap.to(gear2Ref.current, {
+        const t2 = gsap.to(gear2, {
           rotation: -360,
           transformOrigin: "50% 50%",
           repeat: -1,
@@ -244,8 +246,8 @@ export default function PhotoStillLife() {
           ease: "none",
         });
         cleanup = () => {
-          t1.kill();
-          t2.kill();
+          if (t1) t1.kill();
+          if (t2) t2.kill();
         };
       } catch (error) {
         console.warn("Failed to initialize gear animation:", error);
@@ -264,13 +266,14 @@ export default function PhotoStillLife() {
     if (!eventsToModelPathRef.current || !signalDotRef.current) return;
 
     let cleanup: (() => void) | null = null;
+    const path = eventsToModelPathRef.current; // Capture refs for cleanup
+    const signalDot = signalDotRef.current;
 
     async function setupSignalAnimation() {
       try {
         const gsap = await initializeGSAP();
-        if (!eventsToModelPathRef.current || !signalDotRef.current) return;
+        if (!path || !signalDot) return;
 
-        const path = eventsToModelPathRef.current;
         const length = path.getTotalLength();
         const proxy = { t: 0 } as { t: number };
         const tl = gsap.timeline();
@@ -283,14 +286,14 @@ export default function PhotoStillLife() {
               ease: "sine.out",
               onUpdate: () => {
                 const pt = path.getPointAtLength(proxy.t);
-                gsap.set(signalDotRef.current, { attr: { cx: pt.x, cy: pt.y }, opacity: 1 });
+                gsap.set(signalDot, { attr: { cx: pt.x, cy: pt.y }, opacity: 1 });
               },
             },
             0,
           )
-          .to(signalDotRef.current, { opacity: 0, duration: 0.2 }, ">-0.05");
+          .to(signalDot, { opacity: 0, duration: 0.2 }, ">-0.05");
         cleanup = () => {
-          tl.kill();
+          if (tl) tl.kill();
         };
       } catch (error) {
         console.warn("Failed to initialize signal animation:", error);
@@ -309,13 +312,13 @@ export default function PhotoStillLife() {
     if (!photoToEventsPathRef.current) return;
 
     let cleanup: (() => void) | null = null;
+    const path = photoToEventsPathRef.current; // Capture ref for cleanup
 
     async function setupDottedAnimation() {
       try {
         const gsap = await initializeGSAP();
-        if (!photoToEventsPathRef.current) return;
+        if (!path) return;
 
-        const path = photoToEventsPathRef.current;
         // Animate dash offset to create moving dots effect
         const dashCycle = 14; // should match dasharray total (dot + gap)
         const t = gsap.fromTo(
@@ -324,7 +327,7 @@ export default function PhotoStillLife() {
           { strokeDashoffset: dashCycle, duration: 1.8, repeat: -1, ease: "none" },
         );
         cleanup = () => {
-          t.kill();
+          if (t) t.kill();
         };
       } catch (error) {
         console.warn("Failed to initialize dotted animation:", error);
@@ -343,25 +346,25 @@ export default function PhotoStillLife() {
     if (!svgRef.current) return;
 
     let cleanup: (() => void) | null = null;
+    const svg = svgRef.current; // Capture ref for cleanup
 
     async function setupArrowHighlight() {
       try {
         const gsap = await initializeGSAP();
-        if (!svgRef.current) return;
+        if (!svg) return;
 
-        const root = svgRef.current;
-        const allArrows = root.querySelectorAll<SVGPathElement>(".flow-arrow");
+        const allArrows = svg.querySelectorAll<SVGPathElement>(".flow-arrow");
         if (!allArrows.length) return;
         const tl = gsap.timeline();
         tl.to(allArrows, { stroke: accent, duration: 0.3, ease: "sine.out" })
           // revert only non-static accent arrows back to neutral
           .to(
-            root.querySelectorAll<SVGPathElement>(".flow-arrow:not(.static-accent)"),
+            svg.querySelectorAll<SVGPathElement>(".flow-arrow:not(.static-accent)"),
             { stroke: "#6b7280", duration: 0.6, ease: "sine.inOut" },
             "+=0.4",
           );
         cleanup = () => {
-          tl.kill();
+          if (tl) tl.kill();
         };
       } catch (error) {
         console.warn("Failed to initialize arrow highlight animation:", error);
@@ -374,6 +377,35 @@ export default function PhotoStillLife() {
       if (cleanup) cleanup();
     };
   }, [scene, accent]);
+
+  // Main component cleanup - nuclear GSAP cleanup on unmount
+  useEffect(() => {
+    return () => {
+      console.log("🚨 PhotoStillLife UNMOUNTING - NUCLEAR GSAP CLEANUP");
+      
+      // Immediate emergency cleanup (scoped to this svg)
+      try {
+        if (typeof window !== "undefined" && (window as any).gsap) {
+          const gsap = (window as any).gsap;
+          if (gsap && typeof gsap.killTweensOf === "function" && svgRef.current) {
+            gsap.killTweensOf(svgRef.current);
+          }
+        }
+      } catch (error) {
+        console.warn("PhotoStillLife emergency GSAP cleanup failed:", error);
+      }
+
+      // Nuclear cleanup (scoped)
+      (async () => {
+        try {
+          const { NUCLEAR_GSAP_CLEANUP } = await import("../lib/gsap-killer");
+          await NUCLEAR_GSAP_CLEANUP(svgRef.current || undefined);
+        } catch (error) {
+          console.warn("PhotoStillLife nuclear GSAP cleanup failed:", error);
+        }
+      })();
+    };
+  }, []);
 
   return (
     <div className="w-full max-w-none overflow-visible mx-auto">

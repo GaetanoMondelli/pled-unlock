@@ -8,20 +8,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { fetchFromDb } from "@/utils/api";
-import { 
-  ArrowLeft, 
-  Building, 
-  Calendar, 
-  CheckCircle, 
-  Clock, 
-  Download, 
-  Eye, 
-  GitBranch, 
-  Mail, 
-  Settings, 
-  Star, 
+import {
+  ArrowLeft,
+  Building,
+  Calendar,
+  CheckCircle,
+  Clock,
+  Download,
+  Eye,
+  GitBranch,
+  Mail,
+  Settings,
+  Star,
   User,
-  Workflow
+  Workflow,
 } from "lucide-react";
 
 interface Template {
@@ -147,17 +147,15 @@ export default function TemplateDetailPage({ params }: { params: { id: string } 
             Back to Templates
           </Button>
         </Link>
-        
+
         <div className="flex items-start justify-between gap-4 mb-4">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-2">
               <h1 className="text-3xl font-bold">{template.name}</h1>
-              {template.featured && (
-                <Star className="h-6 w-6 text-yellow-500 fill-current" />
-              )}
+              {template.featured && <Star className="h-6 w-6 text-yellow-500 fill-current" />}
             </div>
             <p className="text-gray-600 text-lg mb-3">{template.description}</p>
-            
+
             <div className="flex items-center gap-4 text-sm text-gray-500">
               <div className="flex items-center gap-1">
                 <User className="h-4 w-4" />
@@ -183,7 +181,7 @@ export default function TemplateDetailPage({ params }: { params: { id: string } 
               </div>
             </div>
           </div>
-          
+
           <div className="flex gap-2">
             <Link href={`/procedures?template=${encodeURIComponent(template.templateId)}`}>
               <Button size="lg">
@@ -197,7 +195,9 @@ export default function TemplateDetailPage({ params }: { params: { id: string } 
         <div className="flex gap-2 mb-6">
           <Badge variant="secondary">{template.complexity}</Badge>
           {template.tags?.map(tag => (
-            <Badge key={tag} variant="outline">{tag}</Badge>
+            <Badge key={tag} variant="outline">
+              {tag}
+            </Badge>
           ))}
         </div>
       </div>
@@ -281,7 +281,8 @@ export default function TemplateDetailPage({ params }: { params: { id: string } 
                     <span className="font-medium">Process Flow:</span>
                     <p className="text-gray-600 mt-1 text-xs leading-relaxed">
                       This template defines a workflow with {states.length} states and{" "}
-                      {template.messageRules?.length || 0} message processing rules. The process starts in the &ldquo;{template.stateMachine?.initial}&rdquo; state and can complete in any of the final states.
+                      {template.messageRules?.length || 0} message processing rules. The process starts in the &ldquo;
+                      {template.stateMachine?.initial}&rdquo; state and can complete in any of the final states.
                     </p>
                   </div>
                 </div>
@@ -294,9 +295,7 @@ export default function TemplateDetailPage({ params }: { params: { id: string } 
           <Card>
             <CardHeader>
               <CardTitle>Template Variables</CardTitle>
-              <CardDescription>
-                Variables that can be configured when using this template
-              </CardDescription>
+              <CardDescription>Variables that can be configured when using this template</CardDescription>
             </CardHeader>
             <CardContent>
               {template.variables && Object.keys(template.variables).length > 0 ? (
@@ -323,9 +322,7 @@ export default function TemplateDetailPage({ params }: { params: { id: string } 
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-8 text-gray-500">
-                  No variables defined for this template
-                </div>
+                <div className="text-center py-8 text-gray-500">No variables defined for this template</div>
               )}
             </CardContent>
           </Card>
@@ -335,9 +332,7 @@ export default function TemplateDetailPage({ params }: { params: { id: string } 
           <Card>
             <CardHeader>
               <CardTitle>Event Types</CardTitle>
-              <CardDescription>
-                Types of events this template can process
-              </CardDescription>
+              <CardDescription>Types of events this template can process</CardDescription>
             </CardHeader>
             <CardContent>
               {template.eventTypes && template.eventTypes.length > 0 ? (
@@ -355,7 +350,9 @@ export default function TemplateDetailPage({ params }: { params: { id: string } 
                           {Object.entries(eventType.schema).map(([field, type]) => (
                             <div key={field} className="flex justify-between text-sm">
                               <span className="font-mono">{field}</span>
-                              <Badge variant="secondary" className="text-xs">{type}</Badge>
+                              <Badge variant="secondary" className="text-xs">
+                                {type}
+                              </Badge>
                             </div>
                           ))}
                         </div>
@@ -364,9 +361,7 @@ export default function TemplateDetailPage({ params }: { params: { id: string } 
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-8 text-gray-500">
-                  No event types defined for this template
-                </div>
+                <div className="text-center py-8 text-gray-500">No event types defined for this template</div>
               )}
             </CardContent>
           </Card>
@@ -376,9 +371,7 @@ export default function TemplateDetailPage({ params }: { params: { id: string } 
           <Card>
             <CardHeader>
               <CardTitle>Message Rules</CardTitle>
-              <CardDescription>
-                Rules that process incoming messages and trigger state transitions
-              </CardDescription>
+              <CardDescription>Rules that process incoming messages and trigger state transitions</CardDescription>
             </CardHeader>
             <CardContent>
               {template.messageRules && template.messageRules.length > 0 ? (
@@ -386,7 +379,7 @@ export default function TemplateDetailPage({ params }: { params: { id: string } 
                   {template.messageRules.map((rule, index) => (
                     <div key={index} className="border rounded-lg p-4 space-y-4">
                       <h4 className="font-medium">Rule #{index + 1}</h4>
-                      
+
                       {rule.matches && (
                         <div>
                           <h5 className="text-sm font-medium mb-2">Matches:</h5>
@@ -398,7 +391,9 @@ export default function TemplateDetailPage({ params }: { params: { id: string } 
                                   <div>Conditions:</div>
                                   <div className="ml-2 space-y-1">
                                     {Object.entries(rule.matches.conditions).map(([key, value]) => (
-                                      <div key={key}>• {key}: {String(value)}</div>
+                                      <div key={key}>
+                                        • {key}: {String(value)}
+                                      </div>
                                     ))}
                                   </div>
                                 </div>
@@ -413,7 +408,9 @@ export default function TemplateDetailPage({ params }: { params: { id: string } 
                           <h5 className="text-sm font-medium mb-2">Captures:</h5>
                           <div className="bg-green-50 rounded p-3 text-sm font-mono">
                             {Object.entries(rule.captures).map(([key, value]) => (
-                              <div key={key}>{key}: {String(value)}</div>
+                              <div key={key}>
+                                {key}: {String(value)}
+                              </div>
                             ))}
                           </div>
                         </div>
@@ -429,7 +426,9 @@ export default function TemplateDetailPage({ params }: { params: { id: string } 
                                 <div>Template:</div>
                                 <div className="ml-2 space-y-1 font-mono text-xs">
                                   {Object.entries(rule.generates.template).map(([key, value]) => (
-                                    <div key={key}>• {key}: {String(value)}</div>
+                                    <div key={key}>
+                                      • {key}: {String(value)}
+                                    </div>
                                   ))}
                                 </div>
                               </div>
@@ -444,14 +443,18 @@ export default function TemplateDetailPage({ params }: { params: { id: string } 
                           <div className="bg-orange-50 rounded p-3 text-sm">
                             <div className="flex items-center gap-2">
                               <GitBranch className="h-4 w-4" />
-                              <span>To: <Badge variant="outline">{rule.transition.to}</Badge></span>
+                              <span>
+                                To: <Badge variant="outline">{rule.transition.to}</Badge>
+                              </span>
                             </div>
                             {rule.transition.conditions && (
                               <div className="mt-2">
                                 <div>Conditions:</div>
                                 <div className="ml-2 font-mono text-xs">
                                   {Object.entries(rule.transition.conditions).map(([key, value]) => (
-                                    <div key={key}>• {key}: {String(value)}</div>
+                                    <div key={key}>
+                                      • {key}: {String(value)}
+                                    </div>
                                   ))}
                                 </div>
                               </div>
@@ -463,9 +466,7 @@ export default function TemplateDetailPage({ params }: { params: { id: string } 
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-8 text-gray-500">
-                  No message rules defined for this template
-                </div>
+                <div className="text-center py-8 text-gray-500">No message rules defined for this template</div>
               )}
             </CardContent>
           </Card>
@@ -475,17 +476,15 @@ export default function TemplateDetailPage({ params }: { params: { id: string } 
           <Card>
             <CardHeader>
               <CardTitle>State Machine Definition</CardTitle>
-              <CardDescription>
-                The workflow state transitions defined in FSL (Finite State Language)
-              </CardDescription>
+              <CardDescription>The workflow state transitions defined in FSL (Finite State Language)</CardDescription>
             </CardHeader>
             <CardContent>
               {template.stateMachine ? (
                 <div className="space-y-6">
                   <div>
                     <h4 className="font-medium mb-2">FSL Definition:</h4>
-                    <div className="bg-gray-50 rounded p-4 font-mono text-sm border">
-                      <pre className="whitespace-pre-wrap">{template.stateMachine.fsl}</pre>
+                    <div className="bg-gray-50 rounded p-4 font-mono text-xs border">
+                      <pre className="whitespace-pre-wrap">{formatFslForDisplay(template.stateMachine.fsl)}</pre>
                     </div>
                   </div>
 
@@ -550,20 +549,24 @@ export default function TemplateDetailPage({ params }: { params: { id: string } 
                     <div className="space-y-2">
                       {parseTransitions(template.stateMachine.fsl).map((transition, index) => (
                         <div key={index} className="flex items-center gap-3 p-2 bg-gray-50 rounded text-sm">
-                          <Badge variant="outline" className="font-mono">{transition.from}</Badge>
+                          <Badge variant="outline" className="font-mono">
+                            {transition.from}
+                          </Badge>
                           <span className="text-gray-500">on</span>
-                          <Badge variant="secondary" className="font-mono">{transition.trigger}</Badge>
+                          <Badge variant="secondary" className="font-mono">
+                            {transition.trigger}
+                          </Badge>
                           <span className="text-gray-500">→</span>
-                          <Badge variant="outline" className="font-mono">{transition.to}</Badge>
+                          <Badge variant="outline" className="font-mono">
+                            {transition.to}
+                          </Badge>
                         </div>
                       ))}
                     </div>
                   </div>
                 </div>
               ) : (
-                <div className="text-center py-8 text-gray-500">
-                  No state machine defined for this template
-                </div>
+                <div className="text-center py-8 text-gray-500">No state machine defined for this template</div>
               )}
             </CardContent>
           </Card>
@@ -601,34 +604,60 @@ function inferComplexity(template: any): "Beginner" | "Intermediate" | "Advanced
 
 function parseStateMachine(fsl: string): string[] {
   const states = new Set<string>();
-  const transitions = fsl.split(";").filter(Boolean);
-  
+
+  // Remove comments and normalize newlines to spaces
+  const cleanedFsl = fsl
+    .replace(/\/\*.*?\*\//g, "") // Remove /* comment */ blocks
+    .replace(/\n/g, " ") // Convert newlines to spaces
+    .replace(/\s+/g, " "); // Normalize multiple spaces
+
+  const transitions = cleanedFsl.split(";").filter(Boolean);
+
   transitions.forEach(transition => {
     const match = transition.trim().match(/(\w+)\s+['"]([^'"]+)['"]?\s*->\s*(\w+)/);
     if (match) {
-      states.add(match[1]);  // from state
-      states.add(match[3]);  // to state
+      states.add(match[1]); // from state
+      states.add(match[3]); // to state
     }
   });
-  
+
   return Array.from(states);
 }
 
-function parseTransitions(fsl: string): Array<{from: string, trigger: string, to: string}> {
-  const transitions: Array<{from: string, trigger: string, to: string}> = [];
-  const transitionStrings = fsl.split(";").filter(Boolean);
-  
+function parseTransitions(fsl: string): Array<{ from: string; trigger: string; to: string }> {
+  const transitions: Array<{ from: string; trigger: string; to: string }> = [];
+
+  // Remove comments and normalize newlines to spaces
+  const cleanedFsl = fsl
+    .replace(/\/\*.*?\*\//g, "") // Remove /* comment */ blocks
+    .replace(/\n/g, " ") // Convert newlines to spaces
+    .replace(/\s+/g, " "); // Normalize multiple spaces
+
+  const transitionStrings = cleanedFsl.split(";").filter(Boolean);
+
   transitionStrings.forEach(transition => {
     const match = transition.trim().match(/(\w+)\s+['"]([^'"]+)['"]?\s*->\s*(\w+)/);
     if (match) {
       transitions.push({
         from: match[1],
         trigger: match[2],
-        to: match[3]
+        to: match[3],
       });
     }
   });
-  
+
   return transitions;
 }
 
+function formatFslForDisplay(fsl: string): string {
+  return (
+    fsl
+      // Add line breaks after each transition
+      .replace(/;\s*/g, ";\n")
+      // Format component comments with proper spacing
+      .replace(/\/\*\s*(.*?)\s*\*\//g, "\n\n/* $1 */\n")
+      // Clean up extra whitespace but preserve intentional line breaks
+      .replace(/\n{3,}/g, "\n\n")
+      .trim()
+  );
+}

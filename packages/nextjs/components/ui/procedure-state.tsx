@@ -1068,28 +1068,30 @@ export const ProcedureState: React.FC<ProcedureStateProps> = ({
           </div>
         </div>
 
-        <div className="w-full bg-white rounded-lg shadow-lg p-4">
-          <D3Graph
-            ref={graphRef}
-            nodes={nodes.map(node => ({
-              ...node,
-              highlight: node.id === focusedState,
-            }))}
-            links={links}
-            width={800}
-            height={500}
-            direction="LR"
-            onNodeClick={(node: any) => {
-              console.log("Node clicked:", node);
-              if (node) {
-                handleNodeClick(node);
-              } else {
-                // Deselect when clicking empty space
-                setFocusedState(null);
-              }
-            }}
-            documents={template?.documents}
-          />
+        <div className="w-full bg-white rounded-lg shadow-lg">
+          <div className="h-[400px] overflow-auto border rounded-lg">
+            <D3Graph
+              ref={graphRef}
+              nodes={nodes.map(node => ({
+                ...node,
+                highlight: node.id === focusedState,
+              }))}
+              links={links}
+              width={Math.max(800, nodes.length * 100)}
+              height={Math.max(300, Math.ceil(nodes.length / 4) * 80)}
+              direction="LR"
+              onNodeClick={(node: any) => {
+                console.log("Node clicked:", node);
+                if (node) {
+                  handleNodeClick(node);
+                } else {
+                  // Deselect when clicking empty space
+                  setFocusedState(null);
+                }
+              }}
+              documents={template?.documents}
+            />
+          </div>
         </div>
 
         <div className="space-y-4">

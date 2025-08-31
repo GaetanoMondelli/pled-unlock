@@ -1,3 +1,5 @@
+"use client";
+
 import { connectorsForWallets } from "@rainbow-me/rainbowkit";
 import {
   coinbaseWallet,
@@ -13,9 +15,12 @@ import scaffoldConfig from "~~/scaffold.config";
 
 const { onlyLocalBurnerWallet, targetNetworks } = scaffoldConfig;
 
+const isClient = typeof window !== "undefined";
+
 const wallets = [
   metaMaskWallet,
-  walletConnectWallet,
+  // WalletConnect uses IndexedDB; only enable on the client to avoid SSR crashes
+  ...(isClient ? [walletConnectWallet] : []),
   ledgerWallet,
   coinbaseWallet,
   rainbowWallet,

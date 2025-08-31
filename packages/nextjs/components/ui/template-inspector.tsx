@@ -19,7 +19,9 @@ import {
   Zap,
   Eye,
   Copy,
-  ExternalLink
+  ExternalLink,
+  CheckCircle,
+  Clock
 } from "lucide-react";
 import Link from "next/link";
 
@@ -34,50 +36,13 @@ export function TemplateInspector({ template, open, onOpenChange }: TemplateInsp
 
   if (!template) return null;
 
-  // Parse FSL to extract nodes and links for visualization
-  const getNodesFromFsm = (fsl: string) => {
-    const stateSet = new Set<string>();
-    
-    fsl.split(";").forEach(line => {
-      line = line.trim();
-      if (line) {
-        const sourceState = line.split(/\s+/)[0];
-        const targetState = line.split("->")[1]?.trim();
-        
-        if (sourceState) stateSet.add(sourceState);
-        if (targetState) stateSet.add(targetState);
-      }
-    });
-
-    return Array.from(stateSet).map(state => ({
-      id: state,
-      isInitial: state === "idle" || state === template.stateMachine?.initial
-    }));
-  };
-
-  const getLinksFromFsm = (fsl: string) => {
-    const links: { source: string; target: string; label: string }[] = [];
-
-    fsl.split(";").forEach(line => {
-      line = line.trim();
-      if (!line) return;
-
-      const match = line.match(/(\w+)\s+'([^']+)'\s*->\s*(\w+)/);
-      if (match) {
-        const [, source, event, target] = match;
-        links.push({ source, target, label: event });
-      }
-    });
-
-    return links;
-  };
-
-  const nodes = getNodesFromFsm(template.stateMachine?.fsl || "");
-  const links = getLinksFromFsm(template.stateMachine?.fsl || "");
+  // Use the same parsing functions as template detail page  
+  const states = parseStateMachine(template.stateMachine?.fsl || "");
+  const transitions = parseTransitions(template.stateMachine?.fsl || "");
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Eye className="h-5 w-5" />
@@ -97,7 +62,7 @@ export function TemplateInspector({ template, open, onOpenChange }: TemplateInsp
             <TabsTrigger value="playground">Playground</TabsTrigger>
           </TabsList>
 
-          <ScrollArea className="flex-1 mt-4">
+          <div className="flex-1 mt-4">
             <TabsContent value="overview" className="space-y-4">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <Card>
@@ -150,11 +115,11 @@ export function TemplateInspector({ template, open, onOpenChange }: TemplateInsp
                   <CardContent className="space-y-3">
                     <div className="grid grid-cols-2 gap-4">
                       <div className="text-center">
-                        <div className="text-2xl font-bold">{nodes.length}</div>
+                        <div className="text-2xl font-bold">{states.length}</div>
                         <div className="text-xs text-muted-foreground">States</div>
                       </div>
                       <div className="text-center">
-                        <div className="text-2xl font-bold">{links.length}</div>
+                        <div className="text-2xl font-bold">{transitions.length}</div>
                         <div className="text-xs text-muted-foreground">Transitions</div>
                       </div>
                       <div className="text-center">
@@ -197,15 +162,13 @@ export function TemplateInspector({ template, open, onOpenChange }: TemplateInsp
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {nodes.length > 0 ? (
+                  {states.length > 0 ? (
                     <div className="border rounded-lg p-4 bg-muted/20">
-                      <D3Graph
-                        nodes={nodes}
-                        links={links}
-                        width={600}
-                        height={300}
-                        direction="LR"
-                      />
+                      <div className="text-center text-muted-foreground py-8">
+                        <GitBranch className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                        <p>{states.length} states with {transitions.length} transitions</p>
+                        <p className="text-xs mt-1">View detailed transitions in the sections below</p>
+                      </div>
                     </div>
                   ) : (
                     <div className="text-center text-muted-foreground py-8">
@@ -254,21 +217,97 @@ export function TemplateInspector({ template, open, onOpenChange }: TemplateInsp
 
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Code className="h-4 w-4" />
-                    FSL Definition
-                  </CardTitle>
+                  <CardTitle>State Machine Definition</CardTitle>
                   <CardDescription>
-                    {template.stateMachine?.components 
-                      ? "Composable FSL with component boundaries marked" 
-                      : "Standard FSL definition"
-                    }
+                    The workflow state transitions defined in FSL (Finite State Language)
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <pre className="text-xs bg-muted p-3 rounded-lg overflow-auto whitespace-pre-wrap">
-                    {template.stateMachine?.fsl || "No FSL definition available"}
-                  </pre>
+                  {template.stateMachine ? (
+                    <div className="space-y-6">
+                      <div>
+                        <h4 className="font-medium mb-2">FSL Definition:</h4>
+                        <div className="bg-gray-50 rounded p-4 font-mono text-xs border">
+                          <pre className="whitespace-pre-wrap">{formatFslForDisplay(template.stateMachine.fsl)}</pre>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <Card>
+                          <CardHeader className="pb-3">
+                            <CardTitle className="text-base flex items-center gap-2">
+                              <CheckCircle className="h-4 w-4 text-green-600" />
+                              Initial State
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <Badge variant="outline" className="font-mono">
+                              {template.stateMachine.initial || "idle"}
+                            </Badge>
+                          </CardContent>
+                        </Card>
+
+                        <Card>
+                          <CardHeader className="pb-3">
+                            <CardTitle className="text-base flex items-center gap-2">
+                              <Clock className="h-4 w-4 text-blue-600" />
+                              All States
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="flex flex-wrap gap-1">
+                              {parseStateMachine(template.stateMachine.fsl).map(state => (
+                                <Badge key={state} variant="secondary" className="text-xs font-mono">
+                                  {state}
+                                </Badge>
+                              ))}
+                            </div>
+                          </CardContent>
+                        </Card>
+
+                        <Card>
+                          <CardHeader className="pb-3">
+                            <CardTitle className="text-base flex items-center gap-2">
+                              <CheckCircle className="h-4 w-4 text-red-600" />
+                              Final States
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="flex flex-wrap gap-1">
+                              {template.stateMachine.final?.length > 0 ? (
+                                template.stateMachine.final.map((state: string) => (
+                                  <Badge key={state} variant="destructive" className="text-xs font-mono">
+                                    {state}
+                                  </Badge>
+                                ))
+                              ) : (
+                                <span className="text-gray-600">None defined</span>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </div>
+
+                      <div>
+                        <h4 className="font-medium mb-2">State Transitions:</h4>
+                        <div className="space-y-2">
+                          {parseTransitions(template.stateMachine.fsl).map((transition, index) => (
+                            <div key={index} className="flex items-center gap-3 p-2 bg-gray-50 rounded text-sm">
+                              <Badge variant="outline" className="font-mono">{transition.from}</Badge>
+                              <span className="text-gray-500">on</span>
+                              <Badge variant="secondary" className="font-mono">{transition.trigger}</Badge>
+                              <span className="text-gray-500">→</span>
+                              <Badge variant="outline" className="font-mono">{transition.to}</Badge>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      No state machine defined for this template
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
@@ -456,9 +495,67 @@ export function TemplateInspector({ template, open, onOpenChange }: TemplateInsp
                 </CardContent>
               </Card>
             </TabsContent>
-          </ScrollArea>
+          </div>
         </Tabs>
       </DialogContent>
     </Dialog>
   );
+}
+
+function parseStateMachine(fsl: string): string[] {
+  const states = new Set<string>();
+  
+  // Remove comments and normalize newlines to spaces
+  const cleanedFsl = fsl
+    .replace(/\/\*.*?\*\//g, '') // Remove /* comment */ blocks
+    .replace(/\n/g, ' ') // Convert newlines to spaces
+    .replace(/\s+/g, ' '); // Normalize multiple spaces
+  
+  const transitions = cleanedFsl.split(";").filter(Boolean);
+  
+  transitions.forEach(transition => {
+    const match = transition.trim().match(/(\w+)\s+['"]([^'"]+)['"]?\s*->\s*(\w+)/);
+    if (match) {
+      states.add(match[1]);  // from state
+      states.add(match[3]);  // to state
+    }
+  });
+  
+  return Array.from(states);
+}
+
+function parseTransitions(fsl: string): Array<{from: string, trigger: string, to: string}> {
+  const transitions: Array<{from: string, trigger: string, to: string}> = [];
+  
+  // Remove comments and normalize newlines to spaces
+  const cleanedFsl = fsl
+    .replace(/\/\*.*?\*\//g, '') // Remove /* comment */ blocks
+    .replace(/\n/g, ' ') // Convert newlines to spaces
+    .replace(/\s+/g, ' '); // Normalize multiple spaces
+  
+  const transitionStrings = cleanedFsl.split(";").filter(Boolean);
+  
+  transitionStrings.forEach(transition => {
+    const match = transition.trim().match(/(\w+)\s+['"]([^'"]+)['"]?\s*->\s*(\w+)/);
+    if (match) {
+      transitions.push({
+        from: match[1],
+        trigger: match[2],
+        to: match[3]
+      });
+    }
+  });
+  
+  return transitions;
+}
+
+function formatFslForDisplay(fsl: string): string {
+  return fsl
+    // Add line breaks after each transition
+    .replace(/;\s*/g, ';\n')
+    // Format component comments with proper spacing
+    .replace(/\/\*\s*(.*?)\s*\*\//g, '\n\n/* $1 */\n')
+    // Clean up extra whitespace but preserve intentional line breaks
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
