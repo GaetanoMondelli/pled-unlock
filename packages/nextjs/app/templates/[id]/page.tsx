@@ -126,7 +126,7 @@ export default function TemplateDetailPage({ params }: { params: { id: string } 
         </Link>
         <div className="text-center py-12">
           <h1 className="text-2xl font-bold mb-2">Template Not Found</h1>
-          <p className="text-gray-600 mb-4">The template with ID "{id}" could not be found.</p>
+          <p className="text-gray-600 mb-4">The template with ID &ldquo;{id}&rdquo; could not be found.</p>
           <Link href="/templates">
             <Button>Browse Templates</Button>
           </Link>
@@ -280,8 +280,8 @@ export default function TemplateDetailPage({ params }: { params: { id: string } 
                   <div>
                     <span className="font-medium">Process Flow:</span>
                     <p className="text-gray-600 mt-1 text-xs leading-relaxed">
-                      This template defines a workflow with {states.length} states and {template.messageRules?.length || 0} message processing rules.
-                      The process starts in the "{template.stateMachine?.initial}" state and can complete in any of the final states.
+                      This template defines a workflow with {states.length} states and{" "}
+                      {template.messageRules?.length || 0} message processing rules. The process starts in the &ldquo;{template.stateMachine?.initial}&rdquo; state and can complete in any of the final states.
                     </p>
                   </div>
                 </div>
