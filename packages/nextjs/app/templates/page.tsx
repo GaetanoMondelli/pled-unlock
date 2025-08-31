@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { fetchFromDb, deleteTemplate } from "@/utils/api";
-import { Trash2, Store, ArrowLeft, Cpu, Workflow } from "lucide-react";
+import { Trash2, Store, ArrowLeft, Cpu, Workflow, Plus } from "lucide-react";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import TemplateMarketplace from "@/components/templates/TemplateMarketplace";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
@@ -141,10 +141,10 @@ export default function TemplatesIndexPage() {
 								Component Lab
 							</Button>
 						</Link>
-						<Link href="/workflow-builder">
-							<Button variant="outline">
-								<Workflow className="h-4 w-4 mr-1" />
-								Workflow Builder
+						<Link href="/template-editor">
+							<Button>
+								<Plus className="h-4 w-4 mr-1" />
+								New Template
 							</Button>
 						</Link>
 					</div>

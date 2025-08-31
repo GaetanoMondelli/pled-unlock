@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { gsap } from "gsap";
+
+// Dynamically import GSAP only when needed
+async function initializeGSAP() {
+  const gsap = (await import("gsap")).default;
+  return gsap;
+}
 
 // Simple helpers with fixed locale to avoid SSR/CSR differences
 function formatTime(d: Date, timeZone: string) {
@@ -101,33 +106,50 @@ export default function PhotoStillLife() {
   useEffect(() => {
     if (!bgParisRef.current || !bgLondonRef.current) return;
 
-    const tl = gsap.timeline({ repeat: -1, defaults: { ease: "sine.inOut" } });
+    let cleanup: (() => void) | null = null;
 
-    // Compute slide distance from the photo width so the other city never peeks
-    const slideDist = photoW * 1.2 + 200; // zoom-cover factor + safety margin
+    async function setupAnimation() {
+      try {
+        const gsap = await initializeGSAP();
+        if (!bgParisRef.current || !bgLondonRef.current) return;
 
-    // start with Paris in view, London to the right
-    const paris = bgParisRef.current;
-    const london = bgLondonRef.current;
-    if (!paris || !london) return;
-    gsap.set(paris, { x: 0, opacity: 1 });
-    gsap.set(london, { x: slideDist, opacity: 1 });
+        const tl = gsap.timeline({ repeat: -1, defaults: { ease: "sine.inOut" } });
 
-    tl.call(() => setScene("paris"))
-      // small dwell time on each scene
-      .to({}, { duration: 3.5 })
-      .to(paris, { x: -slideDist, duration: 4.8 })
-      .to(london, { x: 0, duration: 4.8 }, "<")
-      .call(() => setScene("london"))
-      .to({}, { duration: 3.5 })
-      // slide back
-      .to(london, { x: slideDist, duration: 4.8 })
-      .to(paris, { x: 0, duration: 4.8 }, "<");
+        // Compute slide distance from the photo width so the other city never peeks
+        const slideDist = photoW * 1.2 + 200; // zoom-cover factor + safety margin
 
-    tlRef.current = tl;
+        // start with Paris in view, London to the right
+        const paris = bgParisRef.current;
+        const london = bgLondonRef.current;
+        if (!paris || !london) return;
+        gsap.set(paris, { x: 0, opacity: 1 });
+        gsap.set(london, { x: slideDist, opacity: 1 });
+
+        tl.call(() => setScene("paris"))
+          // small dwell time on each scene
+          .to({}, { duration: 3.5 })
+          .to(paris, { x: -slideDist, duration: 4.8 })
+          .to(london, { x: 0, duration: 4.8 }, "<")
+          .call(() => setScene("london"))
+          .to({}, { duration: 3.5 })
+          // slide back
+          .to(london, { x: slideDist, duration: 4.8 })
+          .to(paris, { x: 0, duration: 4.8 }, "<");
+
+        tlRef.current = tl;
+        cleanup = () => {
+          tl.kill();
+          tlRef.current = null;
+        };
+      } catch (error) {
+        console.warn("Failed to initialize GSAP animation:", error);
+      }
+    }
+
+    setupAnimation();
+
     return () => {
-      tl.kill();
-      tlRef.current = null;
+      if (cleanup) cleanup();
     };
   }, [photoW]);
 
@@ -199,85 +221,157 @@ export default function PhotoStillLife() {
   // Continuous counter-rotating gears
   useEffect(() => {
     if (!gear1Ref.current || !gear2Ref.current) return;
-    const t1 = gsap.to(gear1Ref.current, {
-      rotation: 360,
-      transformOrigin: "50% 50%",
-      repeat: -1,
-      duration: 6,
-      ease: "none",
-    });
-    const t2 = gsap.to(gear2Ref.current, {
-      rotation: -360,
-      transformOrigin: "50% 50%",
-      repeat: -1,
-      duration: 4,
-      ease: "none",
-    });
+
+    let cleanup: (() => void) | null = null;
+
+    async function setupGearAnimation() {
+      try {
+        const gsap = await initializeGSAP();
+        if (!gear1Ref.current || !gear2Ref.current) return;
+
+        const t1 = gsap.to(gear1Ref.current, {
+          rotation: 360,
+          transformOrigin: "50% 50%",
+          repeat: -1,
+          duration: 6,
+          ease: "none",
+        });
+        const t2 = gsap.to(gear2Ref.current, {
+          rotation: -360,
+          transformOrigin: "50% 50%",
+          repeat: -1,
+          duration: 4,
+          ease: "none",
+        });
+        cleanup = () => {
+          t1.kill();
+          t2.kill();
+        };
+      } catch (error) {
+        console.warn("Failed to initialize gear animation:", error);
+      }
+    }
+
+    setupGearAnimation();
+
     return () => {
-      t1.kill();
-      t2.kill();
+      if (cleanup) cleanup();
     };
   }, []);
 
   // Pulse a signal along Events -> Model when scene changes
   useEffect(() => {
     if (!eventsToModelPathRef.current || !signalDotRef.current) return;
-    const path = eventsToModelPathRef.current;
-    const length = path.getTotalLength();
-    const proxy = { t: 0 } as { t: number };
-    const tl = gsap.timeline();
-    tl.fromTo(path, { strokeDashoffset: 24 }, { strokeDashoffset: 0, duration: 1.1, ease: "sine.out" })
-      .to(
-        proxy,
-        {
-          t: length,
-          duration: 1.1,
-          ease: "sine.out",
-          onUpdate: () => {
-            const pt = path.getPointAtLength(proxy.t);
-            gsap.set(signalDotRef.current, { attr: { cx: pt.x, cy: pt.y }, opacity: 1 });
-          },
-        },
-        0,
-      )
-      .to(signalDotRef.current, { opacity: 0, duration: 0.2 }, ">-0.05");
+
+    let cleanup: (() => void) | null = null;
+
+    async function setupSignalAnimation() {
+      try {
+        const gsap = await initializeGSAP();
+        if (!eventsToModelPathRef.current || !signalDotRef.current) return;
+
+        const path = eventsToModelPathRef.current;
+        const length = path.getTotalLength();
+        const proxy = { t: 0 } as { t: number };
+        const tl = gsap.timeline();
+        tl.fromTo(path, { strokeDashoffset: 24 }, { strokeDashoffset: 0, duration: 1.1, ease: "sine.out" })
+          .to(
+            proxy,
+            {
+              t: length,
+              duration: 1.1,
+              ease: "sine.out",
+              onUpdate: () => {
+                const pt = path.getPointAtLength(proxy.t);
+                gsap.set(signalDotRef.current, { attr: { cx: pt.x, cy: pt.y }, opacity: 1 });
+              },
+            },
+            0,
+          )
+          .to(signalDotRef.current, { opacity: 0, duration: 0.2 }, ">-0.05");
+        cleanup = () => {
+          tl.kill();
+        };
+      } catch (error) {
+        console.warn("Failed to initialize signal animation:", error);
+      }
+    }
+
+    setupSignalAnimation();
+
     return () => {
-      tl.kill();
+      if (cleanup) cleanup();
     };
   }, [scene]);
 
   // Continuous dotted motion on Photo -> Events arrow
   useEffect(() => {
     if (!photoToEventsPathRef.current) return;
-    const path = photoToEventsPathRef.current;
-    // Animate dash offset to create moving dots effect
-    const dashCycle = 14; // should match dasharray total (dot + gap)
-    const t = gsap.fromTo(
-      path,
-      { strokeDashoffset: 0 },
-      { strokeDashoffset: dashCycle, duration: 1.8, repeat: -1, ease: "none" },
-    );
+
+    let cleanup: (() => void) | null = null;
+
+    async function setupDottedAnimation() {
+      try {
+        const gsap = await initializeGSAP();
+        if (!photoToEventsPathRef.current) return;
+
+        const path = photoToEventsPathRef.current;
+        // Animate dash offset to create moving dots effect
+        const dashCycle = 14; // should match dasharray total (dot + gap)
+        const t = gsap.fromTo(
+          path,
+          { strokeDashoffset: 0 },
+          { strokeDashoffset: dashCycle, duration: 1.8, repeat: -1, ease: "none" },
+        );
+        cleanup = () => {
+          t.kill();
+        };
+      } catch (error) {
+        console.warn("Failed to initialize dotted animation:", error);
+      }
+    }
+
+    setupDottedAnimation();
+
     return () => {
-      t.kill();
+      if (cleanup) cleanup();
     };
   }, []);
 
   // Highlight all arrows briefly on scene change
   useEffect(() => {
     if (!svgRef.current) return;
-    const root = svgRef.current;
-    const allArrows = root.querySelectorAll<SVGPathElement>(".flow-arrow");
-    if (!allArrows.length) return;
-    const tl = gsap.timeline();
-    tl.to(allArrows, { stroke: accent, duration: 0.3, ease: "sine.out" })
-      // revert only non-static accent arrows back to neutral
-      .to(
-        root.querySelectorAll<SVGPathElement>(".flow-arrow:not(.static-accent)"),
-        { stroke: "#6b7280", duration: 0.6, ease: "sine.inOut" },
-        "+=0.4",
-      );
+
+    let cleanup: (() => void) | null = null;
+
+    async function setupArrowHighlight() {
+      try {
+        const gsap = await initializeGSAP();
+        if (!svgRef.current) return;
+
+        const root = svgRef.current;
+        const allArrows = root.querySelectorAll<SVGPathElement>(".flow-arrow");
+        if (!allArrows.length) return;
+        const tl = gsap.timeline();
+        tl.to(allArrows, { stroke: accent, duration: 0.3, ease: "sine.out" })
+          // revert only non-static accent arrows back to neutral
+          .to(
+            root.querySelectorAll<SVGPathElement>(".flow-arrow:not(.static-accent)"),
+            { stroke: "#6b7280", duration: 0.6, ease: "sine.inOut" },
+            "+=0.4",
+          );
+        cleanup = () => {
+          tl.kill();
+        };
+      } catch (error) {
+        console.warn("Failed to initialize arrow highlight animation:", error);
+      }
+    }
+
+    setupArrowHighlight();
+
     return () => {
-      tl.kill();
+      if (cleanup) cleanup();
     };
   }, [scene, accent]);
 

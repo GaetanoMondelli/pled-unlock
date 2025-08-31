@@ -7,7 +7,7 @@ import Link from "next/link";
 import BottomLedger from "@/components/BottomLedger";
 import SafeHeroFsmAnimation from "@/components/SafeHeroFsmAnimation";
 import HowItWorksFlow from "@/components/HowItWorksFlow";
-import PhotoStillLife from "@/components/PhotoStillLife";
+import SafePhotoStillLife from "@/components/SafePhotoStillLife";
 import { RequestDemoDialog } from "@/components/marketing/RequestDemoDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -131,7 +131,7 @@ function Landing() {
             <h3 className="mt-2 text-xl font-semibold">From Static Snapshots to Living Tokens</h3>
             <div className="mt-8 lg:mr-[-32px] xl:mr-[-40px]">
               <div className="relative max-w-[768px] w-full mx-auto">
-                <PhotoStillLife />
+                <SafePhotoStillLife />
               </div>
             </div>
             <div className="mt-10 space-y-3 text-sm leading-relaxed text-muted-foreground">

@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { fetchFromDb } from "@/utils/api";
-import { Star, Eye, Download, Clock, User, Building } from "lucide-react";
+import { Building, Clock, Download, Eye, Star, User } from "lucide-react";
 
 interface Template {
   templateId: string;
@@ -44,7 +44,7 @@ export default function TemplateMarketplace() {
             ...template,
             author: template.author || "Anonymous",
             company: template.company || "Community",
-            rating: template.rating || (Math.random() * 2 + 3), // Random rating between 3-5
+            rating: template.rating || Math.random() * 2 + 3, // Random rating between 3-5
             downloads: template.downloads || Math.floor(Math.random() * 1000 + 10),
             lastUpdated: template.lastUpdated || new Date().toISOString(),
             featured: template.featured || Math.random() > 0.7,
@@ -61,7 +61,7 @@ export default function TemplateMarketplace() {
               ...template,
               author: template.author || "Anonymous",
               company: template.company || "Community",
-              rating: template.rating || (Math.random() * 2 + 3),
+              rating: template.rating || Math.random() * 2 + 3,
               downloads: template.downloads || Math.floor(Math.random() * 1000 + 10),
               lastUpdated: template.lastUpdated || new Date().toISOString(),
               featured: template.featured || Math.random() > 0.7,
@@ -88,7 +88,7 @@ export default function TemplateMarketplace() {
   }, [templates]);
 
   const filteredAndSortedTemplates = useMemo(() => {
-    let filtered = templates.filter(t => {
+    const filtered = templates.filter(t => {
       const cat = t.category || inferCategoryFromName(t.name);
       const inCategory = category === "all" || cat === category;
       const inComplexity = complexity === "all" || t.complexity === complexity;
@@ -142,10 +142,10 @@ export default function TemplateMarketplace() {
         <TabsContent value="browse" className="space-y-6">
           <div className="flex flex-col md:flex-row gap-4 mb-6">
             <div className="flex-1">
-              <Input 
-                placeholder="Search templates by name, description, or tags..." 
-                value={query} 
-                onChange={e => setQuery(e.target.value)} 
+              <Input
+                placeholder="Search templates by name, description, or tags..."
+                value={query}
+                onChange={e => setQuery(e.target.value)}
               />
             </div>
             <Select value={category} onValueChange={setCategory}>
@@ -205,27 +205,29 @@ export default function TemplateMarketplace() {
 
         <TabsContent value="categories">
           <div className="space-y-8">
-            {categories.filter(cat => cat !== "all").map(cat => {
-              const categoryTemplates = templates.filter(t => 
-                (t.category || inferCategoryFromName(t.name)) === cat
-              ).slice(0, 6);
-              
-              return (
-                <div key={cat} className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-xl font-semibold">{capitalize(cat)}</h2>
-                    <Button variant="outline" size="sm" onClick={() => setCategory(cat)}>
-                      View All
-                    </Button>
+            {categories
+              .filter(cat => cat !== "all")
+              .map(cat => {
+                const categoryTemplates = templates
+                  .filter(t => (t.category || inferCategoryFromName(t.name)) === cat)
+                  .slice(0, 6);
+
+                return (
+                  <div key={cat} className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-xl font-semibold">{capitalize(cat)}</h2>
+                      <Button variant="outline" size="sm" onClick={() => setCategory(cat)}>
+                        View All
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {categoryTemplates.map(template => (
+                        <TemplateMarketplaceCard key={template.templateId} template={template} compact />
+                      ))}
+                    </div>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {categoryTemplates.map(template => (
-                      <TemplateMarketplaceCard key={template.templateId} template={template} compact />
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })}
           </div>
         </TabsContent>
       </Tabs>
@@ -265,11 +267,11 @@ function TemplateMarketplaceCard({ template, compact = false }: TemplateCardProp
             {template.category || inferCategoryFromName(template.name)}
           </Badge>
         </div>
-        
+
         <CardDescription className={`${compact ? "line-clamp-1" : "line-clamp-2"}`}>
           {template.description}
         </CardDescription>
-        
+
         {!compact && template.tags && (
           <div className="flex flex-wrap gap-1 mt-2">
             {template.tags.slice(0, 3).map(tag => (
@@ -280,7 +282,7 @@ function TemplateMarketplaceCard({ template, compact = false }: TemplateCardProp
           </div>
         )}
       </CardHeader>
-      
+
       <CardContent className="pt-0">
         <div className="flex items-center justify-between text-xs text-muted-foreground mb-3">
           <div className="flex items-center gap-3">
@@ -298,7 +300,7 @@ function TemplateMarketplaceCard({ template, compact = false }: TemplateCardProp
             </div>
           </div>
         </div>
-        
+
         <div className="flex gap-2">
           <Link href={`/templates/${encodeURIComponent(template.templateId)}`}>
             <Button size="sm" variant="outline" className="flex-1">
@@ -329,7 +331,7 @@ function FeaturedTemplateCard({ template }: { template: Template }) {
         <CardTitle className="text-xl">{template.name}</CardTitle>
         <CardDescription className="line-clamp-3">{template.description}</CardDescription>
       </CardHeader>
-      
+
       <CardContent>
         <div className="flex items-center justify-between text-sm text-muted-foreground mb-4">
           <span className="flex items-center gap-1">
@@ -341,7 +343,7 @@ function FeaturedTemplateCard({ template }: { template: Template }) {
             {template.downloads} downloads
           </span>
         </div>
-        
+
         <div className="flex gap-2">
           <Link href={`/templates/${encodeURIComponent(template.templateId)}`} className="flex-1">
             <Button variant="outline" className="w-full">
@@ -349,9 +351,7 @@ function FeaturedTemplateCard({ template }: { template: Template }) {
             </Button>
           </Link>
           <Link href={`/procedures?template=${encodeURIComponent(template.templateId)}`} className="flex-1">
-            <Button className="w-full">
-              Use Template
-            </Button>
+            <Button className="w-full">Use Template</Button>
           </Link>
         </div>
       </CardContent>
@@ -374,7 +374,7 @@ function inferCategoryFromName(name?: string) {
 function inferTagsFromTemplate(template: any): string[] {
   const tags: string[] = [];
   const text = `${template.name} ${template.description}`.toLowerCase();
-  
+
   if (text.includes("document")) tags.push("document-processing");
   if (text.includes("email")) tags.push("email-workflow");
   if (text.includes("approval")) tags.push("approval-process");
@@ -383,14 +383,14 @@ function inferTagsFromTemplate(template: any): string[] {
   if (text.includes("onboard")) tags.push("onboarding");
   if (text.includes("contract")) tags.push("contract-management");
   if (text.includes("review")) tags.push("review-process");
-  
+
   return tags.length > 0 ? tags : ["workflow"];
 }
 
 function inferComplexity(template: any): "Beginner" | "Intermediate" | "Advanced" {
   const messageRulesCount = template.messageRules?.length || 0;
   const statesCount = (template.stateMachine?.fsl || "").split(";").filter(Boolean).length;
-  
+
   if (messageRulesCount <= 2 && statesCount <= 4) return "Beginner";
   if (messageRulesCount <= 5 && statesCount <= 8) return "Intermediate";
   return "Advanced";

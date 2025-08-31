@@ -1,13 +1,23 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import gsap from "gsap";
-import { MotionPathPlugin } from "gsap/MotionPathPlugin";
 
-// Register plugin with error handling
-if (typeof window !== "undefined") {
-  gsap.registerPlugin(MotionPathPlugin);
-}
+// Dynamically import GSAP only when needed
+const initializeGSAP = async () => {
+  try {
+    const gsap = (await import("gsap")).default;
+    const { MotionPathPlugin } = await import("gsap/MotionPathPlugin");
+    
+    if (typeof window !== "undefined") {
+      gsap.registerPlugin(MotionPathPlugin);
+    }
+    
+    return { gsap, MotionPathPlugin };
+  } catch (error) {
+    console.warn("Failed to load GSAP:", error);
+    return null;
+  }
+};
 
 export default function TurbineStateMachineScene() {
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -15,23 +25,34 @@ export default function TurbineStateMachineScene() {
   useEffect(() => {
     if (!svgRef.current) return;
 
-    const ctx = gsap.context(() => {
-      // Check if all required elements exist before animating
-      const requiredElements = [
-        "#turbine", "#graph", "#weather", "#label-pled", "#label-energy",
-        ".node-core", ".node-label", "#token", "#cert", "#blades",
-        "#node-a", "#node-b", "#node-c", "#node-d"
-      ];
+    let mounted = true;
 
-      const missingElements = requiredElements.filter(selector => {
-        const element = svgRef.current?.querySelector(selector);
-        return !element;
-      });
+    const setupAnimation = async () => {
+      if (!svgRef.current || !mounted) return;
 
-      if (missingElements.length > 0) {
-        console.warn("TurbineStateMachineScene: Missing required elements:", missingElements);
-        return;
-      }
+      try {
+        const gsapModules = await initializeGSAP();
+        if (!gsapModules || !mounted) return;
+
+        const { gsap } = gsapModules;
+
+        const ctx = gsap.context(() => {
+          // Check if all required elements exist before animating
+          const requiredElements = [
+            "#turbine", "#graph", "#weather", "#label-pled", "#label-energy",
+            ".node-core", ".node-label", "#token", "#cert", "#blades",
+            "#node-a", "#node-b", "#node-c", "#node-d"
+          ];
+
+          const missingElements = requiredElements.filter(selector => {
+            const element = svgRef.current?.querySelector(selector);
+            return !element;
+          });
+
+          if (missingElements.length > 0) {
+            console.warn("TurbineStateMachineScene: Missing required elements:", missingElements);
+            return;
+          }
 
       try {
         // SIMPLE WORKING ANIMATION
@@ -87,12 +108,22 @@ export default function TurbineStateMachineScene() {
         tl.set("#node-d .node-core", { fill: "#e5e7eb" }, "<");
 
         return () => tl.kill();
-      } catch (error) {
-        console.error("TurbineStateMachineScene animation error:", error);
-      }
-    }, svgRef);
+        } catch (error) {
+          console.error("TurbineStateMachineScene animation error:", error);
+        }
+      }, svgRef);
 
-    return () => ctx.revert();
+      return () => ctx.revert();
+      } catch (error) {
+        console.error("Failed to setup GSAP animation:", error);
+      }
+    };
+
+    setupAnimation();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   return (

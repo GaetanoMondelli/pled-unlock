@@ -2,10 +2,22 @@
 /* eslint-disable prettier/prettier */
 
 import { useEffect, useRef } from "react";
-import gsap from "gsap";
-import { MotionPathPlugin } from "gsap/MotionPathPlugin";
 
-gsap.registerPlugin(MotionPathPlugin);
+async function initializeGSAP() {
+  try {
+    const gsap = (await import("gsap")).default;
+    const { MotionPathPlugin } = await import("gsap/MotionPathPlugin");
+    
+    if (typeof window !== "undefined") {
+      gsap.registerPlugin(MotionPathPlugin);
+    }
+    
+    return { gsap, MotionPathPlugin };
+  } catch (error) {
+    console.warn("Failed to load GSAP:", error);
+    return null;
+  }
+}
 
 export default function HeroFsmAnimation({ onComplete }: { onComplete?: () => void }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -14,6 +26,12 @@ export default function HeroFsmAnimation({ onComplete }: { onComplete?: () => vo
 
   useEffect(() => {
     if (!containerRef.current || !svgRef.current) return;
+
+    const setupAnimation = async () => {
+      const gsapModules = await initializeGSAP();
+      if (!gsapModules) return;
+      
+      const { gsap } = gsapModules;
 
     const ctx = gsap.context(() => {
       const tl = gsap.timeline({ defaults: { ease: "power2.out" }, repeat: -1, repeatDelay: 1.2 });
@@ -269,6 +287,9 @@ export default function HeroFsmAnimation({ onComplete }: { onComplete?: () => vo
         console.warn('Error during GSAP context cleanup:', error);
       }
     };
+    };
+
+    setupAnimation();
   }, [onComplete]);
 
   return (

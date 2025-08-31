@@ -87,9 +87,9 @@ export default function ProceduresPage() {
               <Cpu className="h-4 w-4" /> Component Lab
             </Button>
           </Link>
-          <Link href="/workflow-builder">
+          <Link href="/template-editor">
             <Button variant="outline" className="gap-2">
-              <Workflow className="h-4 w-4" /> Workflow Builder
+              <Workflow className="h-4 w-4" /> Template Editor
             </Button>
           </Link>
           <Button variant={view === "grid" ? "default" : "outline"} size="sm" onClick={() => setView("grid")}>

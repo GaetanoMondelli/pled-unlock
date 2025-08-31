@@ -1,46 +1,22 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { ComponentLibrary } from "@/components/ui/component-library";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 import { COMPONENT_LIBRARY } from "@/lib/StateMachineComponents";
-import { CARBON_CREDIT_TEMPLATES } from "@/templates/CarbonCreditTokenizationTemplate";
 import { 
   Cpu, 
   Zap, 
   Eye, 
-  Download, 
-  PlayCircle, 
-  Leaf, 
-  Settings, 
   GitBranch,
   Activity,
-  Database,
-  Workflow,
-  Code
+  Workflow
 } from "lucide-react";
 
 export default function ComponentsLabPage() {
-  const searchParams = useSearchParams();
-  const templateParam = searchParams?.get('template');
-  
-  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(templateParam || null);
-  const [previewData, setPreviewData] = useState<any>(null);
-
-  // Simple function to handle carbon template generation
-  const generateCarbonTemplate = (templateKey: string) => {
-    console.log(`Generating carbon template: ${templateKey}`);
-    // Here you would implement the actual template generation logic
-  };
-
-
   const categoryStats = {
     'data-processing': { count: 1, color: 'bg-blue-100 text-blue-800' },
     'aggregation': { count: 1, color: 'bg-green-100 text-green-800' },
@@ -60,10 +36,9 @@ export default function ComponentsLabPage() {
       </div>
 
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="components">Component Library</TabsTrigger>
-          <TabsTrigger value="carbon-demo">Carbon Credits Demo</TabsTrigger>
           <TabsTrigger value="workflow-builder">Workflow Builder</TabsTrigger>
         </TabsList>
 
@@ -156,14 +131,18 @@ export default function ComponentsLabPage() {
                   Use the workflow builder to create custom state machine workflows by connecting individual components.
                 </p>
                 <div className="flex gap-2">
-                  <Button variant="outline" className="flex-1">
-                    <GitBranch className="h-4 w-4 mr-1" />
-                    Open Builder
-                  </Button>
-                  <Button variant="outline" className="flex-1">
-                    <Eye className="h-4 w-4 mr-1" />
-                    View Templates
-                  </Button>
+                  <Link href="/template-editor" className="flex-1">
+                    <Button variant="outline" className="w-full">
+                      <GitBranch className="h-4 w-4 mr-1" />
+                      Template Editor
+                    </Button>
+                  </Link>
+                  <Link href="/templates" className="flex-1">
+                    <Button variant="outline" className="w-full">
+                      <Eye className="h-4 w-4 mr-1" />
+                      View Templates
+                    </Button>
+                  </Link>
                 </div>
               </CardContent>
             </Card>
@@ -245,155 +224,6 @@ export default function ComponentsLabPage() {
           <ComponentLibrary />
         </TabsContent>
 
-        <TabsContent value="carbon-demo" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Leaf className="h-5 w-5 text-green-600" />
-                  Carbon Credit Templates
-                </CardTitle>
-                <CardDescription>
-                  Ready-to-deploy workflows for different renewable energy sources
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {Object.entries(CARBON_CREDIT_TEMPLATES).map(([key, template]) => {
-                  // Access the builder's config property
-                  const config = (template as any).config;
-                  return (
-                    <Card key={key} className="p-4">
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1">
-                          <h4 className="font-medium">
-                            {key
-                              .replace(/_/g, " ")
-                              .toLowerCase()
-                              .replace(/\b\w/g, l => l.toUpperCase())}
-                          </h4>
-                          <div className="flex flex-wrap gap-1 mt-2">
-                            <Badge variant="outline" className="text-xs">
-                              {config?.deviceType.replace("-", " ")}
-                            </Badge>
-                            <Badge variant="outline" className="text-xs">
-                              {config?.tokenStandard} Standard
-                            </Badge>
-                            <Badge variant="outline" className="text-xs">
-                              {config?.certificateSize} tokens/cert
-                            </Badge>
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button size="sm" variant="outline" onClick={() => generateCarbonTemplate(key)}>
-                            <Eye className="h-3 w-3 mr-1" />
-                            Preview
-                          </Button>
-                          <Button size="sm">
-                            <Download className="h-3 w-3 mr-1" />
-                            Deploy
-                          </Button>
-                        </div>
-                      </div>
-                      <div className="text-sm text-muted-foreground space-y-1">
-                        <div>Conversion: {config?.conversionRate} kWh = 1 credit</div>
-                        <div>Aggregation: {config?.aggregationPeriod}</div>
-                        <div>Quality threshold: {config?.qualityThreshold}%</div>
-                      </div>
-                    </Card>
-                  );
-                })}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Activity className="h-5 w-5" />
-                  Workflow Visualization
-                </CardTitle>
-                <CardDescription>
-                  Components and data flow in the carbon credit tokenization process
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-lg border">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Database className="h-4 w-4 text-blue-600" />
-                      <span className="text-sm font-medium">1. IoT Measurements</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Signed renewable energy measurements from certified devices
-                    </p>
-                  </div>
-                  
-                  <div className="flex justify-center">
-                    <div className="w-px h-6 bg-gray-300" />
-                  </div>
-                  
-                  <div className="bg-gradient-to-r from-green-50 to-green-100 p-4 rounded-lg border">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Settings className="h-4 w-4 text-green-600" />
-                      <span className="text-sm font-medium">2. Validation & Processing</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Cryptographic validation, batch aggregation, and quality control
-                    </p>
-                  </div>
-                  
-                  <div className="flex justify-center">
-                    <div className="w-px h-6 bg-gray-300" />
-                  </div>
-                  
-                  <div className="bg-gradient-to-r from-purple-50 to-purple-100 p-4 rounded-lg border">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Zap className="h-4 w-4 text-purple-600" />
-                      <span className="text-sm font-medium">3. Token Creation</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Convert validated measurements into individual carbon credit tokens
-                    </p>
-                  </div>
-                  
-                  <div className="flex justify-center">
-                    <div className="w-px h-6 bg-gray-300" />
-                  </div>
-                  
-                  <div className="bg-gradient-to-r from-orange-50 to-orange-100 p-4 rounded-lg border">
-                    <div className="flex items-center gap-2 mb-2">
-                      <GitBranch className="h-4 w-4 text-orange-600" />
-                      <span className="text-sm font-medium">4. Certificate Aggregation</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Bundle tokens into tradeable certificates with compliance metadata
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {selectedTemplate && previewData && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Code className="h-5 w-5" />
-                  Generated PLED Template Preview
-                </CardTitle>
-                <CardDescription>
-                  Complete template configuration for {selectedTemplate.replace(/_/g, " ")}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ScrollArea className="h-96">
-                  <pre className="text-xs bg-muted p-4 rounded-lg overflow-auto">
-                    {JSON.stringify(previewData, null, 2)}
-                  </pre>
-                </ScrollArea>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
 
         <TabsContent value="workflow-builder">
           <Card>
