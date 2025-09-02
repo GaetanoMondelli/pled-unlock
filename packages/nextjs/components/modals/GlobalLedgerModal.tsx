@@ -15,6 +15,71 @@ import type { HistoryEntry } from '@/lib/simulation/types';
 
 const GlobalActivityTable: React.FC<{ logs: HistoryEntry[] }> = ({ logs }) => {
   const nodesConfig = useSimulationStore(state => state.nodesConfig);
+  const setSelectedToken = useSimulationStore(state => state.setSelectedToken);
+  const globalActivityLog = useSimulationStore(state => state.globalActivityLog);
+
+  const handleTokenClick = (tokenId: string) => {
+    // Find the token in the global activity log and reconstruct it
+    const tokenEvents = globalActivityLog.filter(log => 
+      log.sourceTokenIds?.includes(tokenId) || 
+      log.details?.includes(tokenId) ||
+      (log.action === 'CREATED' && log.details?.includes(tokenId))
+    );
+    
+    if (tokenEvents.length > 0) {
+      const createEvent = tokenEvents.find(e => e.action === 'CREATED' && e.details?.includes(tokenId));
+      if (createEvent) {
+        const reconstructedToken = {
+          id: tokenId,
+          value: createEvent.value,
+          createdAt: createEvent.timestamp,
+          originNodeId: createEvent.nodeId,
+          history: tokenEvents.filter(e => e.details?.includes(tokenId))
+        };
+        setSelectedToken(reconstructedToken);
+      }
+    }
+  };
+
+  const renderTokenLinks = (text: string) => {
+    if (!text) return text;
+    
+    // Match token IDs in the format "Token ABC123XY" or just "ABC123XY" if it looks like a token ID
+    const tokenRegex = /Token (\w{8})|(\w{8}(?=\s|$|,|\.|from|to))/g;
+    const parts = [];
+    let lastIndex = 0;
+    let match;
+
+    while ((match = tokenRegex.exec(text)) !== null) {
+      const tokenId = match[1] || match[2];
+      
+      // Add text before the match
+      if (match.index > lastIndex) {
+        parts.push(text.slice(lastIndex, match.index));
+      }
+      
+      // Add clickable token link
+      parts.push(
+        <button
+          key={`${tokenId}-${match.index}`}
+          onClick={() => handleTokenClick(tokenId)}
+          className="text-primary hover:text-primary/80 underline font-mono text-xs"
+          title={`Click to inspect token ${tokenId}`}
+        >
+          {match[0]}
+        </button>
+      );
+      
+      lastIndex = match.index + match[0].length;
+    }
+    
+    // Add remaining text
+    if (lastIndex < text.length) {
+      parts.push(text.slice(lastIndex));
+    }
+    
+    return parts.length > 1 ? parts : text;
+  };
   
   const getNodeDisplayName = (nodeId: string) => {
     return nodesConfig[nodeId]?.displayName || nodeId;
@@ -65,11 +130,22 @@ const GlobalActivityTable: React.FC<{ logs: HistoryEntry[] }> = ({ logs }) => {
                 </div>
                 <div className="flex-1 min-w-0 text-muted-foreground">
                   <div className="break-words">
-                    {log.details || '-'}
+                    {renderTokenLinks(log.details || '-')}
                   </div>
                   {log.sourceTokenIds && log.sourceTokenIds.length > 0 && (
                     <div className="mt-1 text-xs text-muted-foreground/70">
-                      Source: {log.sourceTokenIds.join(', ')}
+                      Source: {log.sourceTokenIds.map((tokenId, idx) => (
+                        <span key={tokenId}>
+                          {idx > 0 && ', '}
+                          <button
+                            onClick={() => handleTokenClick(tokenId)}
+                            className="text-primary hover:text-primary/80 underline font-mono"
+                            title={`Click to inspect token ${tokenId}`}
+                          >
+                            {tokenId}
+                          </button>
+                        </span>
+                      ))}
                     </div>
                   )}
                 </div>
