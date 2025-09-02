@@ -102,7 +102,7 @@ const CompactTokenTree: React.FC<CompactTokenTreeProps> = ({
       }
       // For other tokens, use their operation source tokens
       else if (token.operation?.sourceTokens) {
-        token.operation.sourceTokens.forEach(source => {
+        token.operation.sourceTokens.forEach((source: any) => {
           childTokenIds.add(source.tokenId);
         });
       }

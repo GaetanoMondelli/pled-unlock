@@ -33,13 +33,14 @@ interface LineageTableProps {
   lineage: TokenLineage;
   onNodeSelect?: (nodeId: string) => void;
   selectedNodeId?: string;
+  nodesConfig?: Record<string, { displayName: string }>;
 }
 
 interface GroupedData {
   [key: string]: TokenLineageNode[];
 }
 
-const LineageTable: React.FC<LineageTableProps> = ({ lineage, onNodeSelect, selectedNodeId }) => {
+const LineageTable: React.FC<LineageTableProps> = ({ lineage, onNodeSelect, selectedNodeId, nodesConfig = {} }) => {
   const [sortField, setSortField] = useState<SortField>("generation");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [groupBy, setGroupBy] = useState<GroupBy>("none");
@@ -55,17 +56,59 @@ const LineageTable: React.FC<LineageTableProps> = ({ lineage, onNodeSelect, sele
     metadata: false,
   });
 
+  // Create nodes array from lineage data
+  const allNodes = useMemo(() => {
+    const nodes: any[] = [];
+    // Add target token
+    if (lineage.targetToken) {
+      nodes.push({
+        ...lineage.targetToken,
+        tokenId: lineage.targetToken.id,
+        nodeId: lineage.targetToken.originNodeId,
+        nodeName: nodesConfig[lineage.targetToken.originNodeId]?.displayName || lineage.targetToken.originNodeId || "Unknown",
+        isTarget: true,
+        isRoot: false,
+        timestamp: lineage.targetToken.createdAt,
+        children: [],
+      });
+    }
+    // Add ancestors
+    lineage.allAncestors.forEach(ancestor => {
+      nodes.push({
+        ...ancestor,
+        tokenId: ancestor.id,
+        nodeId: ancestor.originNodeId,
+        nodeName: nodesConfig[ancestor.originNodeId]?.displayName || ancestor.originNodeId || "Unknown",
+        timestamp: ancestor.createdAt,
+        children: [],
+      });
+    });
+    // Add immediate parents
+    lineage.immediateParents.forEach(parent => {
+      nodes.push({
+        ...parent,
+        tokenId: parent.id,
+        nodeId: parent.originNodeId,
+        nodeName: nodesConfig[parent.originNodeId]?.displayName || parent.originNodeId || "Unknown",
+        timestamp: parent.createdAt,
+        isTarget: false,
+        children: [],
+      });
+    });
+    return nodes;
+  }, [lineage, nodesConfig]);
+
   // Filter nodes based on search term
   const filteredNodes = useMemo(() => {
-    if (!searchTerm) return lineage.nodes;
-    return lineage.nodes.filter(node =>
+    if (!searchTerm) return allNodes;
+    return allNodes.filter((node: any) =>
       Object.values(node).some(value => String(value).toLowerCase().includes(searchTerm.toLowerCase())),
     );
-  }, [lineage.nodes, searchTerm]);
+  }, [allNodes, searchTerm]);
 
   // Sort nodes
   const sortedNodes = useMemo(() => {
-    const sorted = [...filteredNodes].sort((a, b) => {
+    const sorted = [...filteredNodes].sort((a: any, b: any) => {
       let aValue: any = a[sortField];
       let bValue: any = b[sortField];
 
@@ -91,13 +134,13 @@ const LineageTable: React.FC<LineageTableProps> = ({ lineage, onNodeSelect, sele
       let groupKey: string;
       switch (groupBy) {
         case "generation":
-          groupKey = `Generation ${node.generation}`;
+          groupKey = `Generation ${(node as any).generationLevel || 0}`;
           break;
         case "operation":
-          groupKey = node.operation || "Unknown Operation";
+          groupKey = (node as any).operation?.type || "Unknown Operation";
           break;
         case "sourceNode":
-          groupKey = node.sourceNodeId || "Root Tokens";
+          groupKey = node.originNodeId || "Root Tokens";
           break;
         default:
           groupKey = "All Tokens";
@@ -182,17 +225,17 @@ const LineageTable: React.FC<LineageTableProps> = ({ lineage, onNodeSelect, sele
             <div>
               <strong>Node ID:</strong> {node.id}
             </div>
-            {node.sourceNodeId && (
+            {node.nodeId && (
               <div>
-                <strong>Source Node:</strong> {node.sourceNodeId}
+                <strong>Source Node:</strong> {node.nodeId}
               </div>
             )}
           </div>
-          {node.metadata && Object.keys(node.metadata).length > 0 && (
+          {(node as any).operation && (
             <div>
-              <strong>Metadata:</strong>
+              <strong>Operation Details:</strong>
               <pre className="mt-1 text-xs bg-background p-2 rounded border overflow-auto">
-                {JSON.stringify(node.metadata, null, 2)}
+                {JSON.stringify((node as any).operation, null, 2)}
               </pre>
             </div>
           )}
@@ -360,7 +403,7 @@ const LineageTable: React.FC<LineageTableProps> = ({ lineage, onNodeSelect, sele
                 )}
                 <Collapsible open={groupBy === "none" || expandedGroups.has(groupKey)}>
                   <CollapsibleContent>
-                    {nodes.map(node => (
+                    {nodes.map((node: any) => (
                       <React.Fragment key={node.id}>
                         <TableRow
                           className={`cursor-pointer ${selectedNodeId === node.id ? "bg-muted" : ""}`}
@@ -383,15 +426,15 @@ const LineageTable: React.FC<LineageTableProps> = ({ lineage, onNodeSelect, sele
                               )}
                             </Button>
                           </TableCell>
-                          {columnVisibility.generation && <TableCell>{node.generation}</TableCell>}
-                          {columnVisibility.timestamp && <TableCell>{formatTimestamp(node.timestamp)}</TableCell>}
+                          {columnVisibility.generation && <TableCell>{(node as any).generationLevel || 0}</TableCell>}
+                          {columnVisibility.timestamp && <TableCell>{formatTimestamp(node.createdAt)}</TableCell>}
                           {columnVisibility.value && <TableCell>{formatValue(node.value)}</TableCell>}
-                          {columnVisibility.operation && <TableCell>{node.operation}</TableCell>}
-                          {columnVisibility.sourceNode && <TableCell>{node.sourceNodeId || "Root"}</TableCell>}
+                          {columnVisibility.operation && <TableCell>{(node as any).operation?.type || "N/A"}</TableCell>}
+                          {columnVisibility.sourceNode && <TableCell>{node.originNodeId || "Root"}</TableCell>}
                           {columnVisibility.metadata && (
                             <TableCell>
-                              {node.metadata && Object.keys(node.metadata).length > 0
-                                ? `${Object.keys(node.metadata).length} fields`
+                              {(node as any).operation && Object.keys((node as any).operation).length > 0
+                                ? `${Object.keys((node as any).operation).length} fields`
                                 : "None"}
                             </TableCell>
                           )}
@@ -409,7 +452,7 @@ const LineageTable: React.FC<LineageTableProps> = ({ lineage, onNodeSelect, sele
 
       {/* Summary */}
       <div className="text-sm text-muted-foreground">
-        Showing {filteredNodes.length} of {lineage.nodes.length} tokens
+        Showing {filteredNodes.length} of {allNodes.length} tokens
       </div>
     </div>
   );

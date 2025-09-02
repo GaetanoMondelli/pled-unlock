@@ -56,6 +56,10 @@ const D3TokenTree: React.FC<D3TokenTreeProps> = ({
       }
       
       const nodeData = token || parent;
+      if (!nodeData) {
+        throw new Error(`No data found for token ${tokenId}`);
+      }
+      
       const ancestor = lineage.allAncestors.find(a => a.id === tokenId);
       
       const node: TreeNodeData = {
@@ -122,7 +126,7 @@ const D3TokenTree: React.FC<D3TokenTreeProps> = ({
       .data(treeNodes.links())
       .enter().append("path")
       .attr("class", "link")
-      .attr("d", d3.linkHorizontal<any, TreeNodeData>()
+      .attr("d", d3.linkHorizontal<any, d3.HierarchyPointNode<TreeNodeData>>()
         .x(d => d.y)
         .y(d => d.x))
       .style("fill", "none")

@@ -14,6 +14,9 @@ import {
   buildTokenGraphFromHistory,
   isRootToken,
 } from "./tokenGraph";
+
+// Re-export OperationInfo for use by other modules
+export type { OperationInfo } from "./tokenGraph";
 import type { HistoryEntry, Token } from "./types";
 
 /**
@@ -147,13 +150,7 @@ export class TokenGenealogyEngine {
    */
   buildCompleteLineage(tokenId: string): TokenLineage {
     if (!this.graph.hasToken(tokenId)) {
-      throw new LineageError({
-        type: "missing_token",
-        tokenId,
-        message: `Token ${tokenId} not found in graph`,
-        affectedTokens: [tokenId],
-        suggestedAction: "Verify token ID exists in the simulation history",
-      });
+      throw new Error(`Token ${tokenId} not found in graph`);
     }
 
     const targetToken = this.buildTokenFromNode(tokenId);

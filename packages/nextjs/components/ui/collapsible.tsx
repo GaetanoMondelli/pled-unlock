@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { Slot } from "@radix-ui/react-slot";
 import { cn } from "@/lib/utils";
 
 interface CollapsibleProps {
@@ -22,13 +23,13 @@ const Collapsible: React.FC<CollapsibleProps> = ({ children, open, onOpenChange 
       {React.Children.map(children, child => {
         if (React.isValidElement(child)) {
           if (child.type === CollapsibleTrigger) {
-            return React.cloneElement(child, {
+            return React.cloneElement(child as React.ReactElement<any>, {
               onClick: () => handleOpenChange(!isOpen),
               'data-state': isOpen ? "open" : "closed",
             });
           }
           if (child.type === CollapsibleContent) {
-            return React.cloneElement(child, {
+            return React.cloneElement(child as React.ReactElement<any>, {
               'data-state': isOpen ? "open" : "closed",
               style: { display: isOpen ? 'block' : 'none' },
             });
@@ -40,21 +41,28 @@ const Collapsible: React.FC<CollapsibleProps> = ({ children, open, onOpenChange 
   );
 };
 
+interface CollapsibleTriggerProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  asChild?: boolean;
+}
+
 const CollapsibleTrigger = React.forwardRef<
   HTMLButtonElement,
-  React.ButtonHTMLAttributes<HTMLButtonElement>
->(({ className, children, ...props }, ref) => (
-  <button
-    ref={ref}
-    className={cn(
-      "flex w-full items-center justify-between rounded-lg px-4 py-2 text-left text-sm font-medium hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-      className,
-    )}
-    {...props}
-  >
-    {children}
-  </button>
-));
+  CollapsibleTriggerProps
+>(({ className, children, asChild = false, ...props }, ref) => {
+  const Comp = asChild ? Slot : "button";
+  return (
+    <Comp
+      ref={ref}
+      className={cn(
+        "flex w-full items-center justify-between rounded-lg px-4 py-2 text-left text-sm font-medium hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+        className,
+      )}
+      {...props}
+    >
+      {children}
+    </Comp>
+  );
+});
 CollapsibleTrigger.displayName = "CollapsibleTrigger";
 
 const CollapsibleContent = React.forwardRef<
