@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
+import { NextRequest, NextResponse } from "next/server";
 
-export const dynamic = 'force-dynamic'; // Mark route as dynamic
+export const dynamic = "force-dynamic"; // Mark route as dynamic
 
 const BASE_URL = "https://demo.docusign.net/restapi/v2.1";
 
@@ -34,10 +34,7 @@ export async function POST(req: NextRequest) {
 
     if (!accessToken || !accountId) {
       console.log("Missing auth:", { accessToken, accountId, baseUrl }); // Debug log
-      return NextResponse.json(
-        { error: "Missing authentication headers" },
-        { status: 403 },
-      );
+      return NextResponse.json({ error: "Missing authentication headers" }, { status: 403 });
     }
 
     // Convert file to base64 for DocuSign

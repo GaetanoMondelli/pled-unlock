@@ -1,24 +1,36 @@
-import { create } from 'zustand';
-import { z } from 'zod';
+import { nanoid } from "@/lib/nanoid";
+import { evaluateFormula } from "@/lib/simulation/formulaEngine";
 import {
-  type Scenario,
+  calculateGenerationLevel,
+  createAggregationDetails,
+  createEnhancedSourceTokenSummaries,
+  createLineageMetadata,
+  createTransformationDetails,
+  determineOperationType,
+  extractUltimateSources,
+} from "@/lib/simulation/lineageHelpers";
+import {
+  type AggregationDetails,
   type AnyNode,
-  type Token,
-  type HistoryEntry,
   type AnyNodeState,
-  type DataSourceState,
-  type QueueState,
-  type ProcessNodeState,
-  type SinkState,
   DataSourceNodeSchema,
-  QueueNodeSchema,
+  type DataSourceState,
+  type HistoryEntry,
+  type LineageMetadata,
   ProcessNodeSchema,
+  type ProcessNodeState,
+  QueueNodeSchema,
+  type QueueState,
+  type Scenario,
   SinkNodeSchema,
+  type SinkState,
   type SourceTokenSummary,
-} from '@/lib/simulation/types';
-import { validateScenario } from '@/lib/simulation/validation';
-import { evaluateFormula } from '@/lib/simulation/formulaEngine';
-import { nanoid } from '@/lib/nanoid';
+  type Token,
+  type TransformationDetails,
+} from "@/lib/simulation/types";
+import { validateScenario } from "@/lib/simulation/validation";
+import { z } from "zod";
+import { create } from "zustand";
 
 const MAX_SINK_TOKENS_STORED = 50;
 const MAX_NODE_ACTIVITY_LOGS = 500;
@@ -53,7 +65,11 @@ interface SimulationState {
 
   // Helper functions
   _updateNodeState: (nodeId: string, partialState: Partial<AnyNodeState>) => void;
-  _logNodeActivity: (nodeIdForLog: string, logCoreDetails: Omit<HistoryEntry, 'timestamp' | 'nodeId' | 'epochTimestamp' | 'sequence'>, timestamp: number) => HistoryEntry;
+  _logNodeActivity: (
+    nodeIdForLog: string,
+    logCoreDetails: Omit<HistoryEntry, "timestamp" | "nodeId" | "epochTimestamp" | "sequence">,
+    timestamp: number,
+  ) => HistoryEntry;
   _createToken: (originNodeId: string, value: any, timestamp: number, sourceTokens?: Token[]) => Token;
 }
 
@@ -77,26 +93,26 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
   loadScenario: async (scenarioData: any) => {
     const { scenario: parsedScenario, errors } = validateScenario(scenarioData);
     if (errors.length > 0) {
-      set({ 
-        errorMessages: errors, 
-        scenario: null, 
-        nodesConfig: {}, 
-        nodeStates: {}, 
-        globalActivityLog: [], 
-        nodeActivityLogs: {}, 
-        eventCounter: 0 
+      set({
+        errorMessages: errors,
+        scenario: null,
+        nodesConfig: {},
+        nodeStates: {},
+        globalActivityLog: [],
+        nodeActivityLogs: {},
+        eventCounter: 0,
       });
       return;
     }
     if (!parsedScenario) {
-      set({ 
-        errorMessages: ['Failed to parse scenario.'], 
-        scenario: null, 
-        nodesConfig: {}, 
-        nodeStates: {}, 
-        globalActivityLog: [], 
-        nodeActivityLogs: {}, 
-        eventCounter: 0 
+      set({
+        errorMessages: ["Failed to parse scenario."],
+        scenario: null,
+        nodesConfig: {},
+        nodeStates: {},
+        globalActivityLog: [],
+        nodeActivityLogs: {},
+        eventCounter: 0,
       });
       return;
     }
@@ -109,18 +125,22 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       nodesConfig[node.nodeId] = node;
       initialLogs[node.nodeId] = [];
       switch (node.type) {
-        case 'DataSource':
+        case "DataSource":
           initialNodeStates[node.nodeId] = { lastEmissionTime: -1 } as DataSourceState;
           break;
-        case 'Queue':
+        case "Queue":
           initialNodeStates[node.nodeId] = { inputBuffer: [], outputBuffer: [], lastAggregationTime: -1 } as QueueState;
           break;
-        case 'ProcessNode':
+        case "ProcessNode":
           const inputBuffers: Record<string, Token[]> = {};
           initialNodeStates[node.nodeId] = { inputBuffers, lastFiredTime: -1 } as ProcessNodeState;
           break;
-        case 'Sink':
-          initialNodeStates[node.nodeId] = { consumedTokenCount: 0, lastConsumedTime: -1, consumedTokens: [] } as SinkState;
+        case "Sink":
+          initialNodeStates[node.nodeId] = {
+            consumedTokenCount: 0,
+            lastConsumedTime: -1,
+            consumedTokens: [],
+          } as SinkState;
           break;
       }
     });
@@ -175,43 +195,82 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
     Object.values(nodesConfig).forEach(nodeConfig => {
       const currentNodeState = get().nodeStates[nodeConfig.nodeId];
 
-      if (nodeConfig.type === 'DataSource') {
+      if (nodeConfig.type === "DataSource") {
         const dsState = currentNodeState as DataSourceState;
         if (newTime >= (dsState.lastEmissionTime < 0 ? 0 : dsState.lastEmissionTime) + nodeConfig.interval) {
-          const value = Math.floor(Math.random() * (nodeConfig.valueMax - nodeConfig.valueMin + 1)) + nodeConfig.valueMin;
+          const value =
+            Math.floor(Math.random() * (nodeConfig.valueMax - nodeConfig.valueMin + 1)) + nodeConfig.valueMin;
           const token = _createToken(nodeConfig.nodeId, value, newTime);
-          const emissionLog = _logNodeActivity(nodeConfig.nodeId, { action: 'EMITTED', value: token.value, details: `Token ${token.id} to ${nodeConfig.destinationNodeId}` }, newTime);
+          const emissionLog = _logNodeActivity(
+            nodeConfig.nodeId,
+            { action: "EMITTED", value: token.value, details: `Token ${token.id} to ${nodeConfig.destinationNodeId}` },
+            newTime,
+          );
 
           const destNodeConfig = nodesConfig[nodeConfig.destinationNodeId];
           if (destNodeConfig) {
             const destNodeState = get().nodeStates[destNodeConfig.nodeId];
             const arrivalLogDetails = `Token ${token.id} from ${nodeConfig.displayName}`;
-            const arrivalLog = _logNodeActivity(destNodeConfig.nodeId, { action: 'TOKEN_ARRIVED_AT_NODE', value: token.value, details: arrivalLogDetails }, newTime);
+            const arrivalLog = _logNodeActivity(
+              destNodeConfig.nodeId,
+              { action: "TOKEN_ARRIVED_AT_NODE", value: token.value, details: arrivalLogDetails },
+              newTime,
+            );
             token.history.push(arrivalLog);
 
-            if (destNodeConfig.type === 'Queue') {
+            if (destNodeConfig.type === "Queue") {
               const qState = destNodeState as QueueState;
               if (destNodeConfig.capacity && qState.inputBuffer.length >= destNodeConfig.capacity) {
-                const dropLog = _logNodeActivity(destNodeConfig.nodeId, { action: 'DROPPED_AT_QUEUE_INPUT_FULL', value: token.value, details: `From ${nodeConfig.displayName}, Token ${token.id}` }, newTime);
+                const dropLog = _logNodeActivity(
+                  destNodeConfig.nodeId,
+                  {
+                    action: "DROPPED_AT_QUEUE_INPUT_FULL",
+                    value: token.value,
+                    details: `From ${nodeConfig.displayName}, Token ${token.id}`,
+                  },
+                  newTime,
+                );
                 token.history.push(dropLog);
               } else {
                 _updateNodeState(destNodeConfig.nodeId, { inputBuffer: [...qState.inputBuffer, token] });
-                _logNodeActivity(destNodeConfig.nodeId, { action: 'TOKEN_ADDED_TO_INPUT_BUFFER', value: token.value, details: `From ${nodeConfig.displayName}. New size: ${qState.inputBuffer.length + 1}` }, newTime);
+                _logNodeActivity(
+                  destNodeConfig.nodeId,
+                  {
+                    action: "TOKEN_ADDED_TO_INPUT_BUFFER",
+                    value: token.value,
+                    details: `From ${nodeConfig.displayName}. New size: ${qState.inputBuffer.length + 1}`,
+                  },
+                  newTime,
+                );
               }
-            } else if (destNodeConfig.type === 'ProcessNode') {
+            } else if (destNodeConfig.type === "ProcessNode") {
               const pnState = destNodeState as ProcessNodeState;
               const bufferForInput = pnState.inputBuffers[nodeConfig.nodeId] || [];
-              _updateNodeState(destNodeConfig.nodeId, { inputBuffers: { ...pnState.inputBuffers, [nodeConfig.nodeId]: [...bufferForInput, token] } });
-              _logNodeActivity(destNodeConfig.nodeId, { action: 'TOKEN_ADDED_TO_INPUT_BUFFER', value: token.value, details: `From ${nodeConfig.displayName} into buffer for ${nodeConfig.nodeId}. New size: ${bufferForInput.length + 1}` }, newTime);
-            } else if (destNodeConfig.type === 'Sink') {
+              _updateNodeState(destNodeConfig.nodeId, {
+                inputBuffers: { ...pnState.inputBuffers, [nodeConfig.nodeId]: [...bufferForInput, token] },
+              });
+              _logNodeActivity(
+                destNodeConfig.nodeId,
+                {
+                  action: "TOKEN_ADDED_TO_INPUT_BUFFER",
+                  value: token.value,
+                  details: `From ${nodeConfig.displayName} into buffer for ${nodeConfig.nodeId}. New size: ${bufferForInput.length + 1}`,
+                },
+                newTime,
+              );
+            } else if (destNodeConfig.type === "Sink") {
               const sinkState = destNodeState as SinkState;
               const updatedConsumedTokens = [...(sinkState.consumedTokens || []), token].slice(-MAX_SINK_TOKENS_STORED);
               _updateNodeState(destNodeConfig.nodeId, {
                 consumedTokenCount: (sinkState.consumedTokenCount || 0) + 1,
                 lastConsumedTime: newTime,
-                consumedTokens: updatedConsumedTokens
+                consumedTokens: updatedConsumedTokens,
               });
-              const sinkConsumptionLog = _logNodeActivity(destNodeConfig.nodeId, { action: 'CONSUMED_BY_SINK_NODE', value: token.value, details: arrivalLogDetails }, newTime);
+              const sinkConsumptionLog = _logNodeActivity(
+                destNodeConfig.nodeId,
+                { action: "CONSUMED_BY_SINK_NODE", value: token.value, details: arrivalLogDetails },
+                newTime,
+              );
               token.history.push(sinkConsumptionLog);
             }
           }
@@ -220,7 +279,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       }
 
       // Process ProcessNode nodes
-      if (nodeConfig.type === 'ProcessNode') {
+      if (nodeConfig.type === "ProcessNode") {
         const pnConfig = nodeConfig;
         const pnState = currentNodeState as ProcessNodeState;
         let canFire = true;
@@ -228,17 +287,26 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
 
         for (const inputSourceNodeId of pnConfig.inputNodeIds) {
           const sourceNodeConfig = nodesConfig[inputSourceNodeId];
-          if (!sourceNodeConfig) { canFire = false; break; }
+          if (!sourceNodeConfig) {
+            canFire = false;
+            break;
+          }
 
-          if (sourceNodeConfig.type === 'Queue') {
+          if (sourceNodeConfig.type === "Queue") {
             const qState = get().nodeStates[inputSourceNodeId] as QueueState;
             if (qState.outputBuffer.length > 0) {
               inputsDataForFormula[inputSourceNodeId] = qState.outputBuffer[0];
-            } else { canFire = false; break; }
+            } else {
+              canFire = false;
+              break;
+            }
           } else {
             if (pnState.inputBuffers[inputSourceNodeId] && pnState.inputBuffers[inputSourceNodeId].length > 0) {
               inputsDataForFormula[inputSourceNodeId] = pnState.inputBuffers[inputSourceNodeId][0];
-            } else { canFire = false; break; }
+            } else {
+              canFire = false;
+              break;
+            }
           }
         }
 
@@ -249,11 +317,19 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
           Object.entries(inputsDataForFormula).forEach(([inputNodeId, tokenToConsume]) => {
             consumedTokensForThisFiring.push(tokenToConsume);
             const consumptionLogDetails = `From ${nodesConfig[inputNodeId]?.displayName || inputNodeId}, Token ${tokenToConsume.id}`;
-            const consumptionLog = _logNodeActivity(pnConfig.nodeId, { action: 'INPUT_TOKEN_CONSUMED_BY_PROCESSOR', value: tokenToConsume.value, details: consumptionLogDetails }, newTime);
+            const consumptionLog = _logNodeActivity(
+              pnConfig.nodeId,
+              {
+                action: "INPUT_TOKEN_CONSUMED_BY_PROCESSOR",
+                value: tokenToConsume.value,
+                details: consumptionLogDetails,
+              },
+              newTime,
+            );
             tokenToConsume.history.push(consumptionLog);
-            
+
             const sourceNodeConfig = nodesConfig[inputNodeId];
-            if (sourceNodeConfig.type === 'Queue') {
+            if (sourceNodeConfig.type === "Queue") {
               const qState = get().nodeStates[inputNodeId] as QueueState;
               _updateNodeState(inputNodeId, { outputBuffer: qState.outputBuffer.slice(1) });
             } else {
@@ -272,42 +348,117 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
           pnConfig.outputs.forEach((output, index) => {
             const { value: outputValue, error } = evaluateFormula(output.formula, formulaContext);
             if (error) {
-              _logNodeActivity(pnConfig.nodeId, { action: 'FORMULA_ERROR', details: `Output ${index} ('${output.formula}'): ${error}. Context: ${JSON.stringify(formulaContext)}` }, newTime);
-              set(stateFS => ({ errorMessages: [...stateFS.errorMessages, `Node ${pnConfig.displayName} (output ${index}) formula error: ${error}`] }));
+              _logNodeActivity(
+                pnConfig.nodeId,
+                {
+                  action: "FORMULA_ERROR",
+                  details: `Output ${index} ('${output.formula}'): ${error}. Context: ${JSON.stringify(formulaContext)}`,
+                  operationType: "transformation",
+                },
+                newTime,
+              );
+              set(stateFS => ({
+                errorMessages: [
+                  ...stateFS.errorMessages,
+                  `Node ${pnConfig.displayName} (output ${index}) formula error: ${error}`,
+                ],
+              }));
             } else {
               const newToken = _createToken(pnConfig.nodeId, outputValue, newTime, consumedTokensForThisFiring);
-              _logNodeActivity(pnConfig.nodeId, { action: 'OUTPUT_GENERATED', value: newToken.value, sourceTokenIds: consumedTokensForThisFiring.map(t=>t.id), sourceTokenSummaries: consumedTokensForThisFiring.map(t=>({id: t.id, originNodeId: t.originNodeId, originalValue: t.value, createdAt: t.createdAt})), details: `Token ${newToken.id} for output ${index} to ${output.destinationNodeId}` }, newTime);
+
+              // Create detailed transformation breakdown
+              const transformationDetails = createTransformationDetails(
+                output.formula,
+                formulaContext.inputs,
+                outputValue,
+              );
+
+              // Create lineage metadata for transformation
+              const lineageMetadata = createLineageMetadata("transformation", consumedTokensForThisFiring, newToken.id);
+
+              // Enhanced source token summaries
+              const enhancedSourceTokenSummaries = createEnhancedSourceTokenSummaries(consumedTokensForThisFiring);
+
+              _logNodeActivity(
+                pnConfig.nodeId,
+                {
+                  action: "OUTPUT_GENERATED",
+                  value: newToken.value,
+                  sourceTokenIds: consumedTokensForThisFiring.map(t => t.id),
+                  sourceTokenSummaries: enhancedSourceTokenSummaries,
+                  details: `${transformationDetails.calculation}. Token ${newToken.id} for output ${index} to ${output.destinationNodeId}`,
+                  transformationDetails,
+                  lineageMetadata,
+                },
+                newTime,
+              );
 
               const destNodeConfig = nodesConfig[output.destinationNodeId];
               if (destNodeConfig) {
                 const destNodeState = get().nodeStates[destNodeConfig.nodeId];
                 const arrivalLogDetails = `Token ${newToken.id} from ${pnConfig.displayName} output ${index}`;
-                const arrivalLog = _logNodeActivity(destNodeConfig.nodeId, { action: 'TOKEN_ARRIVED_AT_NODE', value: newToken.value, details: arrivalLogDetails }, newTime);
+                const arrivalLog = _logNodeActivity(
+                  destNodeConfig.nodeId,
+                  { action: "TOKEN_ARRIVED_AT_NODE", value: newToken.value, details: arrivalLogDetails },
+                  newTime,
+                );
                 newToken.history.push(arrivalLog);
 
-                if (destNodeConfig.type === 'Queue') {
+                if (destNodeConfig.type === "Queue") {
                   const qState = destNodeState as QueueState;
                   if (destNodeConfig.capacity && qState.inputBuffer.length >= destNodeConfig.capacity) {
-                    const dropLog = _logNodeActivity(destNodeConfig.nodeId, { action: 'DROPPED_AT_QUEUE_INPUT_FULL', value: newToken.value, details: `From ${pnConfig.displayName}, Token ${newToken.id}` }, newTime);
+                    const dropLog = _logNodeActivity(
+                      destNodeConfig.nodeId,
+                      {
+                        action: "DROPPED_AT_QUEUE_INPUT_FULL",
+                        value: newToken.value,
+                        details: `From ${pnConfig.displayName}, Token ${newToken.id}`,
+                      },
+                      newTime,
+                    );
                     newToken.history.push(dropLog);
                   } else {
                     _updateNodeState(destNodeConfig.nodeId, { inputBuffer: [...qState.inputBuffer, newToken] });
-                    _logNodeActivity(destNodeConfig.nodeId, { action: 'TOKEN_ADDED_TO_INPUT_BUFFER', value: newToken.value, details: `From ${pnConfig.displayName}. New size: ${qState.inputBuffer.length + 1}` }, newTime);
+                    _logNodeActivity(
+                      destNodeConfig.nodeId,
+                      {
+                        action: "TOKEN_ADDED_TO_INPUT_BUFFER",
+                        value: newToken.value,
+                        details: `From ${pnConfig.displayName}. New size: ${qState.inputBuffer.length + 1}`,
+                      },
+                      newTime,
+                    );
                   }
-                } else if (destNodeConfig.type === 'ProcessNode') {
+                } else if (destNodeConfig.type === "ProcessNode") {
                   const nextDestPnState = destNodeState as ProcessNodeState;
                   const bufferForInput = nextDestPnState.inputBuffers[pnConfig.nodeId] || [];
-                  _updateNodeState(destNodeConfig.nodeId, { inputBuffers: { ...nextDestPnState.inputBuffers, [pnConfig.nodeId]: [...bufferForInput, newToken] } });
-                  _logNodeActivity(destNodeConfig.nodeId, { action: 'TOKEN_ADDED_TO_INPUT_BUFFER', value: newToken.value, details: `From ${pnConfig.displayName} into buffer for ${pnConfig.nodeId}. New size: ${bufferForInput.length + 1}` }, newTime);
-                } else if (destNodeConfig.type === 'Sink') {
+                  _updateNodeState(destNodeConfig.nodeId, {
+                    inputBuffers: { ...nextDestPnState.inputBuffers, [pnConfig.nodeId]: [...bufferForInput, newToken] },
+                  });
+                  _logNodeActivity(
+                    destNodeConfig.nodeId,
+                    {
+                      action: "TOKEN_ADDED_TO_INPUT_BUFFER",
+                      value: newToken.value,
+                      details: `From ${pnConfig.displayName} into buffer for ${pnConfig.nodeId}. New size: ${bufferForInput.length + 1}`,
+                    },
+                    newTime,
+                  );
+                } else if (destNodeConfig.type === "Sink") {
                   const sinkState = destNodeState as SinkState;
-                  const updatedConsumedTokens = [...(sinkState.consumedTokens || []), newToken].slice(-MAX_SINK_TOKENS_STORED);
+                  const updatedConsumedTokens = [...(sinkState.consumedTokens || []), newToken].slice(
+                    -MAX_SINK_TOKENS_STORED,
+                  );
                   _updateNodeState(destNodeConfig.nodeId, {
                     consumedTokenCount: (sinkState.consumedTokenCount || 0) + 1,
                     lastConsumedTime: newTime,
-                    consumedTokens: updatedConsumedTokens
+                    consumedTokens: updatedConsumedTokens,
                   });
-                  const sinkConsumptionLog = _logNodeActivity(destNodeConfig.nodeId, { action: 'CONSUMED_BY_SINK_NODE', value: newToken.value, details: arrivalLogDetails }, newTime);
+                  const sinkConsumptionLog = _logNodeActivity(
+                    destNodeConfig.nodeId,
+                    { action: "CONSUMED_BY_SINK_NODE", value: newToken.value, details: arrivalLogDetails },
+                    newTime,
+                  );
                   newToken.history.push(sinkConsumptionLog);
                 }
               }
@@ -319,7 +470,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
 
     // Process Queue aggregation
     Object.values(nodesConfig).forEach(nodeConfig => {
-      if (nodeConfig.type === 'Queue') {
+      if (nodeConfig.type === "Queue") {
         const qConfig = nodeConfig;
         const qState = get().nodeStates[qConfig.nodeId] as QueueState;
 
@@ -328,37 +479,103 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
             const tokensToAggregate = [...qState.inputBuffer];
             let aggregatedValue: any;
             const sourceTokenIdsForLog = tokensToAggregate.map(t => t.id);
-            const sourceTokenSummariesForLog = tokensToAggregate.map(t => ({id: t.id, originNodeId: t.originNodeId, originalValue: t.value, createdAt: t.createdAt}));
+            const sourceTokenSummariesForLog = tokensToAggregate.map(t => ({
+              id: t.id,
+              originNodeId: t.originNodeId,
+              originalValue: t.value,
+              createdAt: t.createdAt,
+            }));
 
             switch (qConfig.aggregationMethod) {
-              case 'sum': aggregatedValue = tokensToAggregate.reduce((sum, t) => sum + Number(t.value), 0); break;
-              case 'average': aggregatedValue = tokensToAggregate.length > 0 ? tokensToAggregate.reduce((sum, t) => sum + Number(t.value), 0) / tokensToAggregate.length : 0; break;
-              case 'count': aggregatedValue = tokensToAggregate.length; break;
-              case 'first': aggregatedValue = tokensToAggregate[0]?.value; break;
-              case 'last': aggregatedValue = tokensToAggregate[tokensToAggregate.length - 1]?.value; break;
-              default: aggregatedValue = tokensToAggregate[0]?.value;
+              case "sum":
+                aggregatedValue = tokensToAggregate.reduce((sum, t) => sum + Number(t.value), 0);
+                break;
+              case "average":
+                aggregatedValue =
+                  tokensToAggregate.length > 0
+                    ? tokensToAggregate.reduce((sum, t) => sum + Number(t.value), 0) / tokensToAggregate.length
+                    : 0;
+                break;
+              case "count":
+                aggregatedValue = tokensToAggregate.length;
+                break;
+              case "first":
+                aggregatedValue = tokensToAggregate[0]?.value;
+                break;
+              case "last":
+                aggregatedValue = tokensToAggregate[tokensToAggregate.length - 1]?.value;
+                break;
+              default:
+                aggregatedValue = tokensToAggregate[0]?.value;
             }
 
             if (aggregatedValue !== undefined) {
               const newToken = _createToken(qConfig.nodeId, aggregatedValue, newTime, tokensToAggregate);
+
+              // Create detailed aggregation breakdown
+              const aggregationDetails = createAggregationDetails(
+                qConfig.aggregationMethod,
+                tokensToAggregate,
+                aggregatedValue,
+              );
+
+              // Create lineage metadata for aggregation
+              const lineageMetadata = createLineageMetadata("aggregation", tokensToAggregate, newToken.id);
+
+              // Enhanced source token summaries
+              const enhancedSourceTokenSummaries = createEnhancedSourceTokenSummaries(tokensToAggregate);
+
               tokensToAggregate.forEach(consumedToken => {
                 const aggConsumptionLogDetails = `Token ${consumedToken.id} from input buffer for aggregation by ${qConfig.displayName}`;
-                const aggConsumptionLog = _logNodeActivity(qConfig.nodeId, { action: 'TOKEN_CONSUMED_FOR_AGGREGATION', value: consumedToken.value, details: aggConsumptionLogDetails }, newTime);
+                const aggConsumptionLog = _logNodeActivity(
+                  qConfig.nodeId,
+                  {
+                    action: "TOKEN_CONSUMED_FOR_AGGREGATION",
+                    value: consumedToken.value,
+                    details: aggConsumptionLogDetails,
+                    operationType: "consumption",
+                  },
+                  newTime,
+                );
                 consumedToken.history.push(aggConsumptionLog);
               });
-              _logNodeActivity(qConfig.nodeId, { action: `AGGREGATED_${qConfig.aggregationMethod.toUpperCase()}`, value: newToken.value, sourceTokenIds: sourceTokenIdsForLog, sourceTokenSummaries: sourceTokenSummariesForLog, details: `Token ${newToken.id} placed in output buffer for ${qConfig.destinationNodeId}` }, newTime);
+
+              _logNodeActivity(
+                qConfig.nodeId,
+                {
+                  action: `AGGREGATED_${qConfig.aggregationMethod.toUpperCase()}`,
+                  value: newToken.value,
+                  sourceTokenIds: sourceTokenIdsForLog,
+                  sourceTokenSummaries: enhancedSourceTokenSummaries,
+                  details: `${aggregationDetails.calculation}. Token ${newToken.id} placed in output buffer for ${qConfig.destinationNodeId}`,
+                  aggregationDetails,
+                  lineageMetadata,
+                },
+                newTime,
+              );
 
               _updateNodeState(qConfig.nodeId, {
                 inputBuffer: [],
                 outputBuffer: [...qState.outputBuffer, newToken],
-                lastAggregationTime: newTime
+                lastAggregationTime: newTime,
               });
             } else {
-              _logNodeActivity(qConfig.nodeId, { action: 'AGGREGATION_EMPTY_VALUE', details: `Input buffer cleared. Contained ${tokensToAggregate.length} tokens.` }, newTime);
+              _logNodeActivity(
+                qConfig.nodeId,
+                {
+                  action: "AGGREGATION_EMPTY_VALUE",
+                  details: `Input buffer cleared. Contained ${tokensToAggregate.length} tokens.`,
+                },
+                newTime,
+              );
               _updateNodeState(qConfig.nodeId, { inputBuffer: [], lastAggregationTime: newTime });
             }
           } else {
-            _logNodeActivity(qConfig.nodeId, { action: 'AGGREGATION_WINDOW_PASSED_EMPTY_INPUT', details: `No tokens in input buffer.` }, newTime);
+            _logNodeActivity(
+              qConfig.nodeId,
+              { action: "AGGREGATION_WINDOW_PASSED_EMPTY_INPUT", details: `No tokens in input buffer.` },
+              newTime,
+            );
             _updateNodeState(qConfig.nodeId, { lastAggregationTime: newTime });
           }
         }
@@ -367,7 +584,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
 
     // Forward tokens from Queue output buffers
     Object.values(nodesConfig).forEach(nodeConfig => {
-      if (nodeConfig.type === 'Queue') {
+      if (nodeConfig.type === "Queue") {
         const qConfigSource = nodeConfig;
         const qStateSource = get().nodeStates[qConfigSource.nodeId] as QueueState;
 
@@ -376,31 +593,65 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
           if (destNodeConfig) {
             const tokenToForward = qStateSource.outputBuffer[0];
             const transferLogDetails = `Token ${tokenToForward.id} from ${qConfigSource.displayName} output`;
-            const forwardActionLog = _logNodeActivity(qConfigSource.nodeId, { action: 'TOKEN_FORWARDED_FROM_OUTPUT', value: tokenToForward.value, details: `To ${destNodeConfig.displayName}` }, newTime);
+            const forwardActionLog = _logNodeActivity(
+              qConfigSource.nodeId,
+              {
+                action: "TOKEN_FORWARDED_FROM_OUTPUT",
+                value: tokenToForward.value,
+                details: `To ${destNodeConfig.displayName}`,
+              },
+              newTime,
+            );
             tokenToForward.history.push(forwardActionLog);
 
-            if (destNodeConfig.type === 'Sink') {
+            if (destNodeConfig.type === "Sink") {
               const sinkNodeState = get().nodeStates[destNodeConfig.nodeId] as SinkState;
-              const updatedConsumedTokensSink = [...(sinkNodeState.consumedTokens || []), tokenToForward].slice(-MAX_SINK_TOKENS_STORED);
+              const updatedConsumedTokensSink = [...(sinkNodeState.consumedTokens || []), tokenToForward].slice(
+                -MAX_SINK_TOKENS_STORED,
+              );
               _updateNodeState(destNodeConfig.nodeId, {
                 consumedTokenCount: (sinkNodeState.consumedTokenCount || 0) + 1,
                 lastConsumedTime: newTime,
-                consumedTokens: updatedConsumedTokensSink
+                consumedTokens: updatedConsumedTokensSink,
               });
-              const sinkConsumptionLog = _logNodeActivity(destNodeConfig.nodeId, { action: 'CONSUMED_BY_SINK_NODE', value: tokenToForward.value, details: transferLogDetails }, newTime);
+              const sinkConsumptionLog = _logNodeActivity(
+                destNodeConfig.nodeId,
+                { action: "CONSUMED_BY_SINK_NODE", value: tokenToForward.value, details: transferLogDetails },
+                newTime,
+              );
               tokenToForward.history.push(sinkConsumptionLog);
               _updateNodeState(qConfigSource.nodeId, { outputBuffer: qStateSource.outputBuffer.slice(1) });
-            } else if (destNodeConfig.type === 'Queue') {
+            } else if (destNodeConfig.type === "Queue") {
               const qStateDest = get().nodeStates[destNodeConfig.nodeId] as QueueState;
-              const arrivalLog = _logNodeActivity(destNodeConfig.nodeId, { action: 'TOKEN_ARRIVED_AT_NODE', value: tokenToForward.value, details: transferLogDetails }, newTime);
+              const arrivalLog = _logNodeActivity(
+                destNodeConfig.nodeId,
+                { action: "TOKEN_ARRIVED_AT_NODE", value: tokenToForward.value, details: transferLogDetails },
+                newTime,
+              );
               tokenToForward.history.push(arrivalLog);
 
               if (destNodeConfig.capacity && qStateDest.inputBuffer.length >= destNodeConfig.capacity) {
-                const dropLog = _logNodeActivity(destNodeConfig.nodeId, { action: 'DROPPED_AT_QUEUE_INPUT_FULL', value: tokenToForward.value, details: `Token ${tokenToForward.id} from ${qConfigSource.displayName}` }, newTime);
+                const dropLog = _logNodeActivity(
+                  destNodeConfig.nodeId,
+                  {
+                    action: "DROPPED_AT_QUEUE_INPUT_FULL",
+                    value: tokenToForward.value,
+                    details: `Token ${tokenToForward.id} from ${qConfigSource.displayName}`,
+                  },
+                  newTime,
+                );
                 tokenToForward.history.push(dropLog);
               } else {
                 _updateNodeState(destNodeConfig.nodeId, { inputBuffer: [...qStateDest.inputBuffer, tokenToForward] });
-                _logNodeActivity(destNodeConfig.nodeId, { action: 'TOKEN_ADDED_TO_INPUT_BUFFER', value: tokenToForward.value, details: `From ${qConfigSource.displayName}. New size: ${qStateDest.inputBuffer.length + 1}` }, newTime);
+                _logNodeActivity(
+                  destNodeConfig.nodeId,
+                  {
+                    action: "TOKEN_ADDED_TO_INPUT_BUFFER",
+                    value: tokenToForward.value,
+                    details: `From ${qConfigSource.displayName}. New size: ${qStateDest.inputBuffer.length + 1}`,
+                  },
+                  newTime,
+                );
               }
               _updateNodeState(qConfigSource.nodeId, { outputBuffer: qStateSource.outputBuffer.slice(1) });
             }
@@ -410,8 +661,8 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
     });
   },
 
-  setSelectedNodeId: (nodeId) => set({ selectedNodeId: nodeId, selectedToken: null }),
-  setSelectedToken: (token) => set({ selectedToken: token, selectedNodeId: null }),
+  setSelectedNodeId: nodeId => set({ selectedNodeId: nodeId, selectedToken: null }),
+  setSelectedToken: token => set({ selectedToken: token, selectedNodeId: null }),
   clearErrors: () => set({ errorMessages: [] }),
   toggleGlobalLedger: () => set(state => ({ isGlobalLedgerOpen: !state.isGlobalLedgerOpen })),
 
@@ -425,17 +676,20 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       nodeStates: {
         ...state.nodeStates,
         [nodeId]: { ...state.nodeStates[nodeId], ...partialState },
-      }
+      },
     }));
   },
 
   _logNodeActivity: (nodeIdForLog, logCoreDetails, timestamp) => {
     const currentSequence = get().eventCounter;
     set(stateFS => ({ eventCounter: stateFS.eventCounter + 1 }));
-    
+
+    // Determine operation type from action
+    const operationType = determineOperationType(logCoreDetails.action);
+
     const newEntry: HistoryEntry = {
       timestamp: timestamp,
-      epochTimestamp: Date.now(), 
+      epochTimestamp: Date.now(),
       sequence: currentSequence,
       nodeId: nodeIdForLog,
       action: logCoreDetails.action,
@@ -443,15 +697,22 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       sourceTokenIds: logCoreDetails.sourceTokenIds,
       sourceTokenSummaries: logCoreDetails.sourceTokenSummaries,
       details: logCoreDetails.details,
+      operationType,
+      // Enhanced fields will be added by specific operations
+      aggregationDetails: (logCoreDetails as any).aggregationDetails,
+      transformationDetails: (logCoreDetails as any).transformationDetails,
+      lineageMetadata: (logCoreDetails as any).lineageMetadata,
     };
 
     set(state => {
-      if (!nodeIdForLog || typeof nodeIdForLog !== 'string') {
-        console.error(`[${timestamp}s] SIMULATION ERROR: Attempted to log activity with invalid nodeIdForLog: ${nodeIdForLog}. Action: ${logCoreDetails.action}, Details: ${logCoreDetails.details}`);
+      if (!nodeIdForLog || typeof nodeIdForLog !== "string") {
+        console.error(
+          `[${timestamp}s] SIMULATION ERROR: Attempted to log activity with invalid nodeIdForLog: ${nodeIdForLog}. Action: ${logCoreDetails.action}, Details: ${logCoreDetails.details}`,
+        );
         const currentErrors = state.errorMessages || [];
         return { ...state, errorMessages: [`Logging error: Invalid nodeIdForLog: ${nodeIdForLog}`, ...currentErrors] };
       }
-      
+
       const currentNodeLogs = state.nodeActivityLogs[nodeIdForLog] || [];
       const updatedNodeLogs = [...currentNodeLogs, newEntry].slice(-MAX_NODE_ACTIVITY_LOGS);
       const newNodeActivityLogs = {
@@ -477,20 +738,25 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
     };
 
     const sourceTokenIds = sourceTokens.map(t => t.id);
-    const sourceTokenSummaries: SourceTokenSummary[] = sourceTokens.map(t => ({
-      id: t.id,
-      originNodeId: t.originNodeId,
-      originalValue: t.value,
-      createdAt: t.createdAt,
-    }));
-    
-    const createLog = get()._logNodeActivity(originNodeId, {
-        action: 'CREATED', 
-        value: newToken.value, 
-        sourceTokenIds, 
-        sourceTokenSummaries, 
-        details: `Token ${newToken.id}`
-    }, timestamp);
+
+    // Create enhanced source token summaries with recursive lineage
+    const sourceTokenSummaries = createEnhancedSourceTokenSummaries(sourceTokens);
+
+    // Create lineage metadata for this token creation
+    const lineageMetadata = createLineageMetadata("creation", sourceTokens, newToken.id);
+
+    const createLog = get()._logNodeActivity(
+      originNodeId,
+      {
+        action: "CREATED",
+        value: newToken.value,
+        sourceTokenIds,
+        sourceTokenSummaries,
+        details: `Token ${newToken.id}`,
+        lineageMetadata,
+      },
+      timestamp,
+    );
     newToken.history.push(createLog);
     return newToken;
   },

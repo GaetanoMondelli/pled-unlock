@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { Button } from "./button";
 import { Card } from "./card";
 // import { Collapsible, CollapsibleContent } from "./collapsible";
-
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./dialog";
 import { Input } from "./input";
 import { ScrollArea } from "./scroll-area";
@@ -529,7 +528,7 @@ export const PlaygroundView = () => {
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${authData?.accessToken}`,
-            "Account-Id": authData?.accountId || '', 
+            "Account-Id": authData?.accountId || "",
           },
           body: JSON.stringify({
             clickwrapId,
@@ -1799,7 +1798,7 @@ export const PlaygroundView = () => {
                                             .join(" ")}
                                           :
                                         </span>{" "}
-                                        {typeof value === "boolean" ? (value ? "Yes" : "No") : value} 
+                                        {typeof value === "boolean" ? (value ? "Yes" : "No") : value}
                                       </p>
                                     </div>
                                   ))}
@@ -1878,5 +1877,3 @@ export const PlaygroundView = () => {
     </>
   );
 };
-
-

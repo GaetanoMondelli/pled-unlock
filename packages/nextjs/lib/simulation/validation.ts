@@ -1,11 +1,11 @@
-import { ScenarioSchema, type Scenario, type AnyNode } from './types';
+import { type AnyNode, type Scenario, ScenarioSchema } from "./types";
 
 export function validateScenario(data: any): { scenario: Scenario | null; errors: string[] } {
   const result = ScenarioSchema.safeParse(data);
   if (!result.success) {
     return {
       scenario: null,
-      errors: result.error.issues.map((e: any) => `${e.path.join('.')}: ${e.message}`),
+      errors: result.error.issues.map((e: any) => `${e.path.join(".")}: ${e.message}`),
     };
   }
 
@@ -15,7 +15,7 @@ export function validateScenario(data: any): { scenario: Scenario | null; errors
 
   scenario.nodes.forEach(node => {
     switch (node.type) {
-      case 'DataSource':
+      case "DataSource":
         if (!nodeIds.has(node.destinationNodeId)) {
           errors.push(`DataSource "${node.nodeId}": destinationNodeId "${node.destinationNodeId}" does not exist.`);
         }
@@ -23,12 +23,12 @@ export function validateScenario(data: any): { scenario: Scenario | null; errors
           errors.push(`DataSource "${node.nodeId}": valueMin cannot be greater than valueMax.`);
         }
         break;
-      case 'Queue':
+      case "Queue":
         if (!nodeIds.has(node.destinationNodeId)) {
           errors.push(`Queue "${node.nodeId}": destinationNodeId "${node.destinationNodeId}" does not exist.`);
         }
         break;
-      case 'ProcessNode':
+      case "ProcessNode":
         node.inputNodeIds.forEach(inputId => {
           if (!nodeIds.has(inputId)) {
             errors.push(`ProcessNode "${node.nodeId}": inputNodeId "${inputId}" does not exist.`);
@@ -36,16 +36,20 @@ export function validateScenario(data: any): { scenario: Scenario | null; errors
         });
         node.outputs.forEach(output => {
           if (!nodeIds.has(output.destinationNodeId)) {
-            errors.push(`ProcessNode "${node.nodeId}" output: destinationNodeId "${output.destinationNodeId}" does not exist.`);
+            errors.push(
+              `ProcessNode "${node.nodeId}" output: destinationNodeId "${output.destinationNodeId}" does not exist.`,
+            );
           }
         });
         // Check if nodes targeting this ProcessNode are consistent with inputNodeIds
-        const sourcesForProcessNode = scenario.nodes.filter(n => {
-          if (n.type === 'DataSource' || n.type === 'Queue') return n.destinationNodeId === node.nodeId;
-          if (n.type === 'ProcessNode') return n.outputs.some(o => o.destinationNodeId === node.nodeId);
-          return false;
-        }).map(n => n.nodeId);
-        
+        const sourcesForProcessNode = scenario.nodes
+          .filter(n => {
+            if (n.type === "DataSource" || n.type === "Queue") return n.destinationNodeId === node.nodeId;
+            if (n.type === "ProcessNode") return n.outputs.some(o => o.destinationNodeId === node.nodeId);
+            return false;
+          })
+          .map(n => n.nodeId);
+
         node.inputNodeIds.forEach(inputId => {
           if (!sourcesForProcessNode.includes(inputId)) {
             // This check might be too strict if graph can be partially defined or built dynamically

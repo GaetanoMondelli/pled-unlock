@@ -4,17 +4,17 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { CreateProcedureModal } from "@/components/procedures/CreateProcedureModal";
 import { Badge } from "@/components/ui/badge";
+import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { calculateCurrentState } from "@/lib/fsm";
-import { fetchFromDb, deleteProcedureInstance } from "@/utils/api";
-import { handleEventAndGenerateMessages } from "@/utils/stateAndMessageHandler";
-import { Boxes, Grid2X2, List, PlusCircle, Trash2, Store, Cpu, Eye, Workflow } from "lucide-react";
-import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { TemplateInspector } from "@/components/ui/template-inspector";
-import { Breadcrumb } from "@/components/ui/breadcrumb";
+import { calculateCurrentState } from "@/lib/fsm";
+import { deleteProcedureInstance, fetchFromDb } from "@/utils/api";
+import { handleEventAndGenerateMessages } from "@/utils/stateAndMessageHandler";
+import { Boxes, Cpu, Eye, Grid2X2, List, PlusCircle, Store, Trash2, Workflow } from "lucide-react";
 
 export default function ProceduresPage() {
   const [templates, setTemplates] = useState<any[]>([]);
@@ -68,9 +68,7 @@ export default function ProceduresPage() {
 
   return (
     <div className="container mx-auto p-6">
-      <Breadcrumb items={[
-        { label: "Procedures", current: true }
-      ]} />
+      <Breadcrumb items={[{ label: "Procedures", current: true }]} />
       <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between mb-6">
         <h1 className="text-2xl font-bold">Procedures</h1>
         <div className="flex gap-2">
@@ -133,20 +131,20 @@ export default function ProceduresPage() {
 
       <div className={view === "grid" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" : "space-y-3"}>
         {filteredTemplates.map(template => (
-          <TemplateCard 
-            key={template.templateId} 
-            template={template} 
-            instances={instances} 
-            view={view} 
-            onDeleteInstance={(instanceId) => setDeleteInstanceId(instanceId)}
-            onInspectTemplate={(template) => setInspectingTemplate(template)}
+          <TemplateCard
+            key={template.templateId}
+            template={template}
+            instances={instances}
+            view={view}
+            onDeleteInstance={instanceId => setDeleteInstanceId(instanceId)}
+            onInspectTemplate={template => setInspectingTemplate(template)}
           />
         ))}
       </div>
 
       <ConfirmationDialog
         open={deleteInstanceId !== null}
-        onOpenChange={(open) => !open && setDeleteInstanceId(null)}
+        onOpenChange={open => !open && setDeleteInstanceId(null)}
         title="Delete Procedure Instance"
         description="Are you sure you want to delete this procedure instance? This action cannot be undone and will permanently remove all associated data."
         onConfirm={() => {
@@ -159,13 +157,25 @@ export default function ProceduresPage() {
       <TemplateInspector
         template={inspectingTemplate}
         open={inspectingTemplate !== null}
-        onOpenChange={(open) => !open && setInspectingTemplate(null)}
+        onOpenChange={open => !open && setInspectingTemplate(null)}
       />
     </div>
   );
 }
 
-function TemplateCard({ template, instances, view, onDeleteInstance, onInspectTemplate }: { template: any; instances: any[]; view: "grid" | "list"; onDeleteInstance: (instanceId: string) => void; onInspectTemplate: (template: any) => void }) {
+function TemplateCard({
+  template,
+  instances,
+  view,
+  onDeleteInstance,
+  onInspectTemplate,
+}: {
+  template: any;
+  instances: any[];
+  view: "grid" | "list";
+  onDeleteInstance: (instanceId: string) => void;
+  onInspectTemplate: (template: any) => void;
+}) {
   const templateInstances = useMemo(
     () => instances.filter(i => i.templateId === template.templateId),
     [instances, template.templateId],
@@ -193,10 +203,10 @@ function TemplateCard({ template, instances, view, onDeleteInstance, onInspectTe
         <div className="mt-3 space-y-2">
           <div className="grid grid-cols-1 gap-2">
             {templateInstances.slice(0, 3).map((instance: any) => (
-              <InstanceRow 
-                key={instance.instanceId} 
-                template={template} 
-                instance={instance} 
+              <InstanceRow
+                key={instance.instanceId}
+                template={template}
+                instance={instance}
                 onDelete={() => onDeleteInstance(instance.instanceId)}
               />
             ))}
@@ -206,24 +216,20 @@ function TemplateCard({ template, instances, view, onDeleteInstance, onInspectTe
               </Link>
             )}
           </div>
-          
+
           <div className="pt-2 border-t border-muted-foreground/20">
             <div className="flex gap-1">
               {templateInstances.length > 0 ? (
                 <Link href={`/procedures/${templateInstances[0].instanceId}`} className="flex-1">
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    className="w-full text-xs"
-                  >
+                  <Button size="sm" variant="outline" className="w-full text-xs">
                     <Eye className="h-3 w-3 mr-1" />
                     Inspect
                   </Button>
                 </Link>
               ) : (
-                <Button 
-                  size="sm" 
-                  variant="outline" 
+                <Button
+                  size="sm"
+                  variant="outline"
                   className="flex-1 text-xs"
                   onClick={() => onInspectTemplate(template)}
                 >
@@ -267,10 +273,7 @@ function InstanceRow({ template, instance, onDelete }: { template: any; instance
 
   return (
     <div className="rounded border hover:bg-accent/50 p-2 flex items-center justify-between group">
-      <Link
-        href={`/procedures/${instance.instanceId}`}
-        className="flex items-center justify-between flex-1 min-w-0"
-      >
+      <Link href={`/procedures/${instance.instanceId}`} className="flex items-center justify-between flex-1 min-w-0">
         <div className="text-sm min-w-0 flex-1">
           <div className="font-medium truncate">{instance.variables?.name || instance.instanceId}</div>
           <div className="text-xs text-muted-foreground truncate">
@@ -289,7 +292,7 @@ function InstanceRow({ template, instance, onDelete }: { template: any; instance
       <Button
         variant="ghost"
         size="sm"
-        onClick={(e) => {
+        onClick={e => {
           e.preventDefault();
           e.stopPropagation();
           onDelete();

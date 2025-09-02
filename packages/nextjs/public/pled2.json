@@ -1,1 +1,582 @@
-{"procedureTemplates":[{"templateId":"hiring_process","name":"Software Engineer Hiring Process","description":"Standard hiring workflow for software engineering positions","variables":{"candidate":{"email":{"type":"string","required":true},"name":{"type":"string","required":true}},"company":{"email":{"type":"string","required":true},"department":{"type":"string","required":true}}},"eventTypes":[{"type":"EMAIL_RECEIVED","schema":{"from":"string","to":"string","subject":"string","body":"string","time":"string"}},{"type":"DOCUMENT_UPLOADED","schema":{"filename":"string","type":"string","url":"string"}}],"messageRules":[{"id":"interview_request_pattern","priority":1,"matches":{"type":"EMAIL_RECEIVED","conditions":{"from":"{{candidate.email}}","to":"{{company.email}}","subject":"(contains) interview"}},"captures":{"requestTime":"{{event.data.time}}","requestSubject":"{{event.data.subject}}"},"generates":{"type":"contact_candidate","template":{"title":"Interview requested by {{candidate.name}}","content":"Candidate has requested an interview for {{company.department}} position","timestamp":"{{captures.requestTime}}"}},"transition":{"to":"contacting_candidate","conditions":{"requestTime":"(after) {{previousState.time}}"}}},{"id":"interview_request_llm","priority":2,"matches":{"type":"EMAIL_RECEIVED","conditions":{"from":"{{candidate.email}}","to":"{{company.email}}","body":"(llm-prompt) {{candidate.name}} asks for an interview","time":"{{event.data.time}}"}},"generates":{"type":"discuss_role","template":{"title":"Interview requested by {{candidate.name}}","content":"Candidate has requested an interview for {{company.department}} position","timestamp":"{{event.data.time}}"}}},{"id":"hr_approval_rule","priority":1,"matches":{"type":"HR_EVENT","conditions":{"action":"approve_candidate","decision":"approved"}},"generates":{"type":"prepare_contract","template":{"title":"Prepare employment contract","candidateId":"{{event.data.candidateId}}"}},"transition":"contract_prepared"},{"id":"contract_generated_rule","priority":2,"matches":{"type":"CONTRACT_EVENT","conditions":{"status":"generated","templateId":"(contains) EMP"}},"generates":{"type":"send_contract","template":{"documentId":"{{event.data.documentId}}","candidate":"{{event.data.metadata.candidateName}}"}},"transition":"contract_prepared"},{"id":"docusign_sent_rule","priority":3,"matches":{"type":"DOCUSIGN_EVENT","conditions":{"envelopeStatus":"sent","recipientStatus":["sent"]}},"generates":{"type":"contract_sent_notification","template":{"envelopeId":"{{event.data.envelopeId}}","recipient":"{{event.data.recipients[0].email}}"}},"transition":"contract_sent"},{"id":"role_discussion_rule","priority":2,"matches":{"type":"EMAIL_RECEIVED","conditions":{"from":"{{candidate.email}}","to":"{{company.email}}","subject":"(contains) role"}},"generates":{"type":"discuss_role","template":{"title":"Role discussion with {{candidate.name}}","content":"Candidate wants to discuss role details"}},"transition":"role_discussed"},{"id":"schedule_interview_rule","priority":3,"matches":{"type":"CALENDAR_EVENT","conditions":{"type":"schedule_interview","candidateEmail":"{{candidate.email}}"}},"generates":{"type":"schedule_interview","template":{"title":"Interview scheduled with {{candidate.name}}","content":"Interview scheduled for {{event.data.proposedTime}}"}},"transition":"interview_scheduled"},{"id":"interview_conducted_rule","priority":4,"matches":{"type":"INTERVIEW_EVENT","conditions":{"type":"interview_completed"}},"generates":{"type":"conduct_interview","template":{"title":"Interview completed with {{candidate.name}}","content":"Interview lasted {{event.data.duration}} minutes"}},"transition":"interview_conducted"},{"id":"positive_feedback_rule","priority":5,"matches":{"type":"FEEDBACK_EVENT","conditions":{"type":"interview_feedback","decision":"positive"}},"generates":{"type":"positive_feedback","template":{"title":"Positive feedback for {{candidate.name}}","content":"Interview feedback: {{event.data.notes}}"}},"transition":"offer_preparation"}],"stateMachine":{"fsl":"idle 'contact_candidate' -> contacting_candidate; contacting_candidate 'discuss_role' -> role_discussed; role_discussed 'schedule_interview' -> interview_scheduled; interview_scheduled 'conduct_interview' -> interview_conducted; interview_conducted 'positive_feedback' -> offer_preparation; interview_conducted 'negative_feedback' -> failure; offer_preparation 'set_tabs_for_contract' -> contract_prepared; contract_prepared 'send_contract' -> contract_sent; contract_sent 'wait_for_signature' -> contract_signed; contract_sent 'rejection' -> failure; contract_signed 'check_lifecycle' -> onboarding_started; onboarding_started 'complete_training' -> training_completed; training_completed 'probation_period' -> probation_review; probation_review 'positive_feedback' -> salary_review; probation_review 'negative_feedback' -> termination_initiated; salary_review 'positive_feedback' -> performance_review; salary_review 'negative_feedback' -> termination_initiated; performance_review 'positive_feedback' -> active_employee; performance_review 'negative_feedback' -> termination_initiated; active_employee 'request_to_leave' -> voluntary_exit; active_employee 'termination_decision' -> termination_initiated; termination_initiated 'finalize' -> terminated; voluntary_exit 'finalize' -> exited; failure 'retry' -> idle;"},"states":{"contract_prepared":{"description":"Employment contract has been prepared and is ready to be sent","actions":["docusign_send"]},"contract_sent":{"description":"Employment contract has been sent to the candidate","actions":["send_reminder"]},"contract_signed":{"description":"Employment contract has been signed by the candidate","actions":["create_calendar_event","send_email"]}},"documents":{"contracts":[{"id":"employment_contract","name":"Employment Contract","type":"contract","content":"Standard employment contract template...","linkedStates":["contract_sent","contract_signed"]},{"id":"signed_employment_contract","name":"Signed Employment Contract","type":"contract","content":"Signed version of the employment contract","linkedStates":["contract_signed"]}]},"actions":{"docusign_send":{"id":"docusign_send","name":"Send via DocuSign","type":"DOCUSIGN_SEND","description":"Send contract through DocuSign for signature","template":{"documentId":"employment_contract","recipient":"{{candidate.email}}","message":"Please review and sign your employment contract","expiryDays":7}},"interview_requested":[{"type":"SEND_EMAIL","template":{"from":"{{company.email}}","to":"{{candidate.email}}","subject":"Interview Request Received for {{company.department}}","body":"Dear {{candidate.name}},\n\nWe received your interview request for the position in {{company.department}}.\n\nBest regards,\nHR Team"}},{"type":"CREATE_CALENDAR_EVENT","template":{"title":"Interview with {{candidate.name}}","description":"Interview for {{company.department}} position","attendees":["{{candidate.email}}","{{company.email}}"]}}],"interview_scheduled":[{"type":"SEND_REMINDER","template":{"to":"{{candidate.email}}","subject":"Interview Reminder","body":"Dear {{candidate.name}},\n\nThis is a reminder about your upcoming interview..."}}]}}],"eventTemplates":{"candidate_interview_request":{"id":"interview-request","name":"Candidate Interview Request","description":"Email from candidate requesting an interview","type":"EMAIL_RECEIVED","template":{"source":"gmail","data":{"from":"john@example.com","to":"hr@company.com","subject":"Interview request","body":"I would like to schedule an interview","time":"2024-01-17T10:00:00Z"}},"received":false},"role_discussion":{"id":"role-discuss","name":"Role Discussion","description":"Discussion about role details","type":"EMAIL_RECEIVED","template":{"source":"gmail","data":{"from":"john@example.com","to":"hr@company.com","subject":"Role discussion","body":"I would like to discuss the role details","time":"2024-01-17T11:00:00Z"}},"received":false},"interview_scheduling":{"id":"schedule-interview","name":"Interview Scheduling","description":"Schedule interview time","type":"CALENDAR_EVENT","template":{"source":"google-calendar","data":{"type":"schedule_interview","candidateEmail":"john@example.com","interviewerEmail":"hr@company.com","proposedTime":"2024-01-20T10:00:00Z","duration":"60"}},"received":false},"interview_conducted":{"id":"interview-done","name":"Interview Conducted","description":"Interview completed","type":"INTERVIEW_EVENT","template":{"source":"interview-system","data":{"type":"interview_completed","candidateId":"CAND-123","interviewerId":"INT-456","duration":"55","completedAt":"2024-01-20T11:00:00Z"}},"received":false},"interview_feedback":{"id":"feedback-positive","name":"Positive Interview Feedback","description":"Positive feedback from interview","type":"FEEDBACK_EVENT","template":{"source":"feedback-system","data":{"type":"interview_feedback","candidateId":"CAND-123","decision":"positive","rating":4.5,"notes":"Strong technical skills and good culture fit","recommendedAction":"proceed_to_offer"}},"received":false},"hr_approval":{"id":"hr-approval","name":"HR Approval","description":"HR approves candidate","type":"HR_EVENT","template":{"source":"hr-system","data":{"action":"approve_candidate","decision":"approved","candidateId":"CAND-123","approver":"hr@company.com"}},"received":false},"contract_generation":{"id":"contract-gen","name":"Contract Generation","description":"Contract generated","type":"CONTRACT_EVENT","template":{"source":"contract-service","data":{"status":"generated","templateId":"EMP-001","documentId":"DOC-456","metadata":{"candidateName":"John Doe","position":"Software Engineer","department":"Engineering"}}},"received":false},"docusign_docusign-741ea9b7-0a57-454a-aeaa-495350b6a0d5":{"id":"docusign_docusign-741ea9b7-0a57-454a-aeaa-495350b6a0d5","name":"DocuSign Status Update","description":"DocuSign envelope sent","type":"DOCUSIGN_EVENT","template":{"source":"docusign","data":{"status":"sent","documentsUri":"/envelopes/741ea9b7-0a57-454a-aeaa-495350b6a0d5/documents","recipientsUri":"/envelopes/741ea9b7-0a57-454a-aeaa-495350b6a0d5/recipients","attachmentsUri":"/envelopes/741ea9b7-0a57-454a-aeaa-495350b6a0d5/attachments","envelopeUri":"/envelopes/741ea9b7-0a57-454a-aeaa-495350b6a0d5","emailSubject":"Please sign this document","emailBlurb":"Please review and sign this document at your earliest convenience.","envelopeId":"741ea9b7-0a57-454a-aeaa-495350b6a0d5","signingLocation":"online","customFieldsUri":"/envelopes/741ea9b7-0a57-454a-aeaa-495350b6a0d5/custom_fields","notificationUri":"/envelopes/741ea9b7-0a57-454a-aeaa-495350b6a0d5/notification","enableWetSign":"true","allowMarkup":"false","allowReassign":"true","createdDateTime":"2025-01-17T15:41:24.6400000Z","lastModifiedDateTime":"2025-01-17T15:41:31.9900000Z","initialSentDateTime":"2025-01-17T15:41:32.7430000Z","sentDateTime":"2025-01-17T15:41:32.7430000Z","statusChangedDateTime":"2025-01-17T15:41:32.7430000Z","documentsCombinedUri":"/envelopes/741ea9b7-0a57-454a-aeaa-495350b6a0d5/documents/combined","certificateUri":"/envelopes/741ea9b7-0a57-454a-aeaa-495350b6a0d5/documents/certificate","templatesUri":"/envelopes/741ea9b7-0a57-454a-aeaa-495350b6a0d5/templates","expireEnabled":"true","expireDateTime":"2025-05-17T15:41:32.7430000Z","expireAfter":"119","sender":{"userName":"Gaetano Mondelli","userId":"3d75ee95-c9b7-4531-80e7-31ad925c641c","accountId":"a8c0cf58-75d0-422a-a7cd-1f7a88f15dd6","email":"gaetano.mondelli@gmail.com","ipAddress":"81.133.15.69"},"purgeState":"unpurged","envelopeIdStamping":"true","is21CFRPart11":"false","signerCanSignOnMobile":"true","autoNavigation":"true","isSignatureProviderEnvelope":"false","hasFormDataChanged":"false","allowComments":"true","hasComments":"false","allowViewHistory":"true","envelopeMetadata":{"allowAdvancedCorrect":"true","enableSignWithNotary":"true","allowCorrect":"true"},"anySigner":null,"envelopeLocation":"current_site","isDynamicEnvelope":"false","burnDefaultTabData":"false"}},"received":false}},"procedureInstances":[{"instanceId":"proc_123","templateId":"hiring_process","variables":{"candidate":{"email":"john.doe@example.com","name":"John Doe"},"company":{"email":"hr@company.com","department":"Engineering"}},"currentState":{"name":"contract_prepared","enteredAt":"2024-03-20T14:30:00Z"},"history":{"messages":[{"id":"msg_1","type":"contact_candidate","timestamp":"2024-03-20T10:00:00Z","title":"Interview requested by John Doe","content":"Candidate has requested an interview for Engineering position","fromEvent":"evt_1"},{"id":"msg_2","type":"discuss_role","timestamp":"2024-03-20T11:00:00Z","title":"Role discussion with John Doe","content":"Candidate wants to discuss role details","fromEvent":"evt_2"},{"id":"msg_3","type":"schedule_interview","timestamp":"2024-03-20T12:00:00Z","title":"Interview scheduled with John Doe","content":"Interview scheduled for 2024-03-20T13:00:00Z","fromEvent":"evt_3"},{"id":"msg_4","type":"conduct_interview","timestamp":"2024-03-20T13:55:00Z","title":"Interview completed with John Doe","content":"Interview lasted 55 minutes","fromEvent":"evt_4"},{"id":"msg_5","type":"positive_feedback","timestamp":"2024-03-20T14:15:00Z","title":"Positive feedback for John Doe","content":"Interview feedback: Strong technical skills and good culture fit","fromEvent":"evt_5"},{"id":"msg_6","type":"prepare_contract","timestamp":"2024-03-20T14:30:00Z","title":"Prepare employment contract","content":"Contract preparation initiated for candidate","fromEvent":"evt_6"}],"events":[{"id":"evt_1","type":"EMAIL_RECEIVED","timestamp":"2024-03-20T10:00:00Z","data":{"from":"john.doe@example.com","to":"hr@company.com","subject":"Interview request","body":"I would like to schedule an interview","time":"2024-03-20T10:00:00Z"}},{"id":"evt_2","type":"EMAIL_RECEIVED","timestamp":"2024-03-20T11:00:00Z","data":{"from":"john.doe@example.com","to":"hr@company.com","subject":"Role discussion","body":"I would like to discuss the role details","time":"2024-03-20T11:00:00Z"}},{"id":"evt_3","type":"CALENDAR_EVENT","timestamp":"2024-03-20T12:00:00Z","data":{"type":"schedule_interview","candidateEmail":"john.doe@example.com","proposedTime":"2024-03-20T13:00:00Z"}},{"id":"evt_4","type":"INTERVIEW_EVENT","timestamp":"2024-03-20T13:55:00Z","data":{"type":"interview_completed","candidateId":"CAND-123","duration":"55","completedAt":"2024-03-20T13:55:00Z"}},{"id":"evt_5","type":"FEEDBACK_EVENT","timestamp":"2024-03-20T14:15:00Z","data":{"type":"interview_feedback","candidateId":"CAND-123","decision":"positive","rating":4.5,"notes":"Strong technical skills and good culture fit","recommendedAction":"proceed_to_offer"}},{"id":"evt_6","type":"HR_EVENT","timestamp":"2024-03-20T14:30:00Z","data":{"action":"approve_candidate","decision":"approved","candidateId":"CAND-123","approver":"hr@company.com"}}],"completedActions":[]},"startDate":"2024-03-20T10:00:00Z"},{"instanceId":"proc_1737237009601","templateId":"hiring_process","variables":{"candidate":{"email":"steve@gmail.com","name":"Steve McDonald"},"company":{"email":"hr@pled.com","department":"Accounting"}},"currentState":{"name":"idle","enteredAt":"2025-01-18T21:50:09.601Z"},"history":{"events":[],"messages":[],"completedActions":[]},"startDate":"2025-01-18T21:50:09.601Z"}]}
+{
+  "procedureTemplates": [
+    {
+      "templateId": "hiring_process",
+      "name": "Software Engineer Hiring Process",
+      "description": "Standard hiring workflow for software engineering positions",
+      "variables": {
+        "candidate": {
+          "email": { "type": "string", "required": true },
+          "name": { "type": "string", "required": true }
+        },
+        "company": {
+          "email": { "type": "string", "required": true },
+          "department": { "type": "string", "required": true }
+        }
+      },
+      "eventTypes": [
+        {
+          "type": "EMAIL_RECEIVED",
+          "schema": { "from": "string", "to": "string", "subject": "string", "body": "string", "time": "string" }
+        },
+        { "type": "DOCUMENT_UPLOADED", "schema": { "filename": "string", "type": "string", "url": "string" } }
+      ],
+      "messageRules": [
+        {
+          "id": "interview_request_pattern",
+          "priority": 1,
+          "matches": {
+            "type": "EMAIL_RECEIVED",
+            "conditions": {
+              "from": "{{candidate.email}}",
+              "to": "{{company.email}}",
+              "subject": "(contains) interview"
+            }
+          },
+          "captures": { "requestTime": "{{event.data.time}}", "requestSubject": "{{event.data.subject}}" },
+          "generates": {
+            "type": "contact_candidate",
+            "template": {
+              "title": "Interview requested by {{candidate.name}}",
+              "content": "Candidate has requested an interview for {{company.department}} position",
+              "timestamp": "{{captures.requestTime}}"
+            }
+          },
+          "transition": {
+            "to": "contacting_candidate",
+            "conditions": { "requestTime": "(after) {{previousState.time}}" }
+          }
+        },
+        {
+          "id": "interview_request_llm",
+          "priority": 2,
+          "matches": {
+            "type": "EMAIL_RECEIVED",
+            "conditions": {
+              "from": "{{candidate.email}}",
+              "to": "{{company.email}}",
+              "body": "(llm-prompt) {{candidate.name}} asks for an interview",
+              "time": "{{event.data.time}}"
+            }
+          },
+          "generates": {
+            "type": "discuss_role",
+            "template": {
+              "title": "Interview requested by {{candidate.name}}",
+              "content": "Candidate has requested an interview for {{company.department}} position",
+              "timestamp": "{{event.data.time}}"
+            }
+          }
+        },
+        {
+          "id": "hr_approval_rule",
+          "priority": 1,
+          "matches": { "type": "HR_EVENT", "conditions": { "action": "approve_candidate", "decision": "approved" } },
+          "generates": {
+            "type": "prepare_contract",
+            "template": { "title": "Prepare employment contract", "candidateId": "{{event.data.candidateId}}" }
+          },
+          "transition": "contract_prepared"
+        },
+        {
+          "id": "contract_generated_rule",
+          "priority": 2,
+          "matches": {
+            "type": "CONTRACT_EVENT",
+            "conditions": { "status": "generated", "templateId": "(contains) EMP" }
+          },
+          "generates": {
+            "type": "send_contract",
+            "template": {
+              "documentId": "{{event.data.documentId}}",
+              "candidate": "{{event.data.metadata.candidateName}}"
+            }
+          },
+          "transition": "contract_prepared"
+        },
+        {
+          "id": "docusign_sent_rule",
+          "priority": 3,
+          "matches": {
+            "type": "DOCUSIGN_EVENT",
+            "conditions": { "envelopeStatus": "sent", "recipientStatus": ["sent"] }
+          },
+          "generates": {
+            "type": "contract_sent_notification",
+            "template": { "envelopeId": "{{event.data.envelopeId}}", "recipient": "{{event.data.recipients[0].email}}" }
+          },
+          "transition": "contract_sent"
+        },
+        {
+          "id": "role_discussion_rule",
+          "priority": 2,
+          "matches": {
+            "type": "EMAIL_RECEIVED",
+            "conditions": { "from": "{{candidate.email}}", "to": "{{company.email}}", "subject": "(contains) role" }
+          },
+          "generates": {
+            "type": "discuss_role",
+            "template": {
+              "title": "Role discussion with {{candidate.name}}",
+              "content": "Candidate wants to discuss role details"
+            }
+          },
+          "transition": "role_discussed"
+        },
+        {
+          "id": "schedule_interview_rule",
+          "priority": 3,
+          "matches": {
+            "type": "CALENDAR_EVENT",
+            "conditions": { "type": "schedule_interview", "candidateEmail": "{{candidate.email}}" }
+          },
+          "generates": {
+            "type": "schedule_interview",
+            "template": {
+              "title": "Interview scheduled with {{candidate.name}}",
+              "content": "Interview scheduled for {{event.data.proposedTime}}"
+            }
+          },
+          "transition": "interview_scheduled"
+        },
+        {
+          "id": "interview_conducted_rule",
+          "priority": 4,
+          "matches": { "type": "INTERVIEW_EVENT", "conditions": { "type": "interview_completed" } },
+          "generates": {
+            "type": "conduct_interview",
+            "template": {
+              "title": "Interview completed with {{candidate.name}}",
+              "content": "Interview lasted {{event.data.duration}} minutes"
+            }
+          },
+          "transition": "interview_conducted"
+        },
+        {
+          "id": "positive_feedback_rule",
+          "priority": 5,
+          "matches": {
+            "type": "FEEDBACK_EVENT",
+            "conditions": { "type": "interview_feedback", "decision": "positive" }
+          },
+          "generates": {
+            "type": "positive_feedback",
+            "template": {
+              "title": "Positive feedback for {{candidate.name}}",
+              "content": "Interview feedback: {{event.data.notes}}"
+            }
+          },
+          "transition": "offer_preparation"
+        }
+      ],
+      "stateMachine": {
+        "fsl": "idle 'contact_candidate' -> contacting_candidate; contacting_candidate 'discuss_role' -> role_discussed; role_discussed 'schedule_interview' -> interview_scheduled; interview_scheduled 'conduct_interview' -> interview_conducted; interview_conducted 'positive_feedback' -> offer_preparation; interview_conducted 'negative_feedback' -> failure; offer_preparation 'set_tabs_for_contract' -> contract_prepared; contract_prepared 'send_contract' -> contract_sent; contract_sent 'wait_for_signature' -> contract_signed; contract_sent 'rejection' -> failure; contract_signed 'check_lifecycle' -> onboarding_started; onboarding_started 'complete_training' -> training_completed; training_completed 'probation_period' -> probation_review; probation_review 'positive_feedback' -> salary_review; probation_review 'negative_feedback' -> termination_initiated; salary_review 'positive_feedback' -> performance_review; salary_review 'negative_feedback' -> termination_initiated; performance_review 'positive_feedback' -> active_employee; performance_review 'negative_feedback' -> termination_initiated; active_employee 'request_to_leave' -> voluntary_exit; active_employee 'termination_decision' -> termination_initiated; termination_initiated 'finalize' -> terminated; voluntary_exit 'finalize' -> exited; failure 'retry' -> idle;"
+      },
+      "states": {
+        "contract_prepared": {
+          "description": "Employment contract has been prepared and is ready to be sent",
+          "actions": ["docusign_send"]
+        },
+        "contract_sent": {
+          "description": "Employment contract has been sent to the candidate",
+          "actions": ["send_reminder"]
+        },
+        "contract_signed": {
+          "description": "Employment contract has been signed by the candidate",
+          "actions": ["create_calendar_event", "send_email"]
+        }
+      },
+      "documents": {
+        "contracts": [
+          {
+            "id": "employment_contract",
+            "name": "Employment Contract",
+            "type": "contract",
+            "content": "Standard employment contract template...",
+            "linkedStates": ["contract_sent", "contract_signed"]
+          },
+          {
+            "id": "signed_employment_contract",
+            "name": "Signed Employment Contract",
+            "type": "contract",
+            "content": "Signed version of the employment contract",
+            "linkedStates": ["contract_signed"]
+          }
+        ]
+      },
+      "actions": {
+        "docusign_send": {
+          "id": "docusign_send",
+          "name": "Send via DocuSign",
+          "type": "DOCUSIGN_SEND",
+          "description": "Send contract through DocuSign for signature",
+          "template": {
+            "documentId": "employment_contract",
+            "recipient": "{{candidate.email}}",
+            "message": "Please review and sign your employment contract",
+            "expiryDays": 7
+          }
+        },
+        "interview_requested": [
+          {
+            "type": "SEND_EMAIL",
+            "template": {
+              "from": "{{company.email}}",
+              "to": "{{candidate.email}}",
+              "subject": "Interview Request Received for {{company.department}}",
+              "body": "Dear {{candidate.name}},\n\nWe received your interview request for the position in {{company.department}}.\n\nBest regards,\nHR Team"
+            }
+          },
+          {
+            "type": "CREATE_CALENDAR_EVENT",
+            "template": {
+              "title": "Interview with {{candidate.name}}",
+              "description": "Interview for {{company.department}} position",
+              "attendees": ["{{candidate.email}}", "{{company.email}}"]
+            }
+          }
+        ],
+        "interview_scheduled": [
+          {
+            "type": "SEND_REMINDER",
+            "template": {
+              "to": "{{candidate.email}}",
+              "subject": "Interview Reminder",
+              "body": "Dear {{candidate.name}},\n\nThis is a reminder about your upcoming interview..."
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "eventTemplates": {
+    "candidate_interview_request": {
+      "id": "interview-request",
+      "name": "Candidate Interview Request",
+      "description": "Email from candidate requesting an interview",
+      "type": "EMAIL_RECEIVED",
+      "template": {
+        "source": "gmail",
+        "data": {
+          "from": "john@example.com",
+          "to": "hr@company.com",
+          "subject": "Interview request",
+          "body": "I would like to schedule an interview",
+          "time": "2024-01-17T10:00:00Z"
+        }
+      },
+      "received": false
+    },
+    "role_discussion": {
+      "id": "role-discuss",
+      "name": "Role Discussion",
+      "description": "Discussion about role details",
+      "type": "EMAIL_RECEIVED",
+      "template": {
+        "source": "gmail",
+        "data": {
+          "from": "john@example.com",
+          "to": "hr@company.com",
+          "subject": "Role discussion",
+          "body": "I would like to discuss the role details",
+          "time": "2024-01-17T11:00:00Z"
+        }
+      },
+      "received": false
+    },
+    "interview_scheduling": {
+      "id": "schedule-interview",
+      "name": "Interview Scheduling",
+      "description": "Schedule interview time",
+      "type": "CALENDAR_EVENT",
+      "template": {
+        "source": "google-calendar",
+        "data": {
+          "type": "schedule_interview",
+          "candidateEmail": "john@example.com",
+          "interviewerEmail": "hr@company.com",
+          "proposedTime": "2024-01-20T10:00:00Z",
+          "duration": "60"
+        }
+      },
+      "received": false
+    },
+    "interview_conducted": {
+      "id": "interview-done",
+      "name": "Interview Conducted",
+      "description": "Interview completed",
+      "type": "INTERVIEW_EVENT",
+      "template": {
+        "source": "interview-system",
+        "data": {
+          "type": "interview_completed",
+          "candidateId": "CAND-123",
+          "interviewerId": "INT-456",
+          "duration": "55",
+          "completedAt": "2024-01-20T11:00:00Z"
+        }
+      },
+      "received": false
+    },
+    "interview_feedback": {
+      "id": "feedback-positive",
+      "name": "Positive Interview Feedback",
+      "description": "Positive feedback from interview",
+      "type": "FEEDBACK_EVENT",
+      "template": {
+        "source": "feedback-system",
+        "data": {
+          "type": "interview_feedback",
+          "candidateId": "CAND-123",
+          "decision": "positive",
+          "rating": 4.5,
+          "notes": "Strong technical skills and good culture fit",
+          "recommendedAction": "proceed_to_offer"
+        }
+      },
+      "received": false
+    },
+    "hr_approval": {
+      "id": "hr-approval",
+      "name": "HR Approval",
+      "description": "HR approves candidate",
+      "type": "HR_EVENT",
+      "template": {
+        "source": "hr-system",
+        "data": {
+          "action": "approve_candidate",
+          "decision": "approved",
+          "candidateId": "CAND-123",
+          "approver": "hr@company.com"
+        }
+      },
+      "received": false
+    },
+    "contract_generation": {
+      "id": "contract-gen",
+      "name": "Contract Generation",
+      "description": "Contract generated",
+      "type": "CONTRACT_EVENT",
+      "template": {
+        "source": "contract-service",
+        "data": {
+          "status": "generated",
+          "templateId": "EMP-001",
+          "documentId": "DOC-456",
+          "metadata": { "candidateName": "John Doe", "position": "Software Engineer", "department": "Engineering" }
+        }
+      },
+      "received": false
+    },
+    "docusign_docusign-741ea9b7-0a57-454a-aeaa-495350b6a0d5": {
+      "id": "docusign_docusign-741ea9b7-0a57-454a-aeaa-495350b6a0d5",
+      "name": "DocuSign Status Update",
+      "description": "DocuSign envelope sent",
+      "type": "DOCUSIGN_EVENT",
+      "template": {
+        "source": "docusign",
+        "data": {
+          "status": "sent",
+          "documentsUri": "/envelopes/741ea9b7-0a57-454a-aeaa-495350b6a0d5/documents",
+          "recipientsUri": "/envelopes/741ea9b7-0a57-454a-aeaa-495350b6a0d5/recipients",
+          "attachmentsUri": "/envelopes/741ea9b7-0a57-454a-aeaa-495350b6a0d5/attachments",
+          "envelopeUri": "/envelopes/741ea9b7-0a57-454a-aeaa-495350b6a0d5",
+          "emailSubject": "Please sign this document",
+          "emailBlurb": "Please review and sign this document at your earliest convenience.",
+          "envelopeId": "741ea9b7-0a57-454a-aeaa-495350b6a0d5",
+          "signingLocation": "online",
+          "customFieldsUri": "/envelopes/741ea9b7-0a57-454a-aeaa-495350b6a0d5/custom_fields",
+          "notificationUri": "/envelopes/741ea9b7-0a57-454a-aeaa-495350b6a0d5/notification",
+          "enableWetSign": "true",
+          "allowMarkup": "false",
+          "allowReassign": "true",
+          "createdDateTime": "2025-01-17T15:41:24.6400000Z",
+          "lastModifiedDateTime": "2025-01-17T15:41:31.9900000Z",
+          "initialSentDateTime": "2025-01-17T15:41:32.7430000Z",
+          "sentDateTime": "2025-01-17T15:41:32.7430000Z",
+          "statusChangedDateTime": "2025-01-17T15:41:32.7430000Z",
+          "documentsCombinedUri": "/envelopes/741ea9b7-0a57-454a-aeaa-495350b6a0d5/documents/combined",
+          "certificateUri": "/envelopes/741ea9b7-0a57-454a-aeaa-495350b6a0d5/documents/certificate",
+          "templatesUri": "/envelopes/741ea9b7-0a57-454a-aeaa-495350b6a0d5/templates",
+          "expireEnabled": "true",
+          "expireDateTime": "2025-05-17T15:41:32.7430000Z",
+          "expireAfter": "119",
+          "sender": {
+            "userName": "Gaetano Mondelli",
+            "userId": "3d75ee95-c9b7-4531-80e7-31ad925c641c",
+            "accountId": "a8c0cf58-75d0-422a-a7cd-1f7a88f15dd6",
+            "email": "gaetano.mondelli@gmail.com",
+            "ipAddress": "81.133.15.69"
+          },
+          "purgeState": "unpurged",
+          "envelopeIdStamping": "true",
+          "is21CFRPart11": "false",
+          "signerCanSignOnMobile": "true",
+          "autoNavigation": "true",
+          "isSignatureProviderEnvelope": "false",
+          "hasFormDataChanged": "false",
+          "allowComments": "true",
+          "hasComments": "false",
+          "allowViewHistory": "true",
+          "envelopeMetadata": {
+            "allowAdvancedCorrect": "true",
+            "enableSignWithNotary": "true",
+            "allowCorrect": "true"
+          },
+          "anySigner": null,
+          "envelopeLocation": "current_site",
+          "isDynamicEnvelope": "false",
+          "burnDefaultTabData": "false"
+        }
+      },
+      "received": false
+    }
+  },
+  "procedureInstances": [
+    {
+      "instanceId": "proc_123",
+      "templateId": "hiring_process",
+      "variables": {
+        "candidate": { "email": "john.doe@example.com", "name": "John Doe" },
+        "company": { "email": "hr@company.com", "department": "Engineering" }
+      },
+      "currentState": { "name": "contract_prepared", "enteredAt": "2024-03-20T14:30:00Z" },
+      "history": {
+        "messages": [
+          {
+            "id": "msg_1",
+            "type": "contact_candidate",
+            "timestamp": "2024-03-20T10:00:00Z",
+            "title": "Interview requested by John Doe",
+            "content": "Candidate has requested an interview for Engineering position",
+            "fromEvent": "evt_1"
+          },
+          {
+            "id": "msg_2",
+            "type": "discuss_role",
+            "timestamp": "2024-03-20T11:00:00Z",
+            "title": "Role discussion with John Doe",
+            "content": "Candidate wants to discuss role details",
+            "fromEvent": "evt_2"
+          },
+          {
+            "id": "msg_3",
+            "type": "schedule_interview",
+            "timestamp": "2024-03-20T12:00:00Z",
+            "title": "Interview scheduled with John Doe",
+            "content": "Interview scheduled for 2024-03-20T13:00:00Z",
+            "fromEvent": "evt_3"
+          },
+          {
+            "id": "msg_4",
+            "type": "conduct_interview",
+            "timestamp": "2024-03-20T13:55:00Z",
+            "title": "Interview completed with John Doe",
+            "content": "Interview lasted 55 minutes",
+            "fromEvent": "evt_4"
+          },
+          {
+            "id": "msg_5",
+            "type": "positive_feedback",
+            "timestamp": "2024-03-20T14:15:00Z",
+            "title": "Positive feedback for John Doe",
+            "content": "Interview feedback: Strong technical skills and good culture fit",
+            "fromEvent": "evt_5"
+          },
+          {
+            "id": "msg_6",
+            "type": "prepare_contract",
+            "timestamp": "2024-03-20T14:30:00Z",
+            "title": "Prepare employment contract",
+            "content": "Contract preparation initiated for candidate",
+            "fromEvent": "evt_6"
+          }
+        ],
+        "events": [
+          {
+            "id": "evt_1",
+            "type": "EMAIL_RECEIVED",
+            "timestamp": "2024-03-20T10:00:00Z",
+            "data": {
+              "from": "john.doe@example.com",
+              "to": "hr@company.com",
+              "subject": "Interview request",
+              "body": "I would like to schedule an interview",
+              "time": "2024-03-20T10:00:00Z"
+            }
+          },
+          {
+            "id": "evt_2",
+            "type": "EMAIL_RECEIVED",
+            "timestamp": "2024-03-20T11:00:00Z",
+            "data": {
+              "from": "john.doe@example.com",
+              "to": "hr@company.com",
+              "subject": "Role discussion",
+              "body": "I would like to discuss the role details",
+              "time": "2024-03-20T11:00:00Z"
+            }
+          },
+          {
+            "id": "evt_3",
+            "type": "CALENDAR_EVENT",
+            "timestamp": "2024-03-20T12:00:00Z",
+            "data": {
+              "type": "schedule_interview",
+              "candidateEmail": "john.doe@example.com",
+              "proposedTime": "2024-03-20T13:00:00Z"
+            }
+          },
+          {
+            "id": "evt_4",
+            "type": "INTERVIEW_EVENT",
+            "timestamp": "2024-03-20T13:55:00Z",
+            "data": {
+              "type": "interview_completed",
+              "candidateId": "CAND-123",
+              "duration": "55",
+              "completedAt": "2024-03-20T13:55:00Z"
+            }
+          },
+          {
+            "id": "evt_5",
+            "type": "FEEDBACK_EVENT",
+            "timestamp": "2024-03-20T14:15:00Z",
+            "data": {
+              "type": "interview_feedback",
+              "candidateId": "CAND-123",
+              "decision": "positive",
+              "rating": 4.5,
+              "notes": "Strong technical skills and good culture fit",
+              "recommendedAction": "proceed_to_offer"
+            }
+          },
+          {
+            "id": "evt_6",
+            "type": "HR_EVENT",
+            "timestamp": "2024-03-20T14:30:00Z",
+            "data": {
+              "action": "approve_candidate",
+              "decision": "approved",
+              "candidateId": "CAND-123",
+              "approver": "hr@company.com"
+            }
+          }
+        ],
+        "completedActions": []
+      },
+      "startDate": "2024-03-20T10:00:00Z"
+    },
+    {
+      "instanceId": "proc_1737237009601",
+      "templateId": "hiring_process",
+      "variables": {
+        "candidate": { "email": "steve@gmail.com", "name": "Steve McDonald" },
+        "company": { "email": "hr@pled.com", "department": "Accounting" }
+      },
+      "currentState": { "name": "idle", "enteredAt": "2025-01-18T21:50:09.601Z" },
+      "history": { "events": [], "messages": [], "completedActions": [] },
+      "startDate": "2025-01-18T21:50:09.601Z"
+    }
+  ]
+}

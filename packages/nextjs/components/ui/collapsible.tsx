@@ -1,45 +1,77 @@
-// "use client";
+"use client";
 
-// import * as React from "react";
-// import { cn } from "./utils";
-// import * as CollapsiblePrimitive from "@radix-ui/react-collapsible";
+import * as React from "react";
+import { cn } from "@/lib/utils";
 
-// const Collapsible = CollapsiblePrimitive.Root as any;
-// const CollapsibleTrigger = React.forwardRef<HTMLButtonElement, React.ComponentPropsWithoutRef<typeof CollapsiblePrimitive.Trigger>>(({ className, children, ...props }, ref) => (
-//   <CollapsiblePrimitive.Trigger
-//     ref={ref}
-//     className={cn(
-//       "flex w-full items-center justify-between rounded-lg px-4 py-2 text-left text-sm font-medium hover:bg-gray-100 focus:outline-none focus-visible:ring focus-visible:ring-purple-500 focus-visible:ring-opacity-75",
-//       className,
-//     )}
-//     {...props}
-//   >
-//     {children}
-//   </CollapsiblePrimitive.Trigger>
-// ));
-//     )}
-//     {...props}
-//   >
-//     {children}
-//   </CollapsiblePrimitive.Trigger>
-// )) as any;
-// CollapsibleTrigger.displayName = CollapsiblePrimitive.Trigger.displayName;
+interface CollapsibleProps {
+  children: React.ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}
 
-// const CollapsibleContent = React.forwardRef<
-//   React.ElementRef<any>,
-//   React.ComponentPropsWithoutRef<any>
-// >(({ className, children, ...props }, ref) => (
-//   <CollapsiblePrimitive.Content
-//     ref={ref}
-//     className={cn(
-//       "overflow-hidden text-sm data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down",
-//       className,
-//     )}
-//     {...props}
-//   >
-//     <div className="px-4 py-2">{children}</div>
-//   </CollapsiblePrimitive.Content>
-// ));
-// CollapsibleContent.displayName = CollapsiblePrimitive.Content.displayName;
+const Collapsible: React.FC<CollapsibleProps> = ({ children, open, onOpenChange }) => {
+  const [isOpen, setIsOpen] = React.useState(open ?? false);
+  
+  const handleOpenChange = (newOpen: boolean) => {
+    setIsOpen(newOpen);
+    onOpenChange?.(newOpen);
+  };
 
-// export { Collapsible, CollapsibleTrigger, CollapsibleContent };
+  return (
+    <div data-state={isOpen ? "open" : "closed"}>
+      {React.Children.map(children, child => {
+        if (React.isValidElement(child)) {
+          if (child.type === CollapsibleTrigger) {
+            return React.cloneElement(child, {
+              onClick: () => handleOpenChange(!isOpen),
+              'data-state': isOpen ? "open" : "closed",
+            });
+          }
+          if (child.type === CollapsibleContent) {
+            return React.cloneElement(child, {
+              'data-state': isOpen ? "open" : "closed",
+              style: { display: isOpen ? 'block' : 'none' },
+            });
+          }
+        }
+        return child;
+      })}
+    </div>
+  );
+};
+
+const CollapsibleTrigger = React.forwardRef<
+  HTMLButtonElement,
+  React.ButtonHTMLAttributes<HTMLButtonElement>
+>(({ className, children, ...props }, ref) => (
+  <button
+    ref={ref}
+    className={cn(
+      "flex w-full items-center justify-between rounded-lg px-4 py-2 text-left text-sm font-medium hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+      className,
+    )}
+    {...props}
+  >
+    {children}
+  </button>
+));
+CollapsibleTrigger.displayName = "CollapsibleTrigger";
+
+const CollapsibleContent = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
+>(({ className, children, ...props }, ref) => (
+  <div
+    ref={ref}
+    className={cn(
+      "overflow-hidden text-sm transition-all duration-200",
+      className,
+    )}
+    {...props}
+  >
+    <div className="pb-4 pt-0">{children}</div>
+  </div>
+));
+CollapsibleContent.displayName = "CollapsibleContent";
+
+export { Collapsible, CollapsibleTrigger, CollapsibleContent };

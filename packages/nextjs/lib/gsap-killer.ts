@@ -7,7 +7,7 @@ export const NUCLEAR_GSAP_CLEANUP = async (scope?: Element | string) => {
   try {
     // Try to import GSAP
     const gsap = (await import("gsap")).default;
-    
+
     if (!gsap || typeof window === "undefined") {
       return;
     }
@@ -50,40 +50,40 @@ export const NUCLEAR_GSAP_CLEANUP = async (scope?: Element | string) => {
       }
 
       //  Force cleanup specific problematic elements
-    const problematicSelectors = [
-      "#particle",
-      "#stage",
-      ".core",
-      ".halo",
-      "#hero-title",
-      "#hero-subtitle",
-      "#hero-cta",
-      "#notif-annot",
-      "#token-annot",
-      "#action-annot",
-      "#token",
-      "#cert",
-      "#turbine",
-      "#blades",
-      ".gear",
-      ".gear1",
-      ".gear2",
-      ".signal-dot",
-      ".arrow",
-      ".background-image",
-    ];
+      const problematicSelectors = [
+        "#particle",
+        "#stage",
+        ".core",
+        ".halo",
+        "#hero-title",
+        "#hero-subtitle",
+        "#hero-cta",
+        "#notif-annot",
+        "#token-annot",
+        "#action-annot",
+        "#token",
+        "#cert",
+        "#turbine",
+        "#blades",
+        ".gear",
+        ".gear1",
+        ".gear2",
+        ".signal-dot",
+        ".arrow",
+        ".background-image",
+      ];
 
       problematicSelectors.forEach(selector => {
-      try {
-        if (typeof gsap.killTweensOf === "function") {
-          gsap.killTweensOf(selector);
+        try {
+          if (typeof gsap.killTweensOf === "function") {
+            gsap.killTweensOf(selector);
+          }
+          if (typeof gsap.set === "function") {
+            gsap.set(selector, { clearProps: "all" });
+          }
+        } catch (e) {
+          // Ignore individual selector errors
         }
-        if (typeof gsap.set === "function") {
-          gsap.set(selector, { clearProps: "all" });
-        }
-      } catch (e) {
-        // Ignore individual selector errors
-      }
       });
     }
 
@@ -108,11 +108,11 @@ export const EMERGENCY_GSAP_STOP = () => {
   try {
     if (typeof window !== "undefined" && (window as any).gsap) {
       const gsap = (window as any).gsap;
-      
+
       if (typeof gsap.killTweensOf === "function") {
         gsap.killTweensOf("*");
       }
-      
+
       if (gsap.globalTimeline && typeof gsap.globalTimeline.clear === "function") {
         gsap.globalTimeline.clear();
       }

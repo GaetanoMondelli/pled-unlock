@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect } from "react";
+import { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense } from 'react';
-import DocusignReturn from './DocusignReturn';
+import DocusignReturn from "./DocusignReturn";
 
 export default function DocusignReturnPage() {
   return (

@@ -24,7 +24,7 @@ export function Navbar() {
               </Link>
               <Link href="/profile">
                 <Button variant="ghost" size="sm" className="text-sm text-gray-600 dark:text-gray-300">
-                  {session?.user?.name || 'User'}
+                  {session?.user?.name || "User"}
                 </Button>
               </Link>
               <SettingsMenu />

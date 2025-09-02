@@ -15,7 +15,7 @@ Instead of just component-to-component communication, we focus on **state-to-com
 interface StateMessageEmitter {
   stateId: string;
   onEnter?: MessageEmission[];
-  onExit?: MessageEmission[];  
+  onExit?: MessageEmission[];
   onAction?: Record<string, MessageEmission[]>; // Per action
 }
 
@@ -30,6 +30,7 @@ interface MessageEmission {
 ### 2. Component State Machine Integration
 
 Each component has:
+
 - **Internal state machine** (using FSL)
 - **Message emission rules** for each state
 - **Message consumption rules** for inputs
@@ -39,18 +40,18 @@ Each component has:
 interface ComposableComponent {
   id: string;
   name: string;
-  
+
   // Internal state machine
   stateMachine: {
     fsl: string;
     states: ComponentState[];
     actions: Record<string, ComponentAction[]>; // Actions per state
   };
-  
+
   // Message handling
   messageEmissions: StateMessageEmitter[];
   messageConsumption: MessageConsumer[];
-  
+
   // External interface
   inputs: ComponentPort[];
   outputs: ComponentPort[];
@@ -60,6 +61,7 @@ interface ComposableComponent {
 ### 3. Examples of State-Based Components
 
 #### Queue Component
+
 ```fsl
 idle 'message_received' -> accumulating;
 accumulating 'message_received' -> accumulating;
@@ -68,25 +70,29 @@ flushing 'batch_sent' -> idle;
 ```
 
 **State Actions & Emissions:**
-- `accumulating` state: 
+
+- `accumulating` state:
   - Action: Add message to queue
   - Emission: Progress update messages
 - `flushing` state:
   - Action: Send batch to output
   - Emission: `batch_ready` message with queue contents
 
-#### Aggregator Component  
+#### Aggregator Component
+
 ```fsl
 idle 'data_received' -> processing;
 processing 'calculation_done' -> idle;
 ```
 
 **State Actions & Emissions:**
+
 - `processing` state:
   - Action: Calculate sum/average/etc
   - Emission: `aggregation_complete` with result
 
 #### Splitter Component
+
 ```fsl
 idle 'input_received' -> evaluating;
 evaluating 'condition_met' -> routing_positive;
@@ -96,6 +102,7 @@ routing_negative 'message_sent' -> idle;
 ```
 
 **State Actions & Emissions:**
+
 - `routing_positive` state:
   - Emission: Message to positive output port
 - `routing_negative` state:
@@ -126,15 +133,13 @@ interface MessageRoute {
 
 class MessageBus {
   routes: MessageRoute[] = [];
-  
+
   // Called when a state emits a message
   handleStateEmission(componentId: string, stateId: string, message: any) {
-    const matchingRoutes = this.routes.filter(r => 
-      r.from.componentId === componentId && 
-      r.from.stateId === stateId &&
-      r.from.messageType === message.type
+    const matchingRoutes = this.routes.filter(
+      r => r.from.componentId === componentId && r.from.stateId === stateId && r.from.messageType === message.type,
     );
-    
+
     matchingRoutes.forEach(route => {
       this.deliverMessage(route.to.componentId, route.to.inputPort, message);
     });
@@ -151,16 +156,16 @@ class ComponentComposer {
   static compileComponents(components: ComposableComponent[], connections: MessageRoute[]): PledTemplate {
     // 1. Merge all component state machines
     const mergedStates = this.mergeStateMachines(components);
-    
+
     // 2. Create message rules from state emissions + connections
     const messageRules = this.createMessageRules(components, connections);
-    
+
     // 3. Create action definitions from state actions
     const actions = this.mergeStateActions(components);
-    
+
     // 4. Generate single FSL from connected components
     const fsl = this.generateComposedFSL(components, connections);
-    
+
     return {
       stateMachine: { fsl },
       messageRules,
@@ -174,6 +179,7 @@ class ComponentComposer {
 ### 6. Carbon Credit Example Implementation
 
 #### IoT Validator Component
+
 ```typescript
 {
   stateMachine: {
@@ -197,6 +203,7 @@ class ComponentComposer {
 ```
 
 #### Queue Component (receives validated measurements)
+
 ```typescript
 {
   messageConsumption: [
@@ -219,6 +226,7 @@ class ComponentComposer {
 ```
 
 #### Token Creator Component (receives batches)
+
 ```typescript
 {
   messageConsumption: [
@@ -253,7 +261,7 @@ class ComponentComposer {
 
 1. ✅ **Component Library**: Basic components (queue, aggregator, splitter)
 2. 🔄 **Message Emission System**: State-based message emission
-3. ⏳ **Message Bus**: Routing messages between components  
+3. ⏳ **Message Bus**: Routing messages between components
 4. ⏳ **Component Compiler**: Compile to single state machine
 5. ⏳ **Visual Builder**: UI for connecting components
 6. ⏳ **Testing Framework**: Validate composed workflows

@@ -1,19 +1,20 @@
 "use client";
-/* eslint-disable */
 
+/* eslint-disable */
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import BottomLedger from "@/components/BottomLedger";
-import SafeHeroFsmAnimation from "@/components/SafeHeroFsmAnimation";
 import HowItWorksFlow from "@/components/HowItWorksFlow";
+import SafeHeroFsmAnimation from "@/components/SafeHeroFsmAnimation";
 import SafePhotoStillLife from "@/components/SafePhotoStillLife";
 import { RequestDemoDialog } from "@/components/marketing/RequestDemoDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import templates from "@/lib/templates.json";
 import { motion, useReducedMotion } from "framer-motion";
 import { Shield, Workflow, Zap } from "lucide-react";
-import templates from "@/lib/templates.json";
+
 // import SafeTurbineScene from "@/components/SafeTurbineScene";
 
 export default function Home() {
@@ -101,7 +102,7 @@ function Landing() {
       </section>
 
       {/* SECTION 1.25: Renewable flow (turbine -> graph -> certificate) */}
-  {/* SECTION 1.5 removed; moved PhotoStillLife into How It Works */}
+      {/* SECTION 1.5 removed; moved PhotoStillLife into How It Works */}
 
       {/* SECTION 2: How It Works */}
       <section className="border-t">
@@ -136,26 +137,33 @@ function Landing() {
             </div>
             <div className="mt-10 space-y-3 text-sm leading-relaxed text-muted-foreground">
               <p>
-                Most tokenization solutions work like a photograph — capturing an asset and its context in a single, rigid snapshot. But real-world context — regulations, compliance rules, contracts — is never fixed. It evolves. And when the background changes, the snapshot no longer reflects reality.
+                Most tokenization solutions work like a photograph — capturing an asset and its context in a single,
+                rigid snapshot. But real-world context — regulations, compliance rules, contracts — is never fixed. It
+                evolves. And when the background changes, the snapshot no longer reflects reality.
               </p>
               <p>
-                Pled solves this with a new architecture.
-                We separate facts (events, transactions, sensor data, signed documents) from the rules and models that interpret them. Facts are anchored in a tamper-proof, timestamped ledger, while interpretation layers remain flexible and upgradeable.
+                Pled solves this with a new architecture. We separate facts (events, transactions, sensor data, signed
+                documents) from the rules and models that interpret them. Facts are anchored in a tamper-proof,
+                timestamped ledger, while interpretation layers remain flexible and upgradeable.
               </p>
               <p>This separation brings three breakthroughs:</p>
               <ul className="list-disc list-inside space-y-1">
                 <li>
-                  <span className="font-medium text-foreground">Flexibility</span> — interpretation rules and models can evolve without rewriting history.
+                  <span className="font-medium text-foreground">Flexibility</span> — interpretation rules and models can
+                  evolve without rewriting history.
                 </li>
                 <li>
-                  <span className="font-medium text-foreground">Seamless onboarding</span> — any data source can be plugged in immediately, the context layer adapts later.
+                  <span className="font-medium text-foreground">Seamless onboarding</span> — any data source can be
+                  plugged in immediately, the context layer adapts later.
                 </li>
                 <li>
-                  <span className="font-medium text-foreground">Smart tokens</span> — no longer passive records, tokens become aware of their state and can trigger or suggest actions to reach desired outcomes.
+                  <span className="font-medium text-foreground">Smart tokens</span> — no longer passive records, tokens
+                  become aware of their state and can trigger or suggest actions to reach desired outcomes.
                 </li>
               </ul>
               <p>
-                This is how Pled transforms tokenization from static and fragile… into smart, interoperable, and scalable digital assets.
+                This is how Pled transforms tokenization from static and fragile… into smart, interoperable, and
+                scalable digital assets.
               </p>
             </div>
           </div>
@@ -193,7 +201,7 @@ function Landing() {
         </div>
       </section>
 
-    {/* SECTION 3: Use Cases */}
+      {/* SECTION 3: Use Cases */}
       <section className="border-t bg-muted/30">
         <div className="container mx-auto px-6 py-20">
           <motion.h2
@@ -212,7 +220,10 @@ function Landing() {
             viewport={{ once: true, amount: 0.2 }}
             transition={{ duration: 0.6, ease: "easeOut" }}
           >
-            <div className="overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none]" style={{ WebkitOverflowScrolling: "touch" }}>
+            <div
+              className="overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none]"
+              style={{ WebkitOverflowScrolling: "touch" }}
+            >
               <div className="flex gap-4 snap-x snap-mandatory">
                 {(templates as any[]).slice(0, 10).map(t => (
                   <Card key={t.id} className="min-w-[260px] sm:min-w-[300px] snap-start overflow-hidden">
@@ -223,10 +234,14 @@ function Landing() {
                     ) : null}
                     <CardHeader className="p-4">
                       <CardTitle className="text-sm sm:text-base">{t.title}</CardTitle>
-                      <CardDescription className="mt-1 text-xs sm:text-sm line-clamp-2">{t.description}</CardDescription>
+                      <CardDescription className="mt-1 text-xs sm:text-sm line-clamp-2">
+                        {t.description}
+                      </CardDescription>
                       <div className="mt-3">
                         <Link href={`/templates/${encodeURIComponent(t.id)}`}>
-                          <Button size="sm" variant="outline">Details</Button>
+                          <Button size="sm" variant="outline">
+                            Details
+                          </Button>
                         </Link>
                       </div>
                     </CardHeader>

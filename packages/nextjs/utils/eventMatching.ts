@@ -1,23 +1,23 @@
-const LAZY_RULE_MATCHING = process.env.NEXT_PUBLIC_LAZY_RULE_MATCHING === 'true';
+const LAZY_RULE_MATCHING = process.env.NEXT_PUBLIC_LAZY_RULE_MATCHING === "true";
 
 async function isQuestion(text: string): Promise<boolean> {
   try {
-    const response = await fetch('/api/check-question', {
-      method: 'POST',
+    const response = await fetch("/api/check-question", {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({ text }),
     });
-    
+
     if (!response.ok) {
-      throw new Error('Failed to check question');
+      throw new Error("Failed to check question");
     }
 
     const result = await response.json();
     return result.isQuestion;
   } catch (error) {
-    console.error('Error checking if text is question:', error);
+    console.error("Error checking if text is question:", error);
     return false;
   }
 }
@@ -43,11 +43,9 @@ interface Variables {
   [key: string]: any;
 }
 
-
 export const getValueByPath = (obj: any, path: string): any => {
-  return path.split('.').reduce((acc, part) => acc?.[part], obj);
+  return path.split(".").reduce((acc, part) => acc?.[part], obj);
 };
-
 
 export function matchEventToRule(event: any, rule: any, variables: any = {}) {
   if (!event || !rule) return false;
@@ -64,26 +62,25 @@ export function matchEventToRule(event: any, rule: any, variables: any = {}) {
 
   // Check all conditions
   return Object.entries(rule.conditions).every(([path, pattern]) => {
-    const value = path.split('.').reduce((obj: any, key: string) => obj?.[key], event.data);
-    
-    if (typeof pattern !== 'string') return false;
+    const value = path.split(".").reduce((obj: any, key: string) => obj?.[key], event.data);
+
+    if (typeof pattern !== "string") return false;
 
     // Handle special operators
-    if (pattern.startsWith('(contains)')) {
-      const searchTerm = pattern.replace('(contains)', '').trim().toLowerCase();
-      const valueStr = String(value || '').toLowerCase();
+    if (pattern.startsWith("(contains)")) {
+      const searchTerm = pattern.replace("(contains)", "").trim().toLowerCase();
+      const valueStr = String(value || "").toLowerCase();
       return valueStr.includes(searchTerm);
     }
-    
-    if (pattern.startsWith('(llm-prompt)')) {
+
+    if (pattern.startsWith("(llm-prompt)")) {
       return true;
     }
 
     // Handle template variables
-    if (pattern.includes('{{')) {
+    if (pattern.includes("{{")) {
       const interpolatedPattern = pattern.replace(/\{\{([^}]+)\}\}/g, (_, path) => {
-        return path.split('.')
-          .reduce((obj: any, key: string) => obj?.[key], variables) ?? '';
+        return path.split(".").reduce((obj: any, key: string) => obj?.[key], variables) ?? "";
       });
       return value === interpolatedPattern;
     }
@@ -104,40 +101,37 @@ export async function eventMatches(event: any, rule: any): Promise<boolean> {
     return true;
   }
 
-  const results = await Promise.all(Object.entries(rule.conditions)
-    .map(async ([path, pattern]) => {
-      const value = path.split('.')
-        .reduce((obj: any, key: string) => obj?.[key], event.data);
-      
+  const results = await Promise.all(
+    Object.entries(rule.conditions).map(async ([path, pattern]) => {
+      const value = path.split(".").reduce((obj: any, key: string) => obj?.[key], event.data);
+
       if (value === undefined) return false;
-      if (typeof pattern !== 'string') return true;
+      if (typeof pattern !== "string") return true;
 
       // Handle special operators
-      if (pattern.startsWith('(contains)')) {
-        const searchTerm = pattern.replace('(contains)', '').trim().toLowerCase();
-        const valueStr = String(value || '').toLowerCase();
+      if (pattern.startsWith("(contains)")) {
+        const searchTerm = pattern.replace("(contains)", "").trim().toLowerCase();
+        const valueStr = String(value || "").toLowerCase();
         return valueStr.includes(searchTerm);
       }
 
-      if (pattern.startsWith('(llm-prompt)')) {
-        if (process.env.NEXT_PUBLIC_ENABLE_LLM_RULES !== 'true') {
+      if (pattern.startsWith("(llm-prompt)")) {
+        if (process.env.NEXT_PUBLIC_ENABLE_LLM_RULES !== "true") {
           return true;
         }
         return await isQuestion(String(value));
       }
 
-      if (pattern.includes('{{')) {
+      if (pattern.includes("{{")) {
         return true; // Template variables handled elsewhere
       }
 
       return value === pattern;
-    }));
+    }),
+  );
 
   return results.every(Boolean);
 }
-
-
-
 
 export async function matchEventToRuleAsync(event: any, rule: any, variables: any = {}): Promise<boolean> {
   if (!event || !rule) return false;
@@ -152,34 +146,35 @@ export async function matchEventToRuleAsync(event: any, rule: any, variables: an
     return true;
   }
 
-  const results = await Promise.all(Object.entries(rule.conditions).map(async ([path, pattern]) => {
-    const value = path.split('.').reduce((obj: any, key: string) => obj?.[key], event.data);
-    
-    if (typeof pattern !== 'string') return false;
+  const results = await Promise.all(
+    Object.entries(rule.conditions).map(async ([path, pattern]) => {
+      const value = path.split(".").reduce((obj: any, key: string) => obj?.[key], event.data);
 
-    if (pattern.startsWith('(contains)')) {
-      const searchTerm = pattern.replace('(contains)', '').trim().toLowerCase();
-      const valueStr = String(value || '').toLowerCase();
-      return valueStr.includes(searchTerm);
-    }
-    
-    if (pattern.startsWith('(llm-prompt)')) {
-      if (process.env.NEXT_PUBLIC_ENABLE_LLM_RULES !== 'true') {
-        return true;
+      if (typeof pattern !== "string") return false;
+
+      if (pattern.startsWith("(contains)")) {
+        const searchTerm = pattern.replace("(contains)", "").trim().toLowerCase();
+        const valueStr = String(value || "").toLowerCase();
+        return valueStr.includes(searchTerm);
       }
-      return await isQuestion(String(value));
-    }
 
-    if (pattern.includes('{{')) {
-      const interpolatedPattern = pattern.replace(/\{\{([^}]+)\}\}/g, (_, path) => {
-        return path.split('.')
-          .reduce((obj: any, key: string) => obj?.[key], variables) ?? '';
-      });
-      return value === interpolatedPattern;
-    }
+      if (pattern.startsWith("(llm-prompt)")) {
+        if (process.env.NEXT_PUBLIC_ENABLE_LLM_RULES !== "true") {
+          return true;
+        }
+        return await isQuestion(String(value));
+      }
 
-    return value === pattern;
-  }));
+      if (pattern.includes("{{")) {
+        const interpolatedPattern = pattern.replace(/\{\{([^}]+)\}\}/g, (_, path) => {
+          return path.split(".").reduce((obj: any, key: string) => obj?.[key], variables) ?? "";
+        });
+        return value === interpolatedPattern;
+      }
+
+      return value === pattern;
+    }),
+  );
 
   return results.every(Boolean);
 }
@@ -192,7 +187,7 @@ function getRulePriority(rule: any): number {
 // export function getMatchingRules(event: any, rules: any[], variables: any = {}): any[] {
 //   // Sort rules by priority (highest first)
 //   const sortedRules = [...rules].sort((a, b) => getRulePriority(b) - getRulePriority(a));
-  
+
 //   if (LAZY_RULE_MATCHING && false) {
 //     // Lazy evaluation - return first matching rule
 //     for (const rule of sortedRules) {
@@ -205,5 +200,4 @@ function getRulePriority(rule: any): number {
 //     // Evaluate all rules
 //     return rules.filter(rule => matchEventToRule(event, rule, variables));
 //   }
-// } 
-
+// }

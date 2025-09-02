@@ -44,7 +44,7 @@ export function ConfirmationDialog({
     if (confirmationText && inputValue !== confirmationText) {
       return;
     }
-    
+
     setIsLoading(true);
     try {
       await onConfirm();
@@ -72,9 +72,7 @@ export function ConfirmationDialog({
             <AlertTriangle className="h-5 w-5 text-destructive" />
             {title}
           </DialogTitle>
-          <DialogDescription className="text-left pt-2">
-            {description}
-          </DialogDescription>
+          <DialogDescription className="text-left pt-2">{description}</DialogDescription>
         </DialogHeader>
 
         {confirmationText && (
@@ -85,7 +83,7 @@ export function ConfirmationDialog({
             <Input
               id="confirmation-input"
               value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
+              onChange={e => setInputValue(e.target.value)}
               className="mt-2"
               placeholder={confirmationText}
               disabled={isLoading}
@@ -94,18 +92,10 @@ export function ConfirmationDialog({
         )}
 
         <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={handleCancel}
-            disabled={isLoading}
-          >
+          <Button variant="outline" onClick={handleCancel} disabled={isLoading}>
             {cancelButtonText}
           </Button>
-          <Button
-            variant={variant}
-            onClick={handleConfirm}
-            disabled={!canConfirm || isLoading}
-          >
+          <Button variant={variant} onClick={handleConfirm} disabled={!canConfirm || isLoading}>
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {confirmButtonText}
           </Button>

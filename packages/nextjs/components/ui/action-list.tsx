@@ -287,7 +287,9 @@ export const ActionList = ({ procedureId }: ActionListProps) => {
 
     // Filter out transitions and get unique states
     const states = new Set(
-      stateMatches.filter((word: string) => !["to", "wait_for", "check", "send", "complete", "->", "retry"].includes(word)),
+      stateMatches.filter(
+        (word: string) => !["to", "wait_for", "check", "send", "complete", "->", "retry"].includes(word),
+      ),
     );
 
     // Convert to array and sort for consistent ordering

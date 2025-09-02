@@ -1,5 +1,5 @@
-import { createStateMachine } from "@/lib/fsm";
 import { generateMessages } from "./messageGeneration";
+import { createStateMachine } from "@/lib/fsm";
 
 interface StateTransition {
   id: string;
@@ -14,43 +14,43 @@ export function handleEventAndGenerateMessages(
   rules: any[],
   variables: any,
   currentState: string,
-  fsmDefinition: string
+  fsmDefinition: string,
 ) {
-  console.log('handleEventAndGenerateMessages input:', {
+  console.log("handleEventAndGenerateMessages input:", {
     event,
     rules,
     variables,
     currentState,
-    fsmDefinition
+    fsmDefinition,
   });
 
   // 1. Generate messages from the event
   const { messages, outputs } = generateMessages([event], rules, variables);
-  console.log('Generated messages:', { messages, outputs });
+  console.log("Generated messages:", { messages, outputs });
 
   // 2. Check if any messages trigger state transitions
   const stateMachine = createStateMachine(fsmDefinition);
   const transitions: StateTransition[] = [];
-  
+
   messages.forEach(message => {
     try {
-      console.log('Processing message for transition:', {
+      console.log("Processing message for transition:", {
         message,
         currentState,
-        // availableActions: 
+        // availableActions:
       });
 
       stateMachine.go(currentState);
       const prevState = currentState;
       const actionResult = stateMachine.action(message.type);
-      
-      console.log('Action result:', {
+
+      console.log("Action result:", {
         messageType: message.type,
         actionResult,
         prevState,
-        newState: stateMachine.state()
+        newState: stateMachine.state(),
       });
-      
+
       if (actionResult) {
         const newState = stateMachine.state();
         transitions.push({
@@ -58,12 +58,12 @@ export function handleEventAndGenerateMessages(
           timestamp: message.timestamp,
           message: message.type,
           fromState: prevState,
-          toState: newState
+          toState: newState,
         });
         currentState = newState;
       }
     } catch (error) {
-      console.error('Error processing state transition:', error);
+      console.error("Error processing state transition:", error);
     }
   });
 
@@ -71,9 +71,9 @@ export function handleEventAndGenerateMessages(
     messages,
     outputs,
     transitions,
-    finalState: currentState
+    finalState: currentState,
   };
 
-  console.log('handleEventAndGenerateMessages result:', result);
+  console.log("handleEventAndGenerateMessages result:", result);
   return result;
-} 
+}

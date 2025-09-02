@@ -1,18 +1,26 @@
-'use client';
+"use client";
 
-import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { Button } from '@/components/ui/button';
-import { useSimulationStore } from '@/stores/simulationStore';
-import GraphVisualization from '@/components/graph/GraphVisualization';
-import NodeInspectorModal from '@/components/modals/NodeInspectorModal';
-import TokenInspectorModal from '@/components/modals/TokenInspectorModal';
-import GlobalLedgerModal from '@/components/modals/GlobalLedgerModal';
-import { Play, Pause, StepForward, AlertCircle, RefreshCw, Edit, BookOpen } from 'lucide-react';
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import GraphVisualization from "@/components/graph/GraphVisualization";
+import GlobalLedgerModal from "@/components/modals/GlobalLedgerModal";
+import NodeInspectorModal from "@/components/modals/NodeInspectorModal";
+import TokenInspectorModal from "@/components/modals/TokenInspectorModal";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
+import { useSimulationStore } from "@/stores/simulationStore";
+import { AlertCircle, BookOpen, Edit, Pause, Play, RefreshCw, StepForward } from "lucide-react";
 
 export default function TemplateEditorPage() {
   const loadScenario = useSimulationStore(state => state.loadScenario);
@@ -31,13 +39,13 @@ export default function TemplateEditorPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [isScenarioEditorOpen, setIsScenarioEditorOpen] = useState(false);
-  const [scenarioEditText, setScenarioEditText] = useState<string>('');
-  const [defaultScenarioContent, setDefaultScenarioContent] = useState<string>('');
+  const [scenarioEditText, setScenarioEditText] = useState<string>("");
+  const [defaultScenarioContent, setDefaultScenarioContent] = useState<string>("");
   const lastErrorCountRef = useRef(0);
 
   const fetchDefaultScenarioContent = useCallback(async () => {
     try {
-      const response = await fetch('/scenario.json');
+      const response = await fetch("/scenario.json");
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
@@ -45,8 +53,12 @@ export default function TemplateEditorPage() {
       return data;
     } catch (err) {
       console.error("Error fetching default scenario content:", err);
-      toast({ variant: "destructive", title: "Fetch Error", description: `Could not fetch default scenario.json: ${err instanceof Error ? err.message : String(err)}` });
-      setDefaultScenarioContent('');
+      toast({
+        variant: "destructive",
+        title: "Fetch Error",
+        description: `Could not fetch default scenario.json: ${err instanceof Error ? err.message : String(err)}`,
+      });
+      setDefaultScenarioContent("");
       return null;
     }
   }, [toast]);
@@ -114,7 +126,11 @@ export default function TemplateEditorPage() {
       setScenarioEditText(JSON.stringify(defaultData, null, 2));
       toast({ title: "Editor Reset", description: "Scenario editor reset to default content." });
     } else {
-      toast({ variant: "destructive", title: "Reset Error", description: "Could not re-fetch default scenario for reset." });
+      toast({
+        variant: "destructive",
+        title: "Reset Error",
+        description: "Could not re-fetch default scenario for reset.",
+      });
     }
   };
 
@@ -156,15 +172,15 @@ export default function TemplateEditorPage() {
             <Button variant="outline" size="sm" onClick={handleReloadDefaultScenario}>
               <RefreshCw className="mr-2 h-4 w-4" /> Reload Default
             </Button>
-            <Button 
-              variant={isRunning ? "destructive" : "default"} 
-              size="sm" 
-              onClick={handlePlayPause}
-            >
+            <Button variant={isRunning ? "destructive" : "default"} size="sm" onClick={handlePlayPause}>
               {isRunning ? (
-                <><Pause className="mr-2 h-4 w-4" /> Pause</>
+                <>
+                  <Pause className="mr-2 h-4 w-4" /> Pause
+                </>
               ) : (
-                <><Play className="mr-2 h-4 w-4" /> Play</>
+                <>
+                  <Play className="mr-2 h-4 w-4" /> Play
+                </>
               )}
             </Button>
             <Button variant="outline" size="sm" onClick={handleStepForward} disabled={isRunning}>
@@ -197,7 +213,7 @@ export default function TemplateEditorPage() {
           </div>
         )}
 
-        <div className="flex-grow">
+        <div className="flex-grow h-full w-full">
           <GraphVisualization />
         </div>
       </main>
@@ -218,7 +234,7 @@ export default function TemplateEditorPage() {
             <Textarea
               id="scenario-editor"
               value={scenarioEditText}
-              onChange={(e) => setScenarioEditText(e.target.value)}
+              onChange={e => setScenarioEditText(e.target.value)}
               className="mt-2 font-mono text-sm h-96 resize-none"
               placeholder="Enter scenario JSON here..."
             />

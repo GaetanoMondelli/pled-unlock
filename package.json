@@ -60,7 +60,11 @@
     "node": ">=18.18.0"
   },
   "resolutions": {
-    "zustand": "~5.0.0"
+    "zustand": "~5.0.0",
+    "@noble/hashes": "^1.6.0",
+    "@noble/curves": "^1.9.0",
+    "@scure/bip32": "^1.6.0",
+    "@scure/bip39": "^1.6.0"
   },
   "dependencies": {
     "@radix-ui/react-collapsible": "^1.1.2",

@@ -1,18 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import ActionList from "@/components/ui/action-list";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, Calendar, User, Building, Settings, Activity, MessageSquare, Zap, Play } from "lucide-react";
-import ProcedureState from "@/components/ui/procedure-state";
 import EventList from "@/components/ui/event-list";
 import MessageRules from "@/components/ui/message-rules";
-import ActionList from "@/components/ui/action-list";
+import ProcedureState from "@/components/ui/procedure-state";
+import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Activity, ArrowLeft, Building, Calendar, MessageSquare, Play, Settings, User, Zap } from "lucide-react";
 import { VariablesSection } from "~~/components/variables/VariablesSection";
 import { fetchFromDb } from "~~/utils/api";
 
@@ -68,7 +68,7 @@ export default function ProcedurePage({ params }: { params: { id: string } }) {
   const [data, setData] = useState<{ template: Template; instance: Instance } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState(searchParams?.get('tab') || 'state');
+  const [activeTab, setActiveTab] = useState(searchParams?.get("tab") || "state");
 
   useEffect(() => {
     async function loadData() {
@@ -94,7 +94,7 @@ export default function ProcedurePage({ params }: { params: { id: string } }) {
 
   // Update tab from URL params
   useEffect(() => {
-    const tab = searchParams?.get('tab');
+    const tab = searchParams?.get("tab");
     if (tab) {
       setActiveTab(tab);
     }
@@ -171,8 +171,8 @@ export default function ProcedurePage({ params }: { params: { id: string } }) {
           <div className="flex-1">
             <div className="flex items-center gap-3 mb-2">
               <h1 className="text-3xl font-bold">{instance.name || template.name}</h1>
-              <Badge variant={instance.status === 'active' ? 'default' : 'secondary'}>
-                {instance.status || 'unknown'}
+              <Badge variant={instance.status === "active" ? "default" : "secondary"}>
+                {instance.status || "unknown"}
               </Badge>
             </div>
             <p className="text-gray-600 text-lg mb-3">{template.description}</p>
@@ -188,7 +188,7 @@ export default function ProcedurePage({ params }: { params: { id: string } }) {
               </div>
               <div className="flex items-center gap-1">
                 <Calendar className="h-4 w-4" />
-                <span>Created: {new Date(instance.createdAt || '').toLocaleDateString()}</span>
+                <span>Created: {new Date(instance.createdAt || "").toLocaleDateString()}</span>
               </div>
             </div>
           </div>

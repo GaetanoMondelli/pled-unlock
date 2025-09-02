@@ -1,8 +1,8 @@
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { NextRequest } from "next/server";
-import { headers } from "next/headers";
 
-export const dynamic = 'force-dynamic'; // This marks the route as dynamic
+export const dynamic = "force-dynamic"; // This marks the route as dynamic
 
 export async function GET(req: NextRequest) {
   try {

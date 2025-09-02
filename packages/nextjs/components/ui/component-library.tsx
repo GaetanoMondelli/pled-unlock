@@ -1,41 +1,41 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useCallback, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
-import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { 
-  COMPONENT_LIBRARY, 
-  StateMachineComponent, 
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  COMPONENT_LIBRARY,
   ComponentCategory,
+  ComponentComposer,
+  ComponentConnection,
+  StateMachineComponent,
   getComponentsByCategory,
   searchComponents,
-  ComponentComposer,
-  ComponentConnection
 } from "@/lib/StateMachineComponents";
-import { 
-  Search, 
-  Settings, 
-  Play, 
-  Download, 
-  Eye, 
-  Cpu, 
-  Zap, 
-  GitBranch,
+import {
   ArrowRight,
-  Plus,
-  Trash2,
   Copy,
-  Settings2
+  Cpu,
+  Download,
+  Eye,
+  GitBranch,
+  Play,
+  Plus,
+  Search,
+  Settings,
+  Settings2,
+  Trash2,
+  Zap,
 } from "lucide-react";
 
 interface SelectedComponent {
@@ -69,17 +69,16 @@ export function ComponentLibrary() {
   ];
 
   const filteredComponents = useMemo(() => {
-    let components = selectedCategory === "all" 
-      ? Object.values(COMPONENT_LIBRARY) 
-      : getComponentsByCategory(selectedCategory);
-    
+    let components =
+      selectedCategory === "all" ? Object.values(COMPONENT_LIBRARY) : getComponentsByCategory(selectedCategory);
+
     if (searchQuery) {
       components = searchComponents(searchQuery);
       if (selectedCategory !== "all") {
         components = components.filter(c => c.category === selectedCategory);
       }
     }
-    
+
     return components;
   }, [searchQuery, selectedCategory]);
 
@@ -89,25 +88,20 @@ export function ComponentLibrary() {
       component,
       instanceId,
       configuration: Object.fromEntries(
-        Object.entries(component.config.parameters).map(([key, param]) => [
-          key, 
-          param.defaultValue
-        ])
+        Object.entries(component.config.parameters).map(([key, param]) => [key, param.defaultValue]),
       ),
-      position: { 
-        x: Math.random() * 400 + 50, 
-        y: Math.random() * 300 + 50 
-      }
+      position: {
+        x: Math.random() * 400 + 50,
+        y: Math.random() * 300 + 50,
+      },
     };
-    
+
     setWorkflowComponents(prev => [...prev, newComponent]);
   }, []);
 
   const removeComponentFromWorkflow = useCallback((instanceId: string) => {
     setWorkflowComponents(prev => prev.filter(c => c.instanceId !== instanceId));
-    setConnections(prev => prev.filter(
-      c => c.from.componentId !== instanceId && c.to.componentId !== instanceId
-    ));
+    setConnections(prev => prev.filter(c => c.from.componentId !== instanceId && c.to.componentId !== instanceId));
   }, []);
 
   const configureComponent = useCallback((component: SelectedComponent) => {
@@ -115,21 +109,22 @@ export function ComponentLibrary() {
     setConfigDialogOpen(true);
   }, []);
 
-  const saveComponentConfiguration = useCallback((configuration: Record<string, any>) => {
-    if (configuringComponent) {
-      setWorkflowComponents(prev => prev.map(c => 
-        c.instanceId === configuringComponent.instanceId
-          ? { ...c, configuration }
-          : c
-      ));
-    }
-    setConfigDialogOpen(false);
-    setConfiguringComponent(null);
-  }, [configuringComponent]);
+  const saveComponentConfiguration = useCallback(
+    (configuration: Record<string, any>) => {
+      if (configuringComponent) {
+        setWorkflowComponents(prev =>
+          prev.map(c => (c.instanceId === configuringComponent.instanceId ? { ...c, configuration } : c)),
+        );
+      }
+      setConfigDialogOpen(false);
+      setConfiguringComponent(null);
+    },
+    [configuringComponent],
+  );
 
   const compileWorkflow = useCallback(() => {
     if (workflowComponents.length === 0) return null;
-    
+
     const components = workflowComponents.map(wc => wc.component);
     return ComponentComposer.compileComponents(components, connections);
   }, [workflowComponents, connections]);
@@ -144,10 +139,13 @@ export function ComponentLibrary() {
             <Input
               placeholder="Search components..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={e => setSearchQuery(e.target.value)}
               className="w-full"
             />
-            <Select value={selectedCategory} onValueChange={(value) => setSelectedCategory(value as ComponentCategory | "all")}>
+            <Select
+              value={selectedCategory}
+              onValueChange={value => setSelectedCategory(value as ComponentCategory | "all")}
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -231,7 +229,7 @@ export function ComponentLibrary() {
             <TabsTrigger value="details">Details</TabsTrigger>
             <TabsTrigger value="workflow">Workflow</TabsTrigger>
           </TabsList>
-          
+
           <TabsContent value="details" className="flex-1">
             {selectedComponent ? (
               <ComponentDetails component={selectedComponent} />
@@ -244,10 +242,7 @@ export function ComponentLibrary() {
           </TabsContent>
 
           <TabsContent value="workflow" className="flex-1">
-            <WorkflowSummary 
-              components={workflowComponents} 
-              onCompile={compileWorkflow}
-            />
+            <WorkflowSummary components={workflowComponents} onCompile={compileWorkflow} />
           </TabsContent>
         </Tabs>
       </div>
@@ -280,15 +275,13 @@ function ComponentCard({ component, onAdd, onPreview }: ComponentCardProps) {
             <CardTitle className="text-sm truncate">{component.name}</CardTitle>
             <div className="flex items-center gap-2 mt-1">
               <Badge variant="outline" className="text-xs">
-                {component.category.replace('-', ' ')}
+                {component.category.replace("-", " ")}
               </Badge>
               <span className="text-xs text-muted-foreground">v{component.version}</span>
             </div>
           </div>
         </div>
-        <CardDescription className="text-xs line-clamp-2 mt-2">
-          {component.description}
-        </CardDescription>
+        <CardDescription className="text-xs line-clamp-2 mt-2">{component.description}</CardDescription>
       </CardHeader>
       <CardContent className="pt-0">
         <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
@@ -328,23 +321,13 @@ function WorkflowCanvas({ components, connections, onComponentConfigure, onCompo
           onRemove={() => onComponentRemove(component.instanceId)}
         />
       ))}
-      
+
       {/* Connection lines would be rendered here using SVG */}
       <svg className="absolute inset-0 pointer-events-none">
         {connections.map((connection, index) => {
           // This would calculate the actual positions and draw lines
           // For now, just a placeholder
-          return (
-            <line
-              key={index}
-              x1={100}
-              y1={100}
-              x2={300}
-              y2={200}
-              stroke="rgb(99 102 241)"
-              strokeWidth={2}
-            />
-          );
+          return <line key={index} x1={100} y1={100} x2={300} y2={200} stroke="rgb(99 102 241)" strokeWidth={2} />;
         })}
       </svg>
     </div>
@@ -365,7 +348,7 @@ function WorkflowComponentNode({ component, onConfigure, onRemove }: WorkflowCom
         left: component.position.x,
         top: component.position.y,
         width: 200,
-        minHeight: 120
+        minHeight: 120,
       }}
     >
       <div className="p-3">
@@ -373,7 +356,7 @@ function WorkflowComponentNode({ component, onConfigure, onRemove }: WorkflowCom
           <div className="flex-1 min-w-0">
             <h4 className="text-sm font-medium truncate">{component.component.name}</h4>
             <Badge variant="outline" className="text-xs mt-1">
-              {component.component.category.replace('-', ' ')}
+              {component.component.category.replace("-", " ")}
             </Badge>
           </div>
           <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -385,7 +368,7 @@ function WorkflowComponentNode({ component, onConfigure, onRemove }: WorkflowCom
             </Button>
           </div>
         </div>
-        
+
         <div className="space-y-2">
           <div className="text-xs">
             <div className="flex items-center justify-between text-muted-foreground">
@@ -406,7 +389,7 @@ function ComponentDetails({ component }: { component: StateMachineComponent }) {
         <div>
           <h3 className="font-semibold mb-2">{component.name}</h3>
           <p className="text-sm text-muted-foreground mb-3">{component.description}</p>
-          
+
           <div className="flex flex-wrap gap-1 mb-3">
             {component.tags.map(tag => (
               <Badge key={tag} variant="secondary" className="text-xs">
@@ -430,11 +413,11 @@ function ComponentDetails({ component }: { component: StateMachineComponent }) {
               <div key={input.id} className="p-2 bg-muted/50 rounded text-sm">
                 <div className="flex items-center justify-between">
                   <span className="font-medium">{input.name}</span>
-                  <Badge variant="outline" className="text-xs">{input.type}</Badge>
+                  <Badge variant="outline" className="text-xs">
+                    {input.type}
+                  </Badge>
                 </div>
-                {input.description && (
-                  <p className="text-xs text-muted-foreground mt-1">{input.description}</p>
-                )}
+                {input.description && <p className="text-xs text-muted-foreground mt-1">{input.description}</p>}
               </div>
             ))}
           </div>
@@ -447,11 +430,11 @@ function ComponentDetails({ component }: { component: StateMachineComponent }) {
               <div key={output.id} className="p-2 bg-muted/50 rounded text-sm">
                 <div className="flex items-center justify-between">
                   <span className="font-medium">{output.name}</span>
-                  <Badge variant="outline" className="text-xs">{output.type}</Badge>
+                  <Badge variant="outline" className="text-xs">
+                    {output.type}
+                  </Badge>
                 </div>
-                {output.description && (
-                  <p className="text-xs text-muted-foreground mt-1">{output.description}</p>
-                )}
+                {output.description && <p className="text-xs text-muted-foreground mt-1">{output.description}</p>}
               </div>
             ))}
           </div>
@@ -464,7 +447,9 @@ function ComponentDetails({ component }: { component: StateMachineComponent }) {
               <div key={key} className="p-2 bg-muted/50 rounded text-sm">
                 <div className="flex items-center justify-between">
                   <span className="font-medium">{key}</span>
-                  <Badge variant="outline" className="text-xs">{param.type}</Badge>
+                  <Badge variant="outline" className="text-xs">
+                    {param.type}
+                  </Badge>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">{param.description}</p>
                 {param.defaultValue !== undefined && (
@@ -479,17 +464,14 @@ function ComponentDetails({ component }: { component: StateMachineComponent }) {
   );
 }
 
-function WorkflowSummary({ components, onCompile }: { 
-  components: SelectedComponent[]; 
-  onCompile: () => any 
-}) {
+function WorkflowSummary({ components, onCompile }: { components: SelectedComponent[]; onCompile: () => any }) {
   return (
     <ScrollArea className="flex-1">
       <div className="p-4 space-y-4">
         <div>
           <h3 className="font-semibold mb-2">Current Workflow</h3>
           <p className="text-sm text-muted-foreground mb-3">
-            {components.length} component{components.length !== 1 ? 's' : ''} in workflow
+            {components.length} component{components.length !== 1 ? "s" : ""} in workflow
           </p>
         </div>
 
@@ -505,7 +487,7 @@ function WorkflowSummary({ components, onCompile }: {
                     <div className="flex-1">
                       <div className="font-medium">{component.component.name}</div>
                       <div className="text-xs text-muted-foreground">
-                        {component.component.category.replace('-', ' ')}
+                        {component.component.category.replace("-", " ")}
                       </div>
                     </div>
                   </div>
@@ -545,9 +527,7 @@ function ComponentConfigDialog({ component, open, onOpenChange, onSave }: Compon
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Configure {component.component.name}</DialogTitle>
-          <DialogDescription>
-            Adjust the parameters for this component instance
-          </DialogDescription>
+          <DialogDescription>Adjust the parameters for this component instance</DialogDescription>
         </DialogHeader>
 
         <ScrollArea className="max-h-96">
@@ -555,46 +535,44 @@ function ComponentConfigDialog({ component, open, onOpenChange, onSave }: Compon
             {Object.entries(component.component.config.parameters).map(([key, param]) => (
               <div key={key} className="space-y-2">
                 <Label htmlFor={key}>{key}</Label>
-                <div className="text-xs text-muted-foreground mb-2">
-                  {param.description}
-                </div>
-                
-                {param.type === 'string' && (
+                <div className="text-xs text-muted-foreground mb-2">{param.description}</div>
+
+                {param.type === "string" && (
                   <Input
                     id={key}
-                    value={configuration[key] || ''}
-                    onChange={(e) => setConfiguration(prev => ({ ...prev, [key]: e.target.value }))}
+                    value={configuration[key] || ""}
+                    onChange={e => setConfiguration(prev => ({ ...prev, [key]: e.target.value }))}
                     placeholder={param.defaultValue}
                   />
                 )}
-                
-                {param.type === 'number' && (
+
+                {param.type === "number" && (
                   <Input
                     id={key}
                     type="number"
-                    value={configuration[key] || ''}
-                    onChange={(e) => setConfiguration(prev => ({ ...prev, [key]: Number(e.target.value) }))}
+                    value={configuration[key] || ""}
+                    onChange={e => setConfiguration(prev => ({ ...prev, [key]: Number(e.target.value) }))}
                     placeholder={String(param.defaultValue)}
                   />
                 )}
-                
-                {param.type === 'boolean' && (
+
+                {param.type === "boolean" && (
                   <div className="flex items-center space-x-2">
                     <Switch
                       id={key}
                       checked={configuration[key] || false}
-                      onCheckedChange={(checked) => setConfiguration(prev => ({ ...prev, [key]: checked }))}
+                      onCheckedChange={checked => setConfiguration(prev => ({ ...prev, [key]: checked }))}
                     />
                     <Label htmlFor={key} className="text-sm">
-                      {configuration[key] ? 'Enabled' : 'Disabled'}
+                      {configuration[key] ? "Enabled" : "Disabled"}
                     </Label>
                   </div>
                 )}
-                
-                {param.type === 'select' && param.options && (
+
+                {param.type === "select" && param.options && (
                   <Select
                     value={configuration[key] || param.defaultValue}
-                    onValueChange={(value) => setConfiguration(prev => ({ ...prev, [key]: value }))}
+                    onValueChange={value => setConfiguration(prev => ({ ...prev, [key]: value }))}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -617,9 +595,7 @@ function ComponentConfigDialog({ component, open, onOpenChange, onSave }: Compon
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSave}>
-            Save Configuration
-          </Button>
+          <Button onClick={handleSave}>Save Configuration</Button>
         </div>
       </DialogContent>
     </Dialog>

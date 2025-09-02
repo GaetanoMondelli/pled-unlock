@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useSession } from "next-auth/react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useSession } from "next-auth/react";
 import { useAccount, useConnect, useDisconnect } from "wagmi";
 
 interface UserProfile {
@@ -28,7 +28,7 @@ export default function ProfilePage() {
   const { address, isConnected } = useAccount();
   const { connect, connectors } = useConnect();
   const { disconnect } = useDisconnect();
-  
+
   const [profile, setProfile] = useState<UserProfile>({
     firstName: "",
     lastName: "",
@@ -40,7 +40,7 @@ export default function ProfilePage() {
   // Load user profile from Firebase
   const loadUserProfile = useCallback(async () => {
     if (!session?.user?.id) return;
-    
+
     try {
       const response = await fetch(`/api/users/${session.user.id}`);
       if (response.ok) {
@@ -51,7 +51,7 @@ export default function ProfilePage() {
           walletAddress: userData.walletAddress || "",
         };
         setProfile(newProfile);
-        
+
         // Auto-enable edit mode if profile is incomplete
         if (!newProfile.firstName || !newProfile.lastName) {
           setIsEditing(true);
@@ -74,21 +74,24 @@ export default function ProfilePage() {
   }, [session?.user?.id, loadUserProfile]);
 
   // Save wallet address to Firebase
-  const saveWalletAddress = useCallback(async (walletAddress: string) => {
-    if (!session?.user?.id) return;
-    
-    try {
-      await fetch(`/api/users/${session.user.id}/wallet`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ walletAddress }),
-      });
-    } catch (error) {
-      console.error("Error saving wallet address:", error);
-    }
-  }, [session?.user?.id]);
+  const saveWalletAddress = useCallback(
+    async (walletAddress: string) => {
+      if (!session?.user?.id) return;
+
+      try {
+        await fetch(`/api/users/${session.user.id}/wallet`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ walletAddress }),
+        });
+      } catch (error) {
+        console.error("Error saving wallet address:", error);
+      }
+    },
+    [session?.user?.id],
+  );
 
   // Update wallet address when wallet connection changes
   useEffect(() => {
@@ -101,7 +104,7 @@ export default function ProfilePage() {
   // Save individual field
   const saveField = async (field: string, value: string) => {
     if (!session?.user?.id) return;
-    
+
     setIsSaving(true);
     try {
       const updatedProfile = { ...profile, [field]: value };
@@ -116,7 +119,7 @@ export default function ProfilePage() {
       if (response.ok) {
         setProfile(updatedProfile);
         setEditingField(null);
-        alert(`${field === 'firstName' ? 'First name' : 'Last name'} updated successfully`);
+        alert(`${field === "firstName" ? "First name" : "Last name"} updated successfully`);
       } else {
         throw new Error("Failed to save");
       }
@@ -130,7 +133,7 @@ export default function ProfilePage() {
 
   const saveProfile = async () => {
     if (!session?.user?.id) return;
-    
+
     setIsSaving(true);
     try {
       const response = await fetch(`/api/users/${session.user.id}`, {
@@ -177,14 +180,12 @@ export default function ProfilePage() {
   return (
     <div className="container mx-auto px-4 py-8 max-w-2xl">
       <h1 className="text-3xl font-bold mb-8">Profile</h1>
-      
+
       {/* Personal Information */}
       <Card className="mb-6">
         <CardHeader>
           <CardTitle>Personal Information</CardTitle>
-          <CardDescription>
-            Your personal details
-          </CardDescription>
+          <CardDescription>Your personal details</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {!isEditing ? (
@@ -193,36 +194,40 @@ export default function ProfilePage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>First Name</Label>
-                  {editingField === 'firstName' ? (
+                  {editingField === "firstName" ? (
                     <div className="flex gap-2">
                       <Input
                         value={profile.firstName}
-                        onChange={(e) => setProfile(prev => ({ ...prev, firstName: e.target.value }))}
+                        onChange={e => setProfile(prev => ({ ...prev, firstName: e.target.value }))}
                         placeholder="Enter first name"
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            saveField('firstName', profile.firstName);
-                          } else if (e.key === 'Escape') {
+                        onKeyDown={e => {
+                          if (e.key === "Enter") {
+                            saveField("firstName", profile.firstName);
+                          } else if (e.key === "Escape") {
                             setEditingField(null);
                             loadUserProfile();
                           }
                         }}
                         autoFocus
                       />
-                      <Button size="sm" onClick={() => saveField('firstName', profile.firstName)} disabled={isSaving}>
+                      <Button size="sm" onClick={() => saveField("firstName", profile.firstName)} disabled={isSaving}>
                         ✓
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => {
-                        setEditingField(null);
-                        loadUserProfile();
-                      }}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setEditingField(null);
+                          loadUserProfile();
+                        }}
+                      >
                         ✕
                       </Button>
                     </div>
                   ) : (
-                    <div 
+                    <div
                       className="p-3 border rounded-lg bg-gray-50 hover:bg-gray-100 cursor-pointer transition-colors flex items-center justify-between group"
-                      onClick={() => setEditingField('firstName')}
+                      onClick={() => setEditingField("firstName")}
                     >
                       <span className={profile.firstName ? "text-gray-900" : "text-gray-400 italic"}>
                         {profile.firstName || "Click to add first name"}
@@ -235,36 +240,40 @@ export default function ProfilePage() {
                 </div>
                 <div>
                   <Label>Last Name</Label>
-                  {editingField === 'lastName' ? (
+                  {editingField === "lastName" ? (
                     <div className="flex gap-2">
                       <Input
                         value={profile.lastName}
-                        onChange={(e) => setProfile(prev => ({ ...prev, lastName: e.target.value }))}
+                        onChange={e => setProfile(prev => ({ ...prev, lastName: e.target.value }))}
                         placeholder="Enter last name"
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            saveField('lastName', profile.lastName);
-                          } else if (e.key === 'Escape') {
+                        onKeyDown={e => {
+                          if (e.key === "Enter") {
+                            saveField("lastName", profile.lastName);
+                          } else if (e.key === "Escape") {
                             setEditingField(null);
                             loadUserProfile();
                           }
                         }}
                         autoFocus
                       />
-                      <Button size="sm" onClick={() => saveField('lastName', profile.lastName)} disabled={isSaving}>
+                      <Button size="sm" onClick={() => saveField("lastName", profile.lastName)} disabled={isSaving}>
                         ✓
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => {
-                        setEditingField(null);
-                        loadUserProfile();
-                      }}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setEditingField(null);
+                          loadUserProfile();
+                        }}
+                      >
                         ✕
                       </Button>
                     </div>
                   ) : (
-                    <div 
+                    <div
                       className="p-3 border rounded-lg bg-gray-50 hover:bg-gray-100 cursor-pointer transition-colors flex items-center justify-between group"
-                      onClick={() => setEditingField('lastName')}
+                      onClick={() => setEditingField("lastName")}
                     >
                       <span className={profile.lastName ? "text-gray-900" : "text-gray-400 italic"}>
                         {profile.lastName || "Click to add last name"}
@@ -276,12 +285,10 @@ export default function ProfilePage() {
                   )}
                 </div>
               </div>
-              
+
               <div>
                 <Label>Username</Label>
-                <div className="p-3 border rounded-lg bg-gray-100">
-                  {session.user?.name || ""}
-                </div>
+                <div className="p-3 border rounded-lg bg-gray-100">{session.user?.name || ""}</div>
               </div>
 
               <Button onClick={() => setIsEditing(true)} variant="outline" className="w-full">
@@ -297,7 +304,7 @@ export default function ProfilePage() {
                   <Input
                     id="firstName"
                     value={profile.firstName}
-                    onChange={(e) => setProfile(prev => ({ ...prev, firstName: e.target.value }))}
+                    onChange={e => setProfile(prev => ({ ...prev, firstName: e.target.value }))}
                     placeholder="Enter your first name"
                   />
                 </div>
@@ -306,12 +313,12 @@ export default function ProfilePage() {
                   <Input
                     id="lastName"
                     value={profile.lastName}
-                    onChange={(e) => setProfile(prev => ({ ...prev, lastName: e.target.value }))}
+                    onChange={e => setProfile(prev => ({ ...prev, lastName: e.target.value }))}
                     placeholder="Enter your last name"
                   />
                 </div>
               </div>
-              
+
               <div>
                 <Label>Username</Label>
                 <Input value={session.user?.name || ""} disabled />
@@ -321,11 +328,7 @@ export default function ProfilePage() {
                 <Button onClick={saveProfile} disabled={isSaving} className="flex-1">
                   {isSaving ? "Saving..." : "Save Changes"}
                 </Button>
-                <Button 
-                  onClick={() => setIsEditing(false)} 
-                  variant="outline" 
-                  className="flex-1"
-                >
+                <Button onClick={() => setIsEditing(false)} variant="outline" className="flex-1">
                   Cancel
                 </Button>
               </div>
@@ -338,9 +341,7 @@ export default function ProfilePage() {
       <Card>
         <CardHeader>
           <CardTitle>Wallet Connection</CardTitle>
-          <CardDescription>
-            Connect your wallet to interact with blockchain features
-          </CardDescription>
+          <CardDescription>Connect your wallet to interact with blockchain features</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {isConnected && address ? (
@@ -352,11 +353,7 @@ export default function ProfilePage() {
                   <span className="text-green-600 text-sm">✓ Connected</span>
                 </div>
               </div>
-              <Button 
-                onClick={handleDisconnectWallet} 
-                variant="outline" 
-                className="w-full"
-              >
+              <Button onClick={handleDisconnectWallet} variant="outline" className="w-full">
                 Disconnect Wallet
               </Button>
             </div>
@@ -364,7 +361,7 @@ export default function ProfilePage() {
             <div className="space-y-4">
               <p className="text-gray-600">No wallet connected</p>
               <div className="grid gap-2">
-                {connectors.map((connector) => (
+                {connectors.map(connector => (
                   <Button
                     key={connector.id}
                     onClick={() => connect({ connector })}

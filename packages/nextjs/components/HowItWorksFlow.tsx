@@ -1,6 +1,6 @@
 "use client";
-/* eslint-disable */
 
+/* eslint-disable */
 import React, { useMemo } from "react";
 import ReactFlow, { Controls, Edge, MarkerType, Node, Position } from "reactflow";
 import "reactflow/dist/style.css";
@@ -71,51 +71,51 @@ export default function HowItWorksFlow() {
               <span className="ml-1 inline-flex items-center rounded-full border px-2 py-0.5 text-[10px]">AI</span>
             </div>
           ),
-  },
-  draggable: false,
-  targetPosition: Position.Left,
-  sourcePosition: Position.Right,
+        },
+        draggable: false,
+        targetPosition: Position.Left,
+        sourcePosition: Position.Right,
       },
 
       // Tokenization and State
       {
         id: "token",
         position: { x: 520, y: 60 },
-  data: { label: <div className="rounded-md bg-primary/10 px-4 py-2">Tokenization</div> },
-  draggable: false,
-  targetPosition: Position.Left,
-  sourcePosition: Position.Right,
+        data: { label: <div className="rounded-md bg-primary/10 px-4 py-2">Tokenization</div> },
+        draggable: false,
+        targetPosition: Position.Left,
+        sourcePosition: Position.Right,
       },
       {
         id: "state",
         position: { x: 520, y: 130 },
-  data: { label: <div className="rounded-md bg-primary/10 px-4 py-2">State</div> },
-  draggable: false,
-  targetPosition: Position.Left,
-  sourcePosition: Position.Right,
+        data: { label: <div className="rounded-md bg-primary/10 px-4 py-2">State</div> },
+        draggable: false,
+        targetPosition: Position.Left,
+        sourcePosition: Position.Right,
       },
 
       // Outputs from State
       {
         id: "signatures",
         position: { x: 780, y: 10 },
-  data: { label: pill("Verifiable Signatures") },
-  draggable: false,
-  targetPosition: Position.Left,
+        data: { label: pill("Verifiable Signatures") },
+        draggable: false,
+        targetPosition: Position.Left,
       },
       {
         id: "ledger",
         position: { x: 780, y: 70 },
-  data: { label: pill("Integrity Ledger") },
-  draggable: false,
-  targetPosition: Position.Left,
+        data: { label: pill("Integrity Ledger") },
+        draggable: false,
+        targetPosition: Position.Left,
       },
       {
         id: "story",
         position: { x: 780, y: 130 },
-  data: { label: pill("State Story") },
-  draggable: false,
-  targetPosition: Position.Left,
+        data: { label: pill("State Story") },
+        draggable: false,
+        targetPosition: Position.Left,
       },
 
       // Agent (AI) and its outputs
@@ -140,23 +140,23 @@ export default function HowItWorksFlow() {
       {
         id: "alerts",
         position: { x: 980, y: 180 },
-  data: { label: pill("Alerts") },
-  draggable: false,
-  targetPosition: Position.Left,
+        data: { label: pill("Alerts") },
+        draggable: false,
+        targetPosition: Position.Left,
       },
       {
         id: "notifications",
         position: { x: 980, y: 220 },
-  data: { label: pill("Notifications") },
-  draggable: false,
-  targetPosition: Position.Left,
+        data: { label: pill("Notifications") },
+        draggable: false,
+        targetPosition: Position.Left,
       },
       {
         id: "actions",
         position: { x: 980, y: 260 },
-  data: { label: pill("Actions") },
-  draggable: false,
-  targetPosition: Position.Left,
+        data: { label: pill("Actions") },
+        draggable: false,
+        targetPosition: Position.Left,
       },
     ],
     [],
@@ -171,20 +171,20 @@ export default function HowItWorksFlow() {
       { id: "e4", source: "emails", target: "norm" },
       { id: "e5", source: "iot", target: "norm" },
 
-  // Flow through Tokenization to State
-  { id: "e6", source: "norm", target: "token" },
-  { id: "e7", source: "token", target: "state" },
+      // Flow through Tokenization to State
+      { id: "e6", source: "norm", target: "token" },
+      { id: "e7", source: "token", target: "state" },
 
-  // State fan-out
-  { id: "e8", source: "state", target: "signatures" },
-  { id: "e9", source: "state", target: "ledger" },
-  { id: "e10", source: "state", target: "story" },
+      // State fan-out
+      { id: "e8", source: "state", target: "signatures" },
+      { id: "e9", source: "state", target: "ledger" },
+      { id: "e10", source: "state", target: "story" },
 
-  // Agent hooks
-  { id: "e11", source: "state", target: "agent" },
-  { id: "e12", source: "agent", target: "alerts" },
-  { id: "e13", source: "agent", target: "notifications" },
-  { id: "e14", source: "agent", target: "actions" },
+      // Agent hooks
+      { id: "e11", source: "state", target: "agent" },
+      { id: "e12", source: "agent", target: "alerts" },
+      { id: "e13", source: "agent", target: "notifications" },
+      { id: "e14", source: "agent", target: "actions" },
     ],
     [],
   );

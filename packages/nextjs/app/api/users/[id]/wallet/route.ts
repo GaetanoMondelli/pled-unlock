@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
 import { options } from "@/app/api/configAuth";
 import { PledDataService } from "@/lib/pled-data-service";
+import { getServerSession } from "next-auth";
 
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const session = await getServerSession(options);
-    
+
     // For now, let's use session.user?.email as the identifier since id might not be available
     if (!session?.user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -31,7 +31,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 export async function DELETE(_request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const session = await getServerSession(options);
-    
+
     if (!session?.user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

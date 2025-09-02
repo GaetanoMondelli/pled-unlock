@@ -1,7 +1,7 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import { Suspense } from "react";
+import dynamic from "next/dynamic";
 
 // Dynamically import the TurbineStateMachineScene to avoid SSR issues
 const TurbineStateMachineScene = dynamic(() => import("./TurbineStateMachineScene"), {
@@ -10,7 +10,7 @@ const TurbineStateMachineScene = dynamic(() => import("./TurbineStateMachineScen
     <div className="w-full h-full flex items-center justify-center">
       <div className="text-gray-400">Loading animation...</div>
     </div>
-  )
+  ),
 });
 
 export default function SafeTurbineScene() {

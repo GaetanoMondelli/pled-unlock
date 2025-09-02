@@ -1,17 +1,18 @@
-'use client';
-import React from 'react';
-import { useSimulationStore } from '@/stores/simulationStore';
+"use client";
+
+import React from "react";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
   DialogDescription,
   DialogFooter,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import type { HistoryEntry } from '@/lib/simulation/types';
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import type { HistoryEntry } from "@/lib/simulation/types";
+import { useSimulationStore } from "@/stores/simulationStore";
 
 const GlobalActivityTable: React.FC<{ logs: HistoryEntry[] }> = ({ logs }) => {
   const nodesConfig = useSimulationStore(state => state.nodesConfig);
@@ -20,21 +21,22 @@ const GlobalActivityTable: React.FC<{ logs: HistoryEntry[] }> = ({ logs }) => {
 
   const handleTokenClick = (tokenId: string) => {
     // Find the token in the global activity log and reconstruct it
-    const tokenEvents = globalActivityLog.filter(log => 
-      log.sourceTokenIds?.includes(tokenId) || 
-      log.details?.includes(tokenId) ||
-      (log.action === 'CREATED' && log.details?.includes(tokenId))
+    const tokenEvents = globalActivityLog.filter(
+      log =>
+        log.sourceTokenIds?.includes(tokenId) ||
+        log.details?.includes(tokenId) ||
+        (log.action === "CREATED" && log.details?.includes(tokenId)),
     );
-    
+
     if (tokenEvents.length > 0) {
-      const createEvent = tokenEvents.find(e => e.action === 'CREATED' && e.details?.includes(tokenId));
+      const createEvent = tokenEvents.find(e => e.action === "CREATED" && e.details?.includes(tokenId));
       if (createEvent) {
         const reconstructedToken = {
           id: tokenId,
           value: createEvent.value,
           createdAt: createEvent.timestamp,
           originNodeId: createEvent.nodeId,
-          history: tokenEvents.filter(e => e.details?.includes(tokenId))
+          history: tokenEvents.filter(e => e.details?.includes(tokenId)),
         };
         setSelectedToken(reconstructedToken);
       }
@@ -43,7 +45,7 @@ const GlobalActivityTable: React.FC<{ logs: HistoryEntry[] }> = ({ logs }) => {
 
   const renderTokenLinks = (text: string) => {
     if (!text) return text;
-    
+
     // Match token IDs in the format "Token ABC123XY" or just "ABC123XY" if it looks like a token ID
     const tokenRegex = /Token (\w{8})|(\w{8}(?=\s|$|,|\.|from|to))/g;
     const parts = [];
@@ -52,12 +54,12 @@ const GlobalActivityTable: React.FC<{ logs: HistoryEntry[] }> = ({ logs }) => {
 
     while ((match = tokenRegex.exec(text)) !== null) {
       const tokenId = match[1] || match[2];
-      
+
       // Add text before the match
       if (match.index > lastIndex) {
         parts.push(text.slice(lastIndex, match.index));
       }
-      
+
       // Add clickable token link
       parts.push(
         <button
@@ -67,31 +69,31 @@ const GlobalActivityTable: React.FC<{ logs: HistoryEntry[] }> = ({ logs }) => {
           title={`Click to inspect token ${tokenId}`}
         >
           {match[0]}
-        </button>
+        </button>,
       );
-      
+
       lastIndex = match.index + match[0].length;
     }
-    
+
     // Add remaining text
     if (lastIndex < text.length) {
       parts.push(text.slice(lastIndex));
     }
-    
+
     return parts.length > 1 ? parts : text;
   };
-  
+
   const getNodeDisplayName = (nodeId: string) => {
     return nodesConfig[nodeId]?.displayName || nodeId;
   };
 
   const getActionColor = (action: string): string => {
-    if (action.includes('CREATED') || action.includes('EMITTED')) return 'bg-green-100 text-green-800';
-    if (action.includes('AGGREGATED') || action.includes('CONSUMED')) return 'bg-blue-100 text-blue-800';
-    if (action.includes('OUTPUT') || action.includes('GENERATED')) return 'bg-purple-100 text-purple-800';
-    if (action.includes('ERROR')) return 'bg-red-100 text-red-800';
-    if (action.includes('ARRIVED') || action.includes('ADDED')) return 'bg-orange-100 text-orange-800';
-    return 'bg-gray-100 text-gray-800';
+    if (action.includes("CREATED") || action.includes("EMITTED")) return "bg-green-100 text-green-800";
+    if (action.includes("AGGREGATED") || action.includes("CONSUMED")) return "bg-blue-100 text-blue-800";
+    if (action.includes("OUTPUT") || action.includes("GENERATED")) return "bg-purple-100 text-purple-800";
+    if (action.includes("ERROR")) return "bg-red-100 text-red-800";
+    if (action.includes("ARRIVED") || action.includes("ADDED")) return "bg-orange-100 text-orange-800";
+    return "bg-gray-100 text-gray-800";
   };
 
   return (
@@ -106,54 +108,55 @@ const GlobalActivityTable: React.FC<{ logs: HistoryEntry[] }> = ({ logs }) => {
           <div className="flex-1 min-w-0">Details</div>
         </div>
       </div>
-      <ScrollArea className="max-h-96">
+      <div className="max-h-96 overflow-y-auto">
         <div className="divide-y">
-          {logs.slice(-100).reverse().map((log, index) => (
-            <div key={`${log.sequence}-${index}`} className="px-3 py-2 text-xs hover:bg-muted/30">
-              <div className="flex gap-4 items-start">
-                <div className="w-12 flex-shrink-0 font-mono text-muted-foreground">
-                  {log.sequence}
-                </div>
-                <div className="w-16 flex-shrink-0 font-mono text-muted-foreground">
-                  {log.timestamp}s
-                </div>
-                <div className="w-32 flex-shrink-0 font-medium truncate" title={getNodeDisplayName(log.nodeId)}>
-                  {getNodeDisplayName(log.nodeId)}
-                </div>
-                <div className="w-40 flex-shrink-0">
-                  <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${getActionColor(log.action)} block truncate`} title={log.action}>
-                    {log.action}
-                  </span>
-                </div>
-                <div className="w-16 flex-shrink-0 font-mono text-right">
-                  {log.value !== undefined ? String(log.value) : '-'}
-                </div>
-                <div className="flex-1 min-w-0 text-muted-foreground">
-                  <div className="break-words">
-                    {renderTokenLinks(log.details || '-')}
+          {logs
+            .slice(-100)
+            .reverse()
+            .map((log, index) => (
+              <div key={`${log.sequence}-${index}`} className="px-3 py-2 text-xs hover:bg-muted/30">
+                <div className="flex gap-4 items-start">
+                  <div className="w-12 flex-shrink-0 font-mono text-muted-foreground">{log.sequence}</div>
+                  <div className="w-16 flex-shrink-0 font-mono text-muted-foreground">{log.timestamp}s</div>
+                  <div className="w-32 flex-shrink-0 font-medium truncate" title={getNodeDisplayName(log.nodeId)}>
+                    {getNodeDisplayName(log.nodeId)}
                   </div>
-                  {log.sourceTokenIds && log.sourceTokenIds.length > 0 && (
-                    <div className="mt-1 text-xs text-muted-foreground/70">
-                      Source: {log.sourceTokenIds.map((tokenId, idx) => (
-                        <span key={tokenId}>
-                          {idx > 0 && ', '}
-                          <button
-                            onClick={() => handleTokenClick(tokenId)}
-                            className="text-primary hover:text-primary/80 underline font-mono"
-                            title={`Click to inspect token ${tokenId}`}
-                          >
-                            {tokenId}
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
+                  <div className="w-40 flex-shrink-0">
+                    <span
+                      className={`px-1.5 py-0.5 rounded text-xs font-medium ${getActionColor(log.action)} block truncate no-underline`}
+                      title={log.action}
+                    >
+                      {log.action}
+                    </span>
+                  </div>
+                  <div className="w-16 flex-shrink-0 font-mono text-right">
+                    {log.value !== undefined ? String(log.value) : "-"}
+                  </div>
+                  <div className="flex-1 min-w-0 text-muted-foreground">
+                    <div className="break-words">{renderTokenLinks(log.details || "-")}</div>
+                    {log.sourceTokenIds && log.sourceTokenIds.length > 0 && (
+                      <div className="mt-1 text-xs text-muted-foreground/70">
+                        Source:{" "}
+                        {log.sourceTokenIds.map((tokenId, idx) => (
+                          <span key={tokenId}>
+                            {idx > 0 && ", "}
+                            <button
+                              onClick={() => handleTokenClick(tokenId)}
+                              className="text-primary hover:text-primary/80 underline font-mono"
+                              title={`Click to inspect token ${tokenId}`}
+                            >
+                              {tokenId}
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
         </div>
-      </ScrollArea>
+      </div>
     </div>
   );
 };
@@ -192,7 +195,9 @@ const GlobalLedgerModal: React.FC = () => {
         </div>
 
         <DialogFooter className="pt-4 border-t border-border mt-auto flex-shrink-0">
-          <Button variant="outline" onClick={() => handleOpenChange(false)}>Close</Button>
+          <Button variant="outline" onClick={() => handleOpenChange(false)}>
+            Close
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

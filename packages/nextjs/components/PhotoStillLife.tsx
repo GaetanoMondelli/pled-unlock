@@ -382,7 +382,7 @@ export default function PhotoStillLife() {
   useEffect(() => {
     return () => {
       console.log("🚨 PhotoStillLife UNMOUNTING - NUCLEAR GSAP CLEANUP");
-      
+
       // Immediate emergency cleanup (scoped to this svg)
       try {
         if (typeof window !== "undefined" && (window as any).gsap) {

@@ -7,11 +7,11 @@ const initializeGSAP = async () => {
   try {
     const gsap = (await import("gsap")).default;
     const { MotionPathPlugin } = await import("gsap/MotionPathPlugin");
-    
+
     if (typeof window !== "undefined") {
       gsap.registerPlugin(MotionPathPlugin);
     }
-    
+
     return { gsap, MotionPathPlugin };
   } catch (error) {
     console.warn("Failed to load GSAP:", error);
@@ -39,9 +39,20 @@ export default function TurbineStateMachineScene() {
         const ctx = gsap.context(() => {
           // Check if all required elements exist before animating
           const requiredElements = [
-            "#turbine", "#graph", "#weather", "#label-pled", "#label-energy",
-            ".node-core", ".node-label", "#token", "#cert", "#blades",
-            "#node-a", "#node-b", "#node-c", "#node-d"
+            "#turbine",
+            "#graph",
+            "#weather",
+            "#label-pled",
+            "#label-energy",
+            ".node-core",
+            ".node-label",
+            "#token",
+            "#cert",
+            "#blades",
+            "#node-a",
+            "#node-b",
+            "#node-c",
+            "#node-d",
           ];
 
           const missingElements = requiredElements.filter(selector => {
@@ -54,66 +65,66 @@ export default function TurbineStateMachineScene() {
             return;
           }
 
-      try {
-        // SIMPLE WORKING ANIMATION
-        const tl = gsap.timeline({ repeat: -1, repeatDelay: 3 });
+          try {
+            // SIMPLE WORKING ANIMATION
+            const tl = gsap.timeline({ repeat: -1, repeatDelay: 3 });
 
-        // EVERYTHING ALWAYS VISIBLE - NO HIDING ANYTHING
-        gsap.set("#turbine", { opacity: 1 });
-        gsap.set("#graph", { opacity: 1 });
-        gsap.set("#weather", { opacity: 1 });
-        gsap.set("#label-pled", { opacity: 1 });
-        gsap.set("#label-energy", { opacity: 1 });
-        gsap.set([".node-core", ".node-label"], { opacity: 1 });
-        gsap.set(["#weather-link", "#wire-to-sun"], { opacity: 0.5 });
-        
-        // Only hide token and certificate initially
-        gsap.set("#token", { opacity: 0 });
-        gsap.set("#cert", { opacity: 0 });
+            // EVERYTHING ALWAYS VISIBLE - NO HIDING ANYTHING
+            gsap.set("#turbine", { opacity: 1 });
+            gsap.set("#graph", { opacity: 1 });
+            gsap.set("#weather", { opacity: 1 });
+            gsap.set("#label-pled", { opacity: 1 });
+            gsap.set("#label-energy", { opacity: 1 });
+            gsap.set([".node-core", ".node-label"], { opacity: 1 });
+            gsap.set(["#weather-link", "#wire-to-sun"], { opacity: 0.5 });
 
-        // Nodes ALWAYS visible - start with C active
-        gsap.set("#node-c .node-core", { fill: "#10b981" });
-        gsap.set("#node-a .node-core", { fill: "#e5e7eb" });
-        gsap.set("#node-b .node-core", { fill: "#e5e7eb" });
-        gsap.set("#node-d .node-core", { fill: "#e5e7eb" });
+            // Only hide token and certificate initially
+            gsap.set("#token", { opacity: 0 });
+            gsap.set("#cert", { opacity: 0 });
 
-        // Blade rotation with error handling
-        const blades = svgRef.current?.querySelector("#blades");
-        if (blades) {
-          gsap.to("#blades", { rotation: 360, svgOrigin: "220 260", repeat: -1, ease: "none", duration: 5 });
-        }
+            // Nodes ALWAYS visible - start with C active
+            gsap.set("#node-c .node-core", { fill: "#10b981" });
+            gsap.set("#node-a .node-core", { fill: "#e5e7eb" });
+            gsap.set("#node-b .node-core", { fill: "#e5e7eb" });
+            gsap.set("#node-d .node-core", { fill: "#e5e7eb" });
 
-        // SIMPLE ANIMATION SEQUENCE:
-        
-        // 1. Show token at start position
-        tl.set("#token", { opacity: 1, x: 540, y: 320 }, 1);
-        
-        // 2. Move token C to A - SIMPLE PATH
-        tl.to("#token", { x: 540, y: 220, duration: 2, ease: "power2.inOut" }, 2);
-        tl.set("#node-a .node-core", { fill: "#10b981" }, "<");
-        tl.set("#node-c .node-core", { fill: "#e5e7eb" }, "<");
-        
-        // 3. Move token A to D - SIMPLE PATH  
-        tl.to("#token", { x: 700, y: 240, duration: 2, ease: "power2.inOut" }, ">+1");
-        tl.set("#node-d .node-core", { fill: "#10b981" }, "<");
-        tl.set("#node-a .node-core", { fill: "#e5e7eb" }, "<");
-        
-        // 4. Show certificate - NO MOVEMENT
-        tl.set("#cert", { opacity: 1 }, ">+1");
-        
-        // 5. Reset for next cycle
-        tl.set("#cert", { opacity: 0 }, ">+3");
-        tl.set("#token", { opacity: 0 }, "<");
-        tl.set("#node-c .node-core", { fill: "#10b981" }, ">");
-        tl.set("#node-d .node-core", { fill: "#e5e7eb" }, "<");
+            // Blade rotation with error handling
+            const blades = svgRef.current?.querySelector("#blades");
+            if (blades) {
+              gsap.to("#blades", { rotation: 360, svgOrigin: "220 260", repeat: -1, ease: "none", duration: 5 });
+            }
 
-        return () => tl.kill();
-        } catch (error) {
-          console.error("TurbineStateMachineScene animation error:", error);
-        }
-      }, svgRef);
+            // SIMPLE ANIMATION SEQUENCE:
 
-      return () => ctx.revert();
+            // 1. Show token at start position
+            tl.set("#token", { opacity: 1, x: 540, y: 320 }, 1);
+
+            // 2. Move token C to A - SIMPLE PATH
+            tl.to("#token", { x: 540, y: 220, duration: 2, ease: "power2.inOut" }, 2);
+            tl.set("#node-a .node-core", { fill: "#10b981" }, "<");
+            tl.set("#node-c .node-core", { fill: "#e5e7eb" }, "<");
+
+            // 3. Move token A to D - SIMPLE PATH
+            tl.to("#token", { x: 700, y: 240, duration: 2, ease: "power2.inOut" }, ">+1");
+            tl.set("#node-d .node-core", { fill: "#10b981" }, "<");
+            tl.set("#node-a .node-core", { fill: "#e5e7eb" }, "<");
+
+            // 4. Show certificate - NO MOVEMENT
+            tl.set("#cert", { opacity: 1 }, ">+1");
+
+            // 5. Reset for next cycle
+            tl.set("#cert", { opacity: 0 }, ">+3");
+            tl.set("#token", { opacity: 0 }, "<");
+            tl.set("#node-c .node-core", { fill: "#10b981" }, ">");
+            tl.set("#node-d .node-core", { fill: "#e5e7eb" }, "<");
+
+            return () => tl.kill();
+          } catch (error) {
+            console.error("TurbineStateMachineScene animation error:", error);
+          }
+        }, svgRef);
+
+        return () => ctx.revert();
       } catch (error) {
         console.error("Failed to setup GSAP animation:", error);
       }
@@ -123,10 +134,10 @@ export default function TurbineStateMachineScene() {
 
     return () => {
       mounted = false;
-      
+
       // Nuclear cleanup on unmount
       console.log("🚨 TurbineStateMachineScene UNMOUNTING - NUCLEAR GSAP CLEANUP");
-      
+
       // Immediate emergency cleanup
       try {
         if (typeof window !== "undefined" && (window as any).gsap) {
@@ -208,7 +219,7 @@ export default function TurbineStateMachineScene() {
               strokeWidth="1.5"
               strokeDasharray="2 6"
             />
-            
+
             {/* Enhanced sun - NO SMILE, clean and simple */}
             <g id="sun" transform="translate(900,110)">
               <circle r="28" fill="#fbbf24" stroke="#f59e0b" strokeWidth="2" />
@@ -224,7 +235,7 @@ export default function TurbineStateMachineScene() {
                 <line x1="-30" y1="30" x2="-36" y2="36" />
               </g>
             </g>
-            
+
             {/* Enhanced clouds - closer and more detailed */}
             <g id="clouds" transform="translate(960,85)" fill="#e5e7eb" stroke="#d1d5db" strokeWidth="1">
               <circle cx="0" cy="0" r="18" />
@@ -233,7 +244,7 @@ export default function TurbineStateMachineScene() {
               <circle cx="20" cy="8" r="12" />
               <rect x="-8" y="8" width="56" height="12" rx="6" />
             </g>
-            
+
             {/* weather pulse */}
             <circle id="weatherPulse" cx="900" cy="110" r="8" fill="#f59e0b" opacity="0" />
           </g>
@@ -288,28 +299,60 @@ export default function TurbineStateMachineScene() {
             <g id="node-a" transform="translate(540,220)">
               <circle className="node-halo" r="20" fill="#10b981" opacity="0" />
               <circle className="node-core" r="14" fill="#fff" stroke="currentColor" strokeWidth="1.5" />
-              <text className="node-label" x="0" y="-25" fontSize="12" textAnchor="middle" fill="currentColor" fontWeight="600">
+              <text
+                className="node-label"
+                x="0"
+                y="-25"
+                fontSize="12"
+                textAnchor="middle"
+                fill="currentColor"
+                fontWeight="600"
+              >
                 A
               </text>
             </g>
             <g id="node-b" transform="translate(620,300)">
               <circle className="node-halo" r="20" fill="#10b981" opacity="0" />
               <circle className="node-core" r="14" fill="#fff" stroke="currentColor" strokeWidth="1.5" />
-              <text className="node-label" x="0" y="-25" fontSize="12" textAnchor="middle" fill="currentColor" fontWeight="600">
+              <text
+                className="node-label"
+                x="0"
+                y="-25"
+                fontSize="12"
+                textAnchor="middle"
+                fill="currentColor"
+                fontWeight="600"
+              >
                 B
               </text>
             </g>
             <g id="node-c" transform="translate(540,320)">
               <circle className="node-halo" r="20" fill="#10b981" opacity="0" />
               <circle className="node-core" r="14" fill="#fff" stroke="currentColor" strokeWidth="1.5" />
-              <text className="node-label" x="0" y="-25" fontSize="12" textAnchor="middle" fill="currentColor" fontWeight="600">
+              <text
+                className="node-label"
+                x="0"
+                y="-25"
+                fontSize="12"
+                textAnchor="middle"
+                fill="currentColor"
+                fontWeight="600"
+              >
                 C
               </text>
             </g>
             <g id="node-d" transform="translate(700,240)">
               <circle className="node-halo" r="20" fill="#10b981" opacity="0" />
               <circle className="node-core" r="14" fill="#fff" stroke="currentColor" strokeWidth="1.5" />
-              <text className="node-label" x="0" y="-25" fontSize="12" textAnchor="middle" fill="currentColor" fontWeight="600">
+              <text
+                className="node-label"
+                x="0"
+                y="-25"
+                fontSize="12"
+                textAnchor="middle"
+                fill="currentColor"
+                fontWeight="600"
+              >
                 D
               </text>
             </g>
@@ -338,7 +381,7 @@ export default function TurbineStateMachineScene() {
             <text x="20" y="140" fontSize="12" fill="#374151">
               Issued: {new Date().toLocaleDateString()}
             </text>
-            
+
             {/* verification badge */}
             <circle cx="240" cy="100" r="25" fill="#10b981" opacity="0.1" />
             <circle cx="240" cy="100" r="20" fill="#10b981" />
@@ -354,7 +397,7 @@ export default function TurbineStateMachineScene() {
               Green Energy Generation
             </text>
           </g>
-          
+
           <g id="label-pled" transform="translate(450,380)">
             <rect x="0" y="-16" rx="8" width="220" height="32" fill="#ffffff" stroke="#3b82f6" strokeWidth="2" />
             <text x="16" y="4" fontSize="13" fill="#3b82f6" fontWeight="600">

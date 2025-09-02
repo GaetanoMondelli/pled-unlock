@@ -4,21 +4,21 @@
     "title": "Contract Lifecycle Management",
     "description": "Tokenize legal agreements to automate obligation tracking, manage milestones, and ensure compliance from execution to settlement.",
     "coverImage": "/review-wizard.png",
-  "stateMachineDefinition": "idle 'draft' -> drafting; drafting 'submit' -> review; review 'amend' -> drafting; review 'approve' -> active; review 'reject' -> drafting; active 'milestone' -> active; active 'breach' -> dispute; dispute 'cure' -> active; active 'terminate' -> settled;"
+    "stateMachineDefinition": "idle 'draft' -> drafting; drafting 'submit' -> review; review 'amend' -> drafting; review 'approve' -> active; review 'reject' -> drafting; active 'milestone' -> active; active 'breach' -> dispute; dispute 'cure' -> active; active 'terminate' -> settled;"
   },
   {
     "id": "verifiable_supply_chains",
     "title": "Verifiable Supply Chains",
     "description": "Create digital passports for goods to prove origin, custody, and compliance (including cold chain integrity).",
     "coverImage": "/neweventconsent2.png",
-  "stateMachineDefinition": "idle 'register' -> origin; origin 'ship' -> in_transit; in_transit 'temp_excursion' -> exception; exception 'override' -> in_transit; in_transit 'arrive_hub' -> custody; custody 'qc_fail' -> exception; custody 'qc_pass' -> compliant; compliant 'repackage' -> custody; compliant 'deliver' -> delivered;"
+    "stateMachineDefinition": "idle 'register' -> origin; origin 'ship' -> in_transit; in_transit 'temp_excursion' -> exception; exception 'override' -> in_transit; in_transit 'arrive_hub' -> custody; custody 'qc_fail' -> exception; custody 'qc_pass' -> compliant; compliant 'repackage' -> custody; compliant 'deliver' -> delivered;"
   },
   {
     "id": "carbon_credits",
     "title": "High-Integrity Carbon Credits",
     "description": "Tokenize end-to-end measurement and verification to eliminate greenwashing and enable auditable credits.",
     "coverImage": "/state_machine_ai.png",
-  "stateMachineDefinition": "idle 'project_started' -> monitoring; monitoring 'measure' -> measured; measured 're-measure' -> monitoring; measured 'verify' -> verified; verified 'issue' -> issued; issued 'transfer' -> issued; issued 'retire' -> retired; measured 'dispute' -> dispute; dispute 'resolve' -> measured;"
+    "stateMachineDefinition": "idle 'project_started' -> monitoring; monitoring 'measure' -> measured; measured 're-measure' -> monitoring; measured 'verify' -> verified; verified 'issue' -> issued; issued 'transfer' -> issued; issued 'retire' -> retired; measured 'dispute' -> dispute; dispute 'resolve' -> measured;"
   },
   {
     "id": "public_equities",
@@ -32,7 +32,7 @@
     "title": "Fixed Income",
     "description": "Streamline issuance and lifecycle management of bonds with fractional access and automated workflows.",
     "coverImage": "/msg.png",
-  "stateMachineDefinition": "idle 'issue' -> issued; issued 'coupon_due' -> coupon_pending; coupon_pending 'miss' -> defaulted; coupon_pending 'pay' -> issued; issued 'mature' -> matured; issued 'call' -> redeemed; issued 'default' -> defaulted; defaulted 'cure' -> issued;"
+    "stateMachineDefinition": "idle 'issue' -> issued; issued 'coupon_due' -> coupon_pending; coupon_pending 'miss' -> defaulted; coupon_pending 'pay' -> issued; issued 'mature' -> matured; issued 'call' -> redeemed; issued 'default' -> defaulted; defaulted 'cure' -> issued;"
   },
   {
     "id": "private_equity",
@@ -46,14 +46,14 @@
     "title": "Private Debt",
     "description": "Move private credit on-chain for real-time settlement and reduced back-office friction via smart rules.",
     "coverImage": "/ai-actions.png",
-  "stateMachineDefinition": "idle 'originate' -> originated; originated 'fund' -> active; active 'interest_due' -> interest_pending; interest_pending 'miss' -> defaulted; interest_pending 'pay' -> active; active 'prepay' -> prepaid; active 'default' -> defaulted; defaulted 'workout' -> workout; workout 'resolve' -> active;"
+    "stateMachineDefinition": "idle 'originate' -> originated; originated 'fund' -> active; active 'interest_due' -> interest_pending; interest_pending 'miss' -> defaulted; interest_pending 'pay' -> active; active 'prepay' -> prepaid; active 'default' -> defaulted; defaulted 'workout' -> workout; workout 'resolve' -> active;"
   },
   {
     "id": "real_estate",
     "title": "Real Estate",
     "description": "Enable fractional ownership and streamlined transfers with verifiable property records.",
     "coverImage": "/neweventnavigator.png",
-  "stateMachineDefinition": "idle 'mint_deed' -> registered; registered 'fractionalize' -> fractional; fractional 'transfer' -> fractional; registered 'transfer' -> registered; registered 'lease' -> leased; leased 'end_lease' -> registered; registered 'lien' -> encumbered; encumbered 'release' -> registered;"
+    "stateMachineDefinition": "idle 'mint_deed' -> registered; registered 'fractionalize' -> fractional; fractional 'transfer' -> fractional; registered 'transfer' -> registered; registered 'lease' -> leased; leased 'end_lease' -> registered; registered 'lien' -> encumbered; encumbered 'release' -> registered;"
   },
   {
     "id": "commodities",

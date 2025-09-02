@@ -1,21 +1,20 @@
-
 const getBaseUrl = () => {
-  if (typeof window === 'undefined') {
+  if (typeof window === "undefined") {
     // Server-side
-    return process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    return process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
   }
   // Client-side
-  return '';  // Use relative URLs on client
+  return ""; // Use relative URLs on client
 };
 
 export async function fetchFromDb() {
   const baseUrl = getBaseUrl();
   const response = await fetch(`${baseUrl}/api/db`, {
     // Add cache: 'no-store' to prevent caching
-    cache: 'no-store'
+    cache: "no-store",
   });
   if (!response.ok) {
-    throw new Error('Failed to fetch data');
+    throw new Error("Failed to fetch data");
   }
   return response.json();
 }
@@ -27,13 +26,13 @@ export async function updateDb(data: any, retryCount = 0) {
   try {
     const baseUrl = getBaseUrl();
     const response = await fetch(`${baseUrl}/api/db`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        action: 'update',
-        data: data
+        action: "update",
+        data: data,
       }),
     });
 
@@ -44,7 +43,7 @@ export async function updateDb(data: any, retryCount = 0) {
         await sleep(RETRY_DELAY * (retryCount + 1)); // Exponential backoff
         return updateDb(data, retryCount + 1);
       }
-      throw new Error('Failed to update data');
+      throw new Error("Failed to update data");
     }
 
     return response.json();
@@ -61,15 +60,15 @@ export async function updateDb(data: any, retryCount = 0) {
 // Helper function to get procedure data from the main DB
 export async function getProcedureData(id: string) {
   const data = await fetchFromDb();
-  
+
   const instance = data.procedureInstances?.find((p: any) => p.instanceId === id);
   if (!instance) {
-    throw new Error('Instance not found');
+    throw new Error("Instance not found");
   }
 
   const template = data.procedureTemplates?.find((t: any) => t.templateId === instance.templateId);
   if (!template) {
-    throw new Error('Template not found');
+    throw new Error("Template not found");
   }
 
   return { instance, template };
@@ -79,7 +78,7 @@ export async function getProcedureData(id: string) {
 export async function deleteProcedureInstance(instanceId: string) {
   const data = await fetchFromDb();
   const updatedInstances = data.procedureInstances?.filter((p: any) => p.instanceId !== instanceId) || [];
-  
+
   const updatedDb = {
     ...data,
     procedureInstances: updatedInstances,
@@ -93,7 +92,7 @@ export async function deleteTemplate(templateId: string) {
   const data = await fetchFromDb();
   const updatedTemplates = data.procedureTemplates?.filter((t: any) => t.templateId !== templateId) || [];
   const updatedInstances = data.procedureInstances?.filter((p: any) => p.templateId !== templateId) || [];
-  
+
   const updatedDb = {
     ...data,
     procedureTemplates: updatedTemplates,
@@ -106,4 +105,4 @@ export async function deleteTemplate(templateId: string) {
 // Add helper function for sleep
 function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
-} 
+}

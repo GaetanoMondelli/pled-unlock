@@ -385,7 +385,6 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
 
   const authenticateNavigator = async () => {
     try {
-
       // Check for code in URL
       const urlParams = new URLSearchParams(window.location.search);
       const code = urlParams.get("code");
@@ -439,7 +438,6 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
       };
 
       localStorage.setItem("navigatorAuth", JSON.stringify(authData));
-
     } catch (error: any) {
       console.error("Authentication error:", error);
     }
@@ -491,7 +489,6 @@ export const CreateEventModal = ({ open, onClose, onSave }: CreateEventModalProp
           //     return;
           //   }
           // }
-
 
           // If auth is valid, fetch data
           // if (authResponse.ok) {

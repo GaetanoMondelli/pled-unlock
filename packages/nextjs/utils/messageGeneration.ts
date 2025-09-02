@@ -17,13 +17,16 @@ interface MessageRule {
 
 // Updated formatTemplateContent function
 function formatTemplateContent(template: string | undefined, data: any): string {
-  if (!template) return '';
-  
+  if (!template) return "";
+
   return template.replace(/\{\{([^}]+)\}\}/g, (_, path) => {
-    const value = path.trim().split('.').reduce((obj: any, key: string) => {
-      return obj?.[key];
-    }, data);
-    return value ?? '';
+    const value = path
+      .trim()
+      .split(".")
+      .reduce((obj: any, key: string) => {
+        return obj?.[key];
+      }, data);
+    return value ?? "";
   });
 }
 
@@ -36,13 +39,16 @@ export function generateMessages(events: any[], rules: any[], variables: any) {
       if (matchEventToRule(event, rule.matches, variables)) {
         // Capture outputs if specified
         if (rule.captures) {
-          outputs[rule.generates.type] = Object.entries(rule.captures).reduce((acc, [key, value]) => {
-            acc[key] = formatTemplateContent(value as string, {
-              event,
-              ...variables
-            });
-            return acc;
-          }, {} as Record<string, any>);
+          outputs[rule.generates.type] = Object.entries(rule.captures).reduce(
+            (acc, [key, value]) => {
+              acc[key] = formatTemplateContent(value as string, {
+                event,
+                ...variables,
+              });
+              return acc;
+            },
+            {} as Record<string, any>,
+          );
         }
 
         // Generate message with null checks
@@ -52,17 +58,17 @@ export function generateMessages(events: any[], rules: any[], variables: any) {
           title: formatTemplateContent(rule.generates.template?.title, {
             event,
             captures: outputs[rule.generates.type],
-            ...variables
+            ...variables,
           }),
           content: formatTemplateContent(rule.generates.template?.content, {
             event,
             captures: outputs[rule.generates.type],
-            ...variables
+            ...variables,
           }),
           timestamp: event.data?.time || event.timestamp,
           fromEvent: event.id,
           rule: rule.id,
-          event: event
+          event: event,
         };
 
         messages.push(message);
@@ -72,4 +78,3 @@ export function generateMessages(events: any[], rules: any[], variables: any) {
 
   return { messages, outputs };
 }
-

@@ -1,28 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { ComponentLibrary } from "@/components/ui/component-library";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { ComponentLibrary } from "@/components/ui/component-library";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { COMPONENT_LIBRARY } from "@/lib/StateMachineComponents";
-import { 
-  Cpu, 
-  Zap, 
-  Eye, 
-  GitBranch,
-  Activity,
-  Workflow
-} from "lucide-react";
+import { Activity, Cpu, Eye, GitBranch, Workflow, Zap } from "lucide-react";
 
 export default function ComponentsLabPage() {
   const categoryStats = {
-    'data-processing': { count: 1, color: 'bg-blue-100 text-blue-800' },
-    'aggregation': { count: 1, color: 'bg-green-100 text-green-800' },
-    'splitting': { count: 1, color: 'bg-purple-100 text-purple-800' },
-    'carbon-credits': { count: 3, color: 'bg-emerald-100 text-emerald-800' },
-    'validation': { count: 1, color: 'bg-orange-100 text-orange-800' },
+    "data-processing": { count: 1, color: "bg-blue-100 text-blue-800" },
+    aggregation: { count: 1, color: "bg-green-100 text-green-800" },
+    splitting: { count: 1, color: "bg-purple-100 text-purple-800" },
+    "carbon-credits": { count: 3, color: "bg-emerald-100 text-emerald-800" },
+    validation: { count: 1, color: "bg-orange-100 text-orange-800" },
   };
 
   return (
@@ -30,8 +23,8 @@ export default function ComponentsLabPage() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Composable State Machine Components Lab</h1>
         <p className="text-muted-foreground text-lg">
-          Build complex workflows by composing reusable state machine components. 
-          Design once, use everywhere - from IoT data processing to carbon credit tokenization.
+          Build complex workflows by composing reusable state machine components. Design once, use everywhere - from IoT
+          data processing to carbon credit tokenization.
         </p>
       </div>
 
@@ -96,20 +89,16 @@ export default function ComponentsLabPage() {
                   <Cpu className="h-5 w-5" />
                   Component Categories
                 </CardTitle>
-                <CardDescription>
-                  Browse components by their functional category
-                </CardDescription>
+                <CardDescription>Browse components by their functional category</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 {Object.entries(categoryStats).map(([category, stats]) => (
                   <div key={category} className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Badge className={stats.color}>
-                        {category.replace('-', ' ')}
-                      </Badge>
+                      <Badge className={stats.color}>{category.replace("-", " ")}</Badge>
                     </div>
                     <span className="text-sm text-muted-foreground">
-                      {stats.count} component{stats.count !== 1 ? 's' : ''}
+                      {stats.count} component{stats.count !== 1 ? "s" : ""}
                     </span>
                   </div>
                 ))}
@@ -122,9 +111,7 @@ export default function ComponentsLabPage() {
                   <Workflow className="h-5 w-5 text-blue-600" />
                   Workflow Builder
                 </CardTitle>
-                <CardDescription>
-                  Design complex workflows by connecting components
-                </CardDescription>
+                <CardDescription>Design complex workflows by connecting components</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 <p className="text-sm text-muted-foreground mb-4">
@@ -224,7 +211,6 @@ export default function ComponentsLabPage() {
           <ComponentLibrary />
         </TabsContent>
 
-
         <TabsContent value="workflow-builder">
           <Card>
             <CardHeader>
@@ -232,9 +218,7 @@ export default function ComponentsLabPage() {
                 <Workflow className="h-5 w-5" />
                 Visual Workflow Builder
               </CardTitle>
-              <CardDescription>
-                Drag and drop components to create custom workflows
-              </CardDescription>
+              <CardDescription>Drag and drop components to create custom workflows</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="h-[600px] border rounded-lg">

@@ -143,9 +143,7 @@
             "type": "DOCUSIGN_EVENT",
             "conditions": {
               "envelopeStatus": "sent",
-              "recipientStatus": [
-                "sent"
-              ]
+              "recipientStatus": ["sent"]
             }
           },
           "generates": {
@@ -240,22 +238,15 @@
       "states": {
         "contract_prepared": {
           "description": "Employment contract has been prepared and is ready to be sent",
-          "actions": [
-            "docusign_send"
-          ]
+          "actions": ["docusign_send"]
         },
         "contract_sent": {
           "description": "Employment contract has been sent to the candidate",
-          "actions": [
-            "send_reminder"
-          ]
+          "actions": ["send_reminder"]
         },
         "contract_signed": {
           "description": "Employment contract has been signed by the candidate",
-          "actions": [
-            "create_calendar_event",
-            "send_email"
-          ]
+          "actions": ["create_calendar_event", "send_email"]
         }
       },
       "documents": {
@@ -265,19 +256,14 @@
             "name": "Employment Contract",
             "type": "contract",
             "content": "Standard employment contract template...",
-            "linkedStates": [
-              "contract_sent",
-              "contract_signed"
-            ]
+            "linkedStates": ["contract_sent", "contract_signed"]
           },
           {
             "id": "signed_employment_contract",
             "name": "Signed Employment Contract",
             "type": "contract",
             "content": "Signed version of the employment contract",
-            "linkedStates": [
-              "contract_signed"
-            ]
+            "linkedStates": ["contract_signed"]
           }
         ]
       },
@@ -309,10 +295,7 @@
             "template": {
               "title": "Interview with {{candidate.name}}",
               "description": "Interview for {{company.department}} position",
-              "attendees": [
-                "{{candidate.email}}",
-                "{{company.email}}"
-              ]
+              "attendees": ["{{candidate.email}}", "{{company.email}}"]
             }
           }
         ],
@@ -532,9 +515,7 @@
         "data": {
           "envelopeStatus": "sent",
           "envelopeId": "ENV-789",
-          "recipientStatus": [
-            "sent"
-          ],
+          "recipientStatus": ["sent"],
           "recipients": [
             {
               "email": "john@example.com",
