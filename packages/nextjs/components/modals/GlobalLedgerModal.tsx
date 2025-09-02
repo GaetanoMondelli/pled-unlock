@@ -1,7 +1,5 @@
-
-      
 'use client';
-import React, {useEffect, useState} from 'react';
+import React from 'react';
 import { useSimulationStore } from '@/stores/simulationStore';
 import {
   Dialog,
@@ -12,70 +10,82 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import type { HistoryEntry, SourceTokenSummary } from '@/lib/simulation/types';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import type { HistoryEntry } from '@/lib/simulation/types';
 
-const formatSimTimestamp = (simTime: number): string => {
-  if (typeof simTime !== 'number' || isNaN(simTime)) {
-    return "N/A";
-  }
-  return `${simTime.toFixed(1)}s`;
-};
+const GlobalActivityTable: React.FC<{ logs: HistoryEntry[] }> = ({ logs }) => {
+  const nodesConfig = useSimulationStore(state => state.nodesConfig);
+  
+  const getNodeDisplayName = (nodeId: string) => {
+    return nodesConfig[nodeId]?.displayName || nodeId;
+  };
 
-const formatEpochTimestamp = (epochMillis: number | undefined | null): string => {
-  if (typeof epochMillis !== 'number' || isNaN(epochMillis)) {
-    return 'N/A';
-  }
-  const date = new Date(epochMillis);
-  const hours = date.getHours().toString().padStart(2, '0');
-  const minutes = date.getMinutes().toString().padStart(2, '0');
-  const seconds = date.getSeconds().toString().padStart(2, '0');
-  const milliseconds = date.getMilliseconds().toString().padStart(3, '0');
-  return `${hours}:${minutes}:${seconds}.${milliseconds}`;
-};
+  const getActionColor = (action: string): string => {
+    if (action.includes('CREATED') || action.includes('EMITTED')) return 'bg-green-100 text-green-800';
+    if (action.includes('AGGREGATED') || action.includes('CONSUMED')) return 'bg-blue-100 text-blue-800';
+    if (action.includes('OUTPUT') || action.includes('GENERATED')) return 'bg-purple-100 text-purple-800';
+    if (action.includes('ERROR')) return 'bg-red-100 text-red-800';
+    if (action.includes('ARRIVED') || action.includes('ADDED')) return 'bg-orange-100 text-orange-800';
+    return 'bg-gray-100 text-gray-800';
+  };
 
-const getEventTimeDisplay = (log: HistoryEntry): string => {
-  const formattedEpoch = formatEpochTimestamp(log.epochTimestamp);
-  if (formattedEpoch !== 'N/A') {
-    return formattedEpoch;
-  }
-  if (typeof (log as any).sequence === 'number') {
-    return `Seq: ${(log as any).sequence}`;
-  }
-  return 'N/A';
+  return (
+    <div className="border rounded-md">
+      <div className="bg-muted/50 px-3 py-2 text-xs font-medium border-b">
+        <div className="flex gap-4">
+          <div className="w-12 flex-shrink-0">Seq</div>
+          <div className="w-16 flex-shrink-0">Time</div>
+          <div className="w-32 flex-shrink-0">Node</div>
+          <div className="w-40 flex-shrink-0">Action</div>
+          <div className="w-16 flex-shrink-0">Value</div>
+          <div className="flex-1 min-w-0">Details</div>
+        </div>
+      </div>
+      <ScrollArea className="max-h-96">
+        <div className="divide-y">
+          {logs.slice(-100).reverse().map((log, index) => (
+            <div key={`${log.sequence}-${index}`} className="px-3 py-2 text-xs hover:bg-muted/30">
+              <div className="flex gap-4 items-start">
+                <div className="w-12 flex-shrink-0 font-mono text-muted-foreground">
+                  {log.sequence}
+                </div>
+                <div className="w-16 flex-shrink-0 font-mono text-muted-foreground">
+                  {log.timestamp}s
+                </div>
+                <div className="w-32 flex-shrink-0 font-medium truncate" title={getNodeDisplayName(log.nodeId)}>
+                  {getNodeDisplayName(log.nodeId)}
+                </div>
+                <div className="w-40 flex-shrink-0">
+                  <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${getActionColor(log.action)} block truncate`} title={log.action}>
+                    {log.action}
+                  </span>
+                </div>
+                <div className="w-16 flex-shrink-0 font-mono text-right">
+                  {log.value !== undefined ? String(log.value) : '-'}
+                </div>
+                <div className="flex-1 min-w-0 text-muted-foreground">
+                  <div className="break-words">
+                    {log.details || '-'}
+                  </div>
+                  {log.sourceTokenIds && log.sourceTokenIds.length > 0 && (
+                    <div className="mt-1 text-xs text-muted-foreground/70">
+                      Source: {log.sourceTokenIds.join(', ')}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </ScrollArea>
+    </div>
+  );
 };
 
 const GlobalLedgerModal: React.FC = () => {
-  const {
-    isGlobalLedgerOpen,
-    toggleGlobalLedger,
-    globalActivityLog,
-    nodesConfig,
-   } = useSimulationStore(state => ({
-    isGlobalLedgerOpen: state.isGlobalLedgerOpen,
-    toggleGlobalLedger: state.toggleGlobalLedger,
-    globalActivityLog: state.globalActivityLog,
-    nodesConfig: state.nodesConfig,
-   }));
-
-  const [displayedGlobalLog, setDisplayedGlobalLog] = useState<HistoryEntry[]>([]);
-
-  useEffect(() => {
-    if (globalActivityLog) {
-      const currentLog = globalActivityLog || [];
-      const sortedLog = [...currentLog].sort((a, b) => {
-        if (b.timestamp !== a.timestamp) { // Sim time
-          return b.timestamp - a.timestamp; // Descending (15s before 10s)
-        }
-        if (b.epochTimestamp !== a.epochTimestamp) { // Real-world event time
-          return b.epochTimestamp - a.epochTimestamp; // Descending (later epoch is newer)
-        }
-        return b.sequence - a.sequence; // Descending (higher sequence is newer)
-      });
-      setDisplayedGlobalLog(sortedLog);
-    }
-  }, [globalActivityLog]);
-
+  const isGlobalLedgerOpen = useSimulationStore(state => state.isGlobalLedgerOpen);
+  const toggleGlobalLedger = useSimulationStore(state => state.toggleGlobalLedger);
+  const globalActivityLog = useSimulationStore(state => state.globalActivityLog);
 
   const handleOpenChange = (open: boolean) => {
     if (!open && isGlobalLedgerOpen) {
@@ -84,73 +94,20 @@ const GlobalLedgerModal: React.FC = () => {
       toggleGlobalLedger();
     }
   };
-  
-  const getNodeDisplayName = (nodeId: string) => {
-    if (nodeId === 'simulation_errors' || nodeId === 'simulation_system') return 'Simulation System';
-    return nodesConfig[nodeId]?.displayName || nodeId;
-  };
-
 
   return (
     <Dialog open={isGlobalLedgerOpen} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-5xl max-h-[90vh] flex flex-col">
+      <DialogContent className="sm:max-w-7xl max-h-[90vh] flex flex-col">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle className="font-headline">Global Event Ledger</DialogTitle>
           <DialogDescription>
-            A chronological log of all significant events across all nodes in the simulation. (Newest First)
+            A chronological log of all significant events across all nodes in the simulation.
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 min-h-0 overflow-y-auto py-4 pr-2">
-          {displayedGlobalLog && displayedGlobalLog.length > 0 ? (
-            <div className="border rounded-md">
-              <Table>
-                <TableHeader className="sticky top-0 bg-background z-10">
-                  <TableRow>
-                    <TableHead className="w-[120px] py-1 px-2 text-xs">Event Time</TableHead>
-                    <TableHead className="w-[50px] py-1 px-2 text-xs">Seq</TableHead>
-                    <TableHead className="w-[80px] py-1 px-2 text-xs">Sim Time</TableHead>
-                    <TableHead className="w-[150px] py-1 px-2 text-xs">Node</TableHead>
-                    <TableHead className="w-[180px] py-1 px-2 text-xs">Action</TableHead>
-                    <TableHead className="py-1 px-2 text-xs max-w-[200px] break-words">Value</TableHead>
-                    <TableHead className="py-1 px-2 text-xs break-words">Details</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {displayedGlobalLog.map((log: HistoryEntry) => (
-                    <TableRow key={`${log.timestamp}-${log.epochTimestamp}-${log.sequence}-${log.nodeId}-${log.action}-${log.details || 'no_details_key'}`}>
-                      <TableCell className="py-0.5 px-2 text-xs">{getEventTimeDisplay(log)}</TableCell>
-                      <TableCell className="py-0.5 px-2 text-xs">{log.sequence}</TableCell>
-                      <TableCell className="py-0.5 px-2 text-xs">{formatSimTimestamp(log.timestamp)}</TableCell>
-                      <TableCell className="py-0.5 px-2 text-xs whitespace-nowrap overflow-hidden text-ellipsis max-w-[150px]" title={getNodeDisplayName(log.nodeId)}>
-                        {getNodeDisplayName(log.nodeId)}
-                      </TableCell>
-                      <TableCell className="py-0.5 px-2 text-xs whitespace-nowrap overflow-hidden text-ellipsis max-w-[180px]" title={log.action}>
-                        {log.action}
-                      </TableCell>
-                      <TableCell className="py-0.5 px-2 text-xs whitespace-pre-wrap break-words max-w-[200px]">
-                        {log.value !== undefined ? JSON.stringify(log.value) : '-'}
-                      </TableCell>
-                      <TableCell className="py-0.5 px-2 text-xs whitespace-pre-wrap break-words">
-                        {log.details || '-'}
-                        {log.sourceTokenSummaries && log.sourceTokenSummaries.length > 0 && (
-                            <div className="mt-1 pl-2 border-l-2 border-muted text-muted-foreground">
-                                <p className="text-xs font-semibold">Source Tokens:</p>
-                                <ul className="list-disc list-inside space-y-0.5">
-                                {log.sourceTokenSummaries.map(summary => (
-                                    <li key={summary.id} className="text-xs">
-                                    ID: {summary.id.substring(0,8)}, Val: {JSON.stringify(summary.originalValue)}, Origin: {getNodeDisplayName(summary.originNodeId)} @ {formatSimTimestamp(summary.createdAt)}
-                                    </li>
-                                ))}
-                                </ul>
-                            </div>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+          {globalActivityLog && globalActivityLog.length > 0 ? (
+            <GlobalActivityTable logs={globalActivityLog} />
           ) : (
             <p className="text-sm text-muted-foreground p-3 border rounded-md">
               No global activity logged yet. Start the simulation or load a scenario.
@@ -167,5 +124,3 @@ const GlobalLedgerModal: React.FC = () => {
 };
 
 export default GlobalLedgerModal;
-
-    

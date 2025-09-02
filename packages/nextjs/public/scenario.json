@@ -47,9 +47,7 @@
         "x": 550,
         "y": 200
       },
-      "inputNodeIds": [
-        "Queue_B"
-      ],
+      "inputNodeIds": ["Queue_B"],
       "outputs": [
         {
           "formula": "inputs.Queue_B.value + 10",

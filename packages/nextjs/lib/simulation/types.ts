@@ -1,5 +1,3 @@
-
-      
 import { z } from 'zod';
 
 export const SourceTokenSummarySchema = z.object({
@@ -138,5 +136,3 @@ export interface RFNodeData {
 export interface RFEdgeData {
   animated?: boolean;
 }
-
-    

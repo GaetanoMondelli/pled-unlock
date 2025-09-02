@@ -59,6 +59,9 @@
   "engines": {
     "node": ">=18.18.0"
   },
+  "resolutions": {
+    "zustand": "~5.0.0"
+  },
   "dependencies": {
     "@radix-ui/react-collapsible": "^1.1.2",
     "@shadcn/ui": "^0.0.4",
