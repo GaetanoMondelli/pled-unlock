@@ -275,9 +275,8 @@ export default function WorkflowBuilderPage() {
                 {components.map(component => (
                   <div
                     key={component.id}
-                    className={`absolute p-3 bg-background border rounded-lg shadow-sm cursor-move hover:shadow-md transition-all ${
-                      selectedComponent === component.id ? "ring-2 ring-primary" : ""
-                    }`}
+                    className={`absolute p-3 bg-background border rounded-lg shadow-sm cursor-move hover:shadow-md transition-all ${selectedComponent === component.id ? "ring-2 ring-primary" : ""
+                      }`}
                     style={{
                       left: component.position.x,
                       top: component.position.y,

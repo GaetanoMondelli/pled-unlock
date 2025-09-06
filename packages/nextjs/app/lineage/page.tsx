@@ -5,6 +5,7 @@ export default function LineagePage() {
       <div className="bg-muted p-4 rounded-lg">
         <p>Lineage components are available for integration.</p>
         <p className="text-sm text-muted-foreground">Use LineageTable, D3TokenTree, or CompactTokenTree with your TokenLineage data.</p>
+        <p className="text-sm text-muted-foreground mt-2">Components are now located under workflow-builder/lineage/</p>
       </div>
     </div>
   );

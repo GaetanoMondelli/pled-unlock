@@ -8,7 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import type { HistoryEntry, Token } from "@/lib/simulation/types";
 import { useSimulationStore } from "@/stores/simulationStore";
-import D3TokenTree from "@/components/lineage/D3TokenTree";
+import D3TokenTree from "@/components/workflow-builder/lineage/D3TokenTree";
 import { TokenGenealogyEngine } from "@/lib/simulation/tokenGenealogyEngine";
 
 const TokenInspectorModal: React.FC = () => {
