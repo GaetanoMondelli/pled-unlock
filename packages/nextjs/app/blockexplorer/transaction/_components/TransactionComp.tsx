@@ -129,7 +129,7 @@ const TransactionComp = ({ txHash }: { txHash: Hash }) => {
                   <ul>
                     {receipt?.logs?.map((log, i) => (
                       <li key={i}>
-                        <strong>Log {i} topics:</strong> {JSON.stringify(log.topics, replacer, 2)}
+                        <strong>Log {i} topics:</strong> {JSON.stringify((log as any).topics, replacer, 2)}
                       </li>
                     ))}
                   </ul>

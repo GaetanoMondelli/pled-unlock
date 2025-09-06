@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowRight, BookOpen, Cpu, Database, FileCode, GitBranch, Mail, Rocket, ShieldCheck } from "lucide-react";
+// Temporarily removing lucide icons due to build issues
 
 export default function ArchitecturePage() {
   return (
@@ -22,12 +22,12 @@ export default function ArchitecturePage() {
           <div className="mt-8 flex gap-3">
             <Link href="/api">
               <Button size="lg" className="gap-2">
-                <FileCode className="h-4 w-4" /> Explore the API Docs
+                Explore the API Docs
               </Button>
             </Link>
             <Link href="/whitepaper">
               <Button size="lg" variant="outline" className="gap-2">
-                <BookOpen className="h-4 w-4" /> Read the Technical Whitepaper
+                Read the Technical Whitepaper
               </Button>
             </Link>
           </div>
@@ -63,32 +63,32 @@ export default function ArchitecturePage() {
 
           <div className="grid md:grid-cols-2 gap-6">
             <ModuleCard
-              icon={<GitBranch className="h-5 w-5" />}
+              icon={<div className="h-5 w-5 bg-primary/10 rounded"></div>}
               title="The Representation Module"
               role="The blueprint of the process, defined as a formal state machine."
               patent="Corresponds to Module (2) in our WIPO patent application."
             />
             <ModuleCard
-              icon={<Database className="h-5 w-5" />}
+              icon={<div className="h-5 w-5 bg-primary/10 rounded"></div>}
               title="The Event Reception & Storage Module"
               role="The gateway that ingests, classifies, and chronologically stores all raw event data."
               patent="Corresponds to Module (3) in our WIPO patent application."
             />
             <ModuleCard
-              icon={<Cpu className="h-5 w-5" />}
+              icon={<div className="h-5 w-5 bg-primary/10 rounded"></div>}
               title="The Event Interpretation & Validation Module"
               role="The patented brain of the protocol: an AI engine that interprets unstructured event data to create validated, meaningful Messages."
               patent="Corresponds to Module (4) in our WIPO patent application."
               highlight
             />
             <ModuleCard
-              icon={<ShieldCheck className="h-5 w-5" />}
+              icon={<div className="h-5 w-5 bg-primary/10 rounded"></div>}
               title="The Procedure State Update Module"
               role="Applies validated Messages to the state machine, driving the process forward."
               patent="Corresponds to Module (5) in our WIPO patent application."
             />
             <ModuleCard
-              icon={<Rocket className="h-5 w-5" />}
+              icon={<div className="h-5 w-5 bg-primary/10 rounded"></div>}
               title="The Action Module"
               role="Translates state changes into real-world outcomes, from API calls to on-chain transactions."
               patent="Corresponds to Module (8) in our WIPO patent application."
@@ -107,28 +107,28 @@ export default function ArchitecturePage() {
               step="1"
               title="Ingest"
               desc="A 'payment approved' email arrives and is captured as a raw Event."
-              icon={<Mail className="h-4 w-4" />}
+              icon={<div className="h-4 w-4 bg-primary/10 rounded"></div>}
             />
             <Arrow className="hidden lg:flex" />
             <FlowStep
               step="2"
               title="Interpret"
               desc="The AI engine classifies and validates it as a Message: payment_approved."
-              icon={<Cpu className="h-4 w-4" />}
+              icon={<div className="h-4 w-4 bg-primary/10 rounded"></div>}
             />
             <Arrow className="hidden lg:flex" />
             <FlowStep
               step="3"
               title="Update State"
               desc="The state machine transitions from Pending to Paid."
-              icon={<GitBranch className="h-4 w-4" />}
+              icon={<div className="h-4 w-4 bg-primary/10 rounded"></div>}
             />
             <Arrow className="hidden lg:flex" />
             <FlowStep
               step="4"
               title="Act"
               desc="An 'Issue Receipt' action is triggered (e.g., mint receipt token, send webhook)."
-              icon={<Rocket className="h-4 w-4" />}
+              icon={<div className="h-4 w-4 bg-primary/10 rounded"></div>}
             />
           </div>
         </div>
@@ -141,12 +141,12 @@ export default function ArchitecturePage() {
             <h3 className="text-xl font-semibold mr-auto">Build on a Verifiable Foundation</h3>
             <Link href="/api">
               <Button size="lg" className="gap-2">
-                <FileCode className="h-4 w-4" /> Explore the API Docs
+                Explore the API Docs
               </Button>
             </Link>
             <Link href="/whitepaper">
               <Button size="lg" variant="outline" className="gap-2">
-                <BookOpen className="h-4 w-4" /> Read the Technical Whitepaper
+                Read the Technical Whitepaper
               </Button>
             </Link>
           </div>
@@ -209,7 +209,7 @@ function FlowStep({ step, title, desc, icon }: { step: string; title: string; de
 function Arrow({ className }: { className?: string }) {
   return (
     <div className={className}>
-      <ArrowRight className="h-6 w-6 text-muted-foreground mt-14" />
+      <div className="h-6 w-6 bg-muted-foreground/20 rounded mt-14"></div>
     </div>
   );
 }
