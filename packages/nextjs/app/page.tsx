@@ -10,6 +10,12 @@ import { Brain, Clock, Link2Off, Puzzle, ShieldAlert, Zap } from "lucide-react";
 import { RequestDemoDialog } from "@/components/marketing/RequestDemoDialog";
 import BottomLedger from "@/components/BottomLedger";
 import SafeHeroFsmAnimation from "@/components/SafeHeroFsmAnimation";
+import BlurFade from "@/components/ui/blur-fade";
+import BorderBeam from "@/components/ui/border-beam";
+import Marquee from "@/components/ui/marquee";
+import { BentoGrid, BentoGridItem } from "@/components/ui/bento-grid";
+import ArchitectureDiagram from "@/components/ArchitectureDiagram";
+import { Highlighter } from "@/components/ui/highlighter";
 
 export default function Home() {
   return <Landing />;
@@ -77,10 +83,10 @@ function Landing() {
           <div className="grid lg:grid-cols-2 gap-10 items-stretch">
             <motion.div ref={heroMeasureRef} variants={stagger} initial="hidden" animate="show" className="self-center">
               <motion.h1 id="hero-title" className="text-4xl sm:text-5xl font-extrabold tracking-tight leading-tight" variants={fadeUp}>
-                AI-Powered Trust for the $16T Tokenization Market.
+                AI-Powered Trust for the <Highlighter action="highlight" color="#FF9800" animationDuration={1000} isView={true}>$16T</Highlighter> Tokenization Market.
               </motion.h1>
               <motion.p id="hero-subtitle" className="mt-5 text-lg text-muted-foreground max-w-2xl" variants={fadeUp}>
-                Pled creates verifiable, <span className="font-semibold text-foreground">living digital twins</span> of your most complex processes — from contracts to supply chains — bridging the gap between tokens and reality.
+                Pled creates verifiable, <span className="font-semibold text-foreground">living digital twins</span> of your most complex processes, from contracts to supply chains, bridging the gap between tokens and reality
               </motion.p>
               <motion.div id="hero-cta" className="mt-8 flex flex-wrap gap-3" variants={fadeUp}>
                 <RequestDemoDialog trigger={<Button size="lg">Book a Demo</Button>} />
@@ -126,87 +132,138 @@ function Landing() {
   {/* SOLVING THE DIGITAL TRUST DEFICIT */}
       <section className="border-t bg-white dark:bg-black">
         <div className="container mx-auto px-6 py-20">
+          <BlurFade delay={0.2} className="mb-16">
+            <h2 className="text-2xl sm:text-3xl font-bold">Today's Tokenization is Broken.</h2>
+            <p className="mt-4 max-w-3xl text-muted-foreground">Most digital assets are dead static tokens, instantly outdated, disconnected from reality, and reliant on costly manual checks and software updates. That kills trust and scalability. The promise is real, but the execution is flawed.</p>
+          </BlurFade>
+
+          {/* TOKENIZATION POTENTIAL MARQUEE */}
           <div className="mb-16">
-          <h2 className="text-2xl sm:text-3xl font-bold">Today's Tokenization is Broken.</h2>
-          <p className="mt-4 max-w-3xl text-muted-foreground">Most digital assets are dead static tokens, instantly outdated, disconnected from reality, and reliant on costly manual checks and software updates. That kills trust and scalability.</p>
+            <Marquee className="[--duration:120s]" pauseOnHover speed="slow">
+              <div className="flex items-center space-x-3 bg-white dark:bg-gray-900 px-5 py-3 rounded-lg shadow-sm border mx-3 min-w-[280px] max-w-[350px]">
+                <img src="/logos/blackrock.png" alt="BlackRock" className="w-20 h-20 object-contain flex-shrink-0" />
+                <div className="text-xs">
+                  <p className="font-medium text-gray-900 dark:text-gray-100 leading-relaxed">"The next step will be <Highlighter action="underline" color="#22c55e">tokenization</Highlighter> of financial assets"</p>
+                  <p className="text-gray-600 dark:text-gray-400 mt-1">— Larry Fink, BlackRock</p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-3 bg-white dark:bg-gray-900 px-5 py-3 rounded-lg shadow-sm border mx-3 min-w-[280px] max-w-[350px]">
+                <img src="/logos/bcg.png" alt="BCG" className="w-20 h-20 object-contain flex-shrink-0" />
+                <div className="text-xs">
+                  <p className="font-medium text-gray-900 dark:text-gray-100 leading-relaxed">"<Highlighter action="underline" color="#22c55e">Tokenization</Highlighter> could reach <Highlighter action="underline" color="#22c55e">$16 trillion</Highlighter> by 2030"</p>
+                  <p className="text-gray-600 dark:text-gray-400 mt-1">— Boston Consulting Group</p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-3 bg-white dark:bg-gray-900 px-5 py-3 rounded-lg shadow-sm border mx-3 min-w-[280px] max-w-[350px]">
+                <img src="/logos/wef.png" alt="World Economic Forum" className="w-20 h-20 object-contain flex-shrink-0" />
+                <div className="text-xs">
+                  <p className="font-medium text-gray-900 dark:text-gray-100 leading-relaxed">"Trade-offs between <Highlighter action="underline" color="#22c55e">efficiency</Highlighter> and <Highlighter action="underline" color="#22c55e">flexibility</Highlighter>"</p>
+                  <p className="text-gray-600 dark:text-gray-400 mt-1">— World Economic Forum</p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-3 bg-white dark:bg-gray-900 px-5 py-3 rounded-lg shadow-sm border mx-3 min-w-[280px] max-w-[350px]">
+                <img src="/logos/mckkinsey.png" alt="McKinsey" className="w-16 h-16 object-contain flex-shrink-0" />
+                <div className="text-xs">
+                  <p className="font-medium text-gray-900 dark:text-gray-100 leading-relaxed">"Realizing benefits requires assembling <Highlighter action="underline" color="#22c55e">counterparties</Highlighter> to <Highlighter action="underline" color="#22c55e">collaborate</Highlighter>"</p>
+                  <p className="text-gray-600 dark:text-gray-400 mt-1">— McKinsey & Company</p>
+                </div>
+              </div>
+            </Marquee>
           </div>
           
-          <div className="grid gap-8 lg:grid-cols-3">
-            <Card className="h-full">
-              <CardHeader>
-                <div className="w-16 h-16 bg-muted rounded-full mb-6 flex items-center justify-center mx-auto">
-                  <svg className="w-8 h-8 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                  </svg>
-                </div>
-                <CardTitle>The Challenge</CardTitle>
-                <CardDescription className="mt-6 space-y-2">
-                  <div>• Fragmented, outdated digital information</div>
-                  <div>• Costly manual reconciliations</div>
-                  <div>• Rigid software vs flexible legal and industry needs</div>
-                  <div>• No way to handle ambiguous real-world data</div>
-                  <div>• Trust deficit between parties</div>
-                </CardDescription>
-              </CardHeader>
-            </Card>
+          <BentoGrid className="max-w-7xl mx-auto">
+            <BorderBeam
+              className="md:col-span-1"
+              colorFrom="#ef4444"
+              colorTo="#f97316"
+              duration={8}
+            >
+              <BentoGridItem
+                className="md:col-span-1 border-0 bg-white dark:bg-gray-950"
+                title="The Challenge"
+                description={
+                  <div className="space-y-2 text-sm">
+                    <div>• Fragmented, outdated digital information</div>
+                    <div>• Costly manual reconciliations</div>
+                    <div>• Rigid software vs flexible legal needs</div>
+                    <div>• No way to handle ambiguous data</div>
+                    <div>• Trust deficit between parties</div>
+                  </div>
+                }
+                header={
+                  <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-6 mx-auto">
+                    <ShieldAlert className="w-8 h-8 text-red-600 dark:text-red-400" />
+                  </div>
+                }
+              />
+            </BorderBeam>
 
-            {/* The Pled Solution */}
-            <Card className="h-full">
-              <CardHeader>
-                <div className="w-16 h-16 bg-muted rounded-full mb-6 flex items-center justify-center mx-auto">
-                  <svg className="w-8 h-8 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <CardTitle>PLED Protocol</CardTitle>
-                <CardDescription className="mt-6 space-y-2">
-                  <div>• Living digital twins that evolve</div>
-                  <div>• AI-powered data interpretation</div>
-                  <div>• Probabilistic state management when necessary</div>
-                  <div>• Verifiable audit trails</div>
-                  <div>• Flexible and composable workflow automation</div>
-                  <div>• Back compatible and integrable with existing systems</div>
-                </CardDescription>
-              </CardHeader>
-            </Card>
+            <BorderBeam
+              className="md:col-span-1"
+              colorFrom="#3b82f6"
+              colorTo="#06b6d4"
+              duration={10}
+            >
+              <BentoGridItem
+                className="md:col-span-1 border-0 bg-white dark:bg-gray-950"
+                title="PLED Protocol"
+                description={
+                  <div className="space-y-2 text-sm">
+                    <div>• Living digital twins that evolve</div>
+                    <div>• AI-powered data interpretation</div>
+                    <div>• Probabilistic state management</div>
+                    <div>• Verifiable audit trails</div>
+                    <div>• Flexible workflow automation</div>
+                  </div>
+                }
+                header={
+                  <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-6 mx-auto">
+                    <Brain className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+                  </div>
+                }
+              />
+            </BorderBeam>
 
-            {/* The Result */}
-            <Card className="h-full">
-              <CardHeader>
-                <div className="w-16 h-16 bg-muted rounded-full mb-6 flex items-center justify-center mx-auto">
-                  <svg className="w-8 h-8 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                  </svg>
-                </div>
-                <CardTitle>The Result</CardTitle>
-                <CardDescription className="mt-6 space-y-2">
-                  <div>• Reduced operational costs</div>
-                  <div>• Data insights for optimization</div>
-                  <div>• Increased transparency & trust</div>
-                  <div>• Real-time compliance verification</div>
-                  <div>• Continuous state synchronization</div>
-                </CardDescription>
-              </CardHeader>
-            </Card>
-          </div>
+            <BorderBeam
+              className="md:col-span-1"
+              colorFrom="#22c55e"
+              colorTo="#10b981"
+              duration={12}
+            >
+              <BentoGridItem
+                className="md:col-span-1 border-0 bg-white dark:bg-gray-950"
+                title="The Result"
+                description={
+                  <div className="space-y-2 text-sm">
+                    <div>• Reduced operational costs</div>
+                    <div>• Data insights for optimization</div>
+                    <div>• Increased transparency & trust</div>
+                    <div>• Real-time compliance verification</div>
+                    <div>• Continuous state synchronization</div>
+                  </div>
+                }
+                header={
+                  <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-6 mx-auto">
+                    <Zap className="w-8 h-8 text-green-600 dark:text-green-400" />
+                  </div>
+                }
+              />
+            </BorderBeam>
+          </BentoGrid>
         </div>
       </section>
 
   {/* HOW IT WORKS - simple two-column layout with left placeholder */}
-      <section className="border-t">
+      <section className="border-t bg-muted/30">
         <div className="container mx-auto px-6 py-20">
+          <BlurFade delay={0.1}>
             <h2 className="text-2xl sm:text-3xl font-bold">Pled turns digital mess into living digital twins</h2>
-          <p className="mt-3 max-w-3xl text-muted-foreground">  Turn messy, real-world signals into reliable insights, then automate decisions with guardrails.
-  From ingestion to action, every step is observable, testable, and safe by design </p>
+            <p className="mt-3 max-w-3xl text-muted-foreground">Turn messy, real-world signals into reliable insights, then automate decisions with guardrails. From ingestion to action, every step is observable, testable, and safe by design</p>
+          </BlurFade>
           <div className="mt-8 grid gap-8 lg:grid-cols-2 items-start">
-            {/* Left: visual placeholder */}
-            <div
-              id="how-it-works-visual-placeholder"
-              className="rounded-xl border border-dashed bg-muted/20 ring-1 ring-border min-h-[260px] sm:min-h-[320px] grid place-items-center"
-            >
-              <div className="text-xs sm:text-sm text-muted-foreground">
-                Visual placeholder — high-level diagram area
-              </div>
+            {/* Left: Architecture Diagram */}
+            <div className="lg:mr-4">
+              <ArchitectureDiagram />
             </div>
             {/* Right: the 3 simple steps */}
             <div className="space-y-8">
@@ -234,10 +291,12 @@ function Landing() {
       </section>
 
       {/* CORE BENEFITS - simple feature blocks (no cards/chips) */}
-      <section className="border-t bg-muted/30">
+      <section className="border-t bg-white dark:bg-black">
         <div className="container mx-auto px-6 py-20">
-          <h2 className="text-2xl sm:text-3xl font-bold">AI-Powered Verifiable Operations</h2>
-          <p className="mt-3 max-w-3xl text-muted-foreground">Turn messy, real-world processes into auditable, automated workflows.</p>
+          <BlurFade delay={0.2}>
+            <h2 className="text-2xl sm:text-3xl font-bold">AI-Powered Verifiable Operations</h2>
+            <p className="mt-3 max-w-3xl text-muted-foreground">Turn messy, real-world processes into auditable, automated workflows.</p>
+          </BlurFade>
           <div className="mt-10 grid gap-10 sm:grid-cols-2 lg:grid-cols-3">
             <div>
               <div className="p-2 rounded-md bg-primary/10 text-primary w-fit mb-3"><Puzzle className="h-6 w-6" /></div>
@@ -259,9 +318,11 @@ function Landing() {
       </section>
 
   {/* USE CASES */}
-      <section className="border-t">
+      <section className="border-t bg-muted/30">
         <div className="container mx-auto px-6 py-20">
-          <h2 className="text-2xl sm:text-3xl font-bold">Powering the Next Generation of Digital Assets</h2>
+          <BlurFade delay={0.1}>
+            <h2 className="text-2xl sm:text-3xl font-bold">Powering the Next Generation of Digital Assets</h2>
+          </BlurFade>
           <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             <UseCaseCard title="Carbon Credits" text="Prove creation, transfer, and retirement with trusted event trails to eliminate double-counting." />
             <UseCaseCard title="Pharma Cold Chain" text="Live, verifiable temperature and custody data to guarantee integrity from factory to patient." />
@@ -274,14 +335,16 @@ function Landing() {
   {/* FINAL CTA */}
       <section className="border-t bg-gradient-to-b from-white to-slate-50 dark:from-gray-950 dark:to-black">
         <div className="container mx-auto px-6 py-20">
-          <h2 className="text-2xl sm:text-3xl font-bold">Pled is the AI that makes tokenization trustworthy.</h2>
-          <p className="mt-3 max-w-2xl text-muted-foreground">Ready to bridge reality and digital assets?</p>
-          <div className="mt-6 flex gap-3">
-            <RequestDemoDialog trigger={<Button size="lg">Book a Demo</Button>} />
-            <Link href="/architecture">
-              <Button size="lg" variant="outline">See the Tech</Button>
-            </Link>
-          </div>
+          <BlurFade delay={0.3}>
+            <h2 className="text-2xl sm:text-3xl font-bold">Pled is the AI that makes tokenization trustworthy.</h2>
+            <p className="mt-3 max-w-2xl text-muted-foreground">Ready to bridge reality and digital assets?</p>
+            <div className="mt-6 flex gap-3">
+              <RequestDemoDialog trigger={<Button size="lg">Book a Demo</Button>} />
+              <Link href="/architecture">
+                <Button size="lg" variant="outline">See the Tech</Button>
+              </Link>
+            </div>
+          </BlurFade>
         </div>
       </section>
 
@@ -321,23 +384,6 @@ function Landing() {
   );
 }
 
-function ProblemCard({ icon, title, text }: { icon: React.ReactNode; title: string; text: string }) {
-  return (
-    <Card>
-      <CardHeader className="flex flex-row gap-4 items-start">
-        <div className="p-2 rounded-md bg-primary/10 text-primary">{icon}</div>
-        <div>
-          <CardTitle>{title}</CardTitle>
-          <CardDescription className="mt-2">{text}</CardDescription>
-        </div>
-      </CardHeader>
-    </Card>
-  );
-}
-
-function BenefitCard({ icon, title, text }: { icon: React.ReactNode; title: string; text: string }) {
-  return null;
-}
 
 function UseCaseCard({ title, text }: { title: string; text: string }) {
   return (
