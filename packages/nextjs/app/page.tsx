@@ -52,17 +52,17 @@ function Landing() {
       {
         id: 1,
         title: "Capture",
-        body: "Ingest raw, real-world events from emails, docs, sensors, and APIs. Every event is anchored to create an immutable history.",
+        body: "Ingest raw, real-world events from emails, docs, sensors, and APIs. Every event is anchored to create an immutable history",
       },
       {
         id: 2,
         title: "Validate",
-        body: "Our AI interprets each event, validates it against your rules, and assigns a Reliability Index (RI) so decisions are made with confidence.",
+        body: "Our Rules Engine turns events into actionable Messages, uses AI for unclear cases, and assigns a Reliability Index so you can decide with confidence",
       },
       {
         id: 3,
         title: "Execute",
-        body: "Validated messages update your living digital twin and trigger the next safe action — on-chain or off — automatically.",
+        body: "Validated Messages update your living digital twin and trigger the next safe action automatically based on its current state",
       },
     ],
     [],
@@ -144,9 +144,7 @@ function Landing() {
           <BlurFade delay={0.2} className="mb-16">
             <h2 className="text-2xl sm:text-3xl font-bold">Today's Tokenization is Broken.</h2>
             <p className="mt-4 max-w-3xl text-muted-foreground">
-              Most digital assets exist as static tokens — instantly outdated, disconnected from reality, and dependent
-              on costly manual checks and rigid software updates. That kills trust and scalability. The vision is
-              powerful, but today’s execution falls short.
+Tokenization promises to transform global markets and unlock trillions in value. Yet today's tokens are static, outdated, and costly to maintain, undermining trust and scalability
             </p>
           </BlurFade>
 
@@ -224,18 +222,18 @@ function Landing() {
             </Marquee>
           </div>
 
-          <BentoGrid className="max-w-7xl mx-auto">
-            <BorderBeam className="md:col-span-1" colorFrom="#ef4444" colorTo="#f97316" duration={8}>
+          <BentoGrid className="max-w-none mx-auto mb-24 grid-cols-1 lg:grid-cols-3 gap-8 text-left">
+            <BorderBeam className="col-span-1" colorFrom="#ef4444" colorTo="#f97316" duration={8}>
               <BentoGridItem
-                className="md:col-span-1 border-0 bg-white dark:bg-gray-950"
+                className="col-span-1 border-0 bg-white dark:bg-gray-950 p-8"
                 title="The Challenge"
                 description={
-                  <div className="space-y-2 text-sm">
-                    <div>• Fragmented, outdated digital information</div>
-                    <div>• Costly manual reconciliations</div>
-                    <div>• Rigid software vs flexible legal needs</div>
-                    <div>• No way to handle ambiguous data</div>
-                    <div>• Trust deficit between parties</div>
+                  <div className="space-y-3 text-base">
+                    <div>• Manual reconciliation is slow and expensive</div>
+                    <div>• Legacy systems can't handle well unstructured data</div>
+                    <div>• Existing solutions and smart contracts are too rigid</div>
+                    <div>• Unclear regulations create uncertainty</div>
+                    <div>• Low liquidity and fragmented protocols limit adoption</div>
                   </div>
                 }
                 header={
@@ -246,17 +244,17 @@ function Landing() {
               />
             </BorderBeam>
 
-            <BorderBeam className="md:col-span-1" colorFrom="#3b82f6" colorTo="#06b6d4" duration={10}>
+            <BorderBeam className="col-span-1" colorFrom="#3b82f6" colorTo="#06b6d4" duration={10}>
               <BentoGridItem
-                className="md:col-span-1 border-0 bg-white dark:bg-gray-950"
+                className="col-span-1 border-0 bg-white dark:bg-gray-950 p-8"
                 title="PLED Protocol"
                 description={
-                  <div className="space-y-2 text-sm">
-                    <div>• Living digital twins that evolve</div>
-                    <div>• AI-powered data interpretation</div>
-                    <div>• Probabilistic state management</div>
-                    <div>• Verifiable audit trails</div>
-                    <div>• Flexible workflow automation</div>
+                  <div className="space-y-3 text-base">
+                    <div>• AI interprets unstructured data with reliability scoring</div>
+                    <div>• Smart state machines handle complex workflows</div>
+                    <div>• Modular architecture for flexible agreement modeling</div>
+                    <div>• Data storage, processing and settlement are separated</div>
+                    <div>• Can be easily integrated with existing systems</div>
                   </div>
                 }
                 header={
@@ -267,17 +265,17 @@ function Landing() {
               />
             </BorderBeam>
 
-            <BorderBeam className="md:col-span-1" colorFrom="#22c55e" colorTo="#10b981" duration={12}>
+            <BorderBeam className="col-span-1" colorFrom="#22c55e" colorTo="#10b981" duration={12}>
               <BentoGridItem
-                className="md:col-span-1 border-0 bg-white dark:bg-gray-950"
+                className="col-span-1 border-0 bg-white dark:bg-gray-950 p-8"
                 title="The Result"
                 description={
-                  <div className="space-y-2 text-sm">
-                    <div>• Reduced operational costs</div>
-                    <div>• Data insights for optimization</div>
-                    <div>• Increased transparency & trust</div>
+                  <div className="space-y-3 text-base">
+                    <div>• Reduce costs through automated workflows</div>
+                    <div>• Create unified, auditable asset records</div>
+                    <div>• Lower investment barriers for broader market access</div>
+                    <div>• Optimization from real-time data insights</div>
                     <div>• Real-time compliance verification</div>
-                    <div>• Continuous state synchronization</div>
                   </div>
                 }
                 header={
@@ -301,13 +299,13 @@ function Landing() {
               ingestion to action, every step is observable, testable, and safe by design
             </p>
           </BlurFade>
-          <div className="mt-8 grid gap-8 lg:grid-cols-2 items-start">
+          <div className="mt-8 grid gap-8 lg:grid-cols-2 items-center">
             {/* Left: Architecture Diagram */}
             <div className="lg:mr-4">
               <ArchitectureDiagram />
             </div>
             {/* Right: the 3 simple steps */}
-            <div className="space-y-8">
+            <div className="space-y-8 flex flex-col justify-center">
               {steps.map(step => (
                 <motion.div
                   key={step.id}
