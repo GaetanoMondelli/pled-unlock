@@ -16,6 +16,7 @@
     "pled:upload": "ts-node --compilerOptions '{\"module\":\"commonjs\"}' scripts/pled-sync.ts upload"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@hello-pangea/dnd": "^17.0.0",
     "@heroicons/react": "~2.1.5",
     "@radix-ui/react-checkbox": "^1.1.3",

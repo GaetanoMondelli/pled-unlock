@@ -5,6 +5,7 @@ import GraphVisualization from "@/components/graph/GraphVisualization";
 import GlobalLedgerModal from "@/components/modals/GlobalLedgerModal";
 import NodeInspectorModal from "@/components/modals/NodeInspectorModal";
 import TokenInspectorModal from "@/components/modals/TokenInspectorModal";
+import IntegratedAIAssistant from "@/components/ai/IntegratedAIAssistant";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -20,7 +21,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useSimulationStore } from "@/stores/simulationStore";
-import { AlertCircle, BookOpen, Edit, Pause, Play, RefreshCw, StepForward } from "lucide-react";
+import { AlertCircle, BookOpen, Edit, Pause, Play, RefreshCw, StepForward, Brain, Zap } from "lucide-react";
+import { cn } from "~~/lib/utils";
 
 export default function TemplateEditorPage() {
   const loadScenario = useSimulationStore(state => state.loadScenario);
@@ -41,6 +43,7 @@ export default function TemplateEditorPage() {
   const [isScenarioEditorOpen, setIsScenarioEditorOpen] = useState(false);
   const [scenarioEditText, setScenarioEditText] = useState<string>("");
   const [defaultScenarioContent, setDefaultScenarioContent] = useState<string>("");
+  const [showAIAssistant, setShowAIAssistant] = useState(true);
   const lastErrorCountRef = useRef(0);
 
   const fetchDefaultScenarioContent = useCallback(async () => {
@@ -172,6 +175,15 @@ export default function TemplateEditorPage() {
             <Button variant="outline" size="sm" onClick={handleReloadDefaultScenario}>
               <RefreshCw className="mr-2 h-4 w-4" /> Reload Default
             </Button>
+            <Button 
+              variant={showAIAssistant ? "default" : "outline"} 
+              size="sm" 
+              onClick={() => setShowAIAssistant(!showAIAssistant)}
+              className="bg-slate-900 hover:bg-slate-800 text-white border-slate-700"
+            >
+              <Brain className="mr-2 h-4 w-4" /> 
+              AI Agent
+            </Button>
             <Button variant={isRunning ? "destructive" : "default"} size="sm" onClick={handlePlayPause}>
               {isRunning ? (
                 <>
@@ -194,28 +206,43 @@ export default function TemplateEditorPage() {
       </header>
 
       <main className="flex-grow flex relative overflow-hidden">
-        {errorMessages.length > 0 && (
-          <div className="absolute top-4 left-4 z-10 bg-destructive/90 text-destructive-foreground p-3 rounded-md shadow-lg max-w-md">
-            <div className="flex items-center">
-              <AlertCircle className="h-4 w-4 mr-2" />
-              <span className="font-semibold">Simulation Errors ({errorMessages.length})</span>
+        {/* Main Content Area */}
+        <div className={cn(
+          "flex-grow h-full transition-all duration-300",
+          showAIAssistant ? "mr-96" : "mr-0"
+        )}>
+          {errorMessages.length > 0 && (
+            <div className="absolute top-4 left-4 z-10 bg-destructive/90 text-destructive-foreground p-3 rounded-md shadow-lg max-w-md">
+              <div className="flex items-center">
+                <AlertCircle className="h-4 w-4 mr-2" />
+                <span className="font-semibold">Simulation Errors ({errorMessages.length})</span>
+              </div>
+              <ScrollArea className="max-h-32 mt-2">
+                <ul className="text-sm space-y-1">
+                  {errorMessages.map((msg, index) => (
+                    <li key={index}>• {msg}</li>
+                  ))}
+                </ul>
+              </ScrollArea>
+              <Button variant="outline" size="sm" className="mt-2" onClick={clearErrors}>
+                Clear Errors
+              </Button>
             </div>
-            <ScrollArea className="max-h-32 mt-2">
-              <ul className="text-sm space-y-1">
-                {errorMessages.map((msg, index) => (
-                  <li key={index}>• {msg}</li>
-                ))}
-              </ul>
-            </ScrollArea>
-            <Button variant="outline" size="sm" className="mt-2" onClick={clearErrors}>
-              Clear Errors
-            </Button>
+          )}
+
+          <div className="h-full w-full">
+            <GraphVisualization />
+          </div>
+        </div>
+
+        {/* AI Assistant Side Panel */}
+        {showAIAssistant && (
+          <div className="fixed right-0 top-0 h-full w-96 z-20">
+            <div className="h-full pt-[73px]">
+              <IntegratedAIAssistant className="h-full" />
+            </div>
           </div>
         )}
-
-        <div className="flex-grow h-full w-full">
-          <GraphVisualization />
-        </div>
       </main>
 
       {/* Scenario Editor Modal */}

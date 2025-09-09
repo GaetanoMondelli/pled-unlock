@@ -125,6 +125,80 @@ function Landing() {
         </div>
       </section>
 
+      {/* AI WORKFLOW SIMULATOR SHOWCASE */}
+      <section className="border-t bg-muted/10">
+        <div className="container mx-auto px-6 py-20">
+          <BlurFade delay={0.1} className="text-center mb-12">
+            <h2 className="text-2xl sm:text-3xl font-bold">Model Complex Workflows with AI Assistance</h2>
+            <p className="mt-4 max-w-3xl mx-auto text-muted-foreground">
+              Our visual template editor lets you design tokenization workflows using AI chat, just like Cursor for digital transformation
+            </p>
+          </BlurFade>
+          
+          <div className="max-w-5xl mx-auto">
+            <BorderBeam 
+              className="bg-white dark:bg-gray-900 p-2 rounded-2xl shadow-2xl"
+              colorFrom="#3b82f6"
+              colorTo="#06b6d4"
+              duration={15}
+            >
+              <div className="bg-gray-100 dark:bg-gray-800 rounded-xl p-4 relative overflow-hidden">
+                {/* Browser mockup header */}
+                <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-300 dark:border-gray-600">
+                  <div className="flex gap-2">
+                    <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                    <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                    <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                  </div>
+                  <div className="flex-1 bg-white dark:bg-gray-700 rounded px-3 py-1 text-sm text-gray-600 dark:text-gray-300 ml-4">
+                    pled.io/workflow-builder
+                  </div>
+                </div>
+                
+                {/* Simulator screenshot */}
+                <div className="bg-white dark:bg-gray-900 rounded-lg overflow-hidden shadow-lg">
+                  <img 
+                    src="/simulator.png" 
+                    alt="Pled Template Editor showing AI-powered workflow simulation with queue processing, data sources, and AI assistant"
+                    className="w-full h-auto"
+                  />
+                </div>
+              </div>
+            </BorderBeam>
+            <br/> 
+            <div className="mt-8 grid gap-6 sm:grid-cols-3 text-center">
+              <div>
+                <div className="p-3 rounded-lg bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 w-fit mx-auto mb-3">
+                  <Brain className="h-6 w-6" />
+                </div>
+                <h3 className="font-semibold">AI-Powered Design</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Chat with AI to model complex tokenization workflows visually
+                </p>
+              </div>
+              <div>
+                <div className="p-3 rounded-lg bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-400 w-fit mx-auto mb-3">
+                  <Zap className="h-6 w-6" />
+                </div>
+                <h3 className="font-semibold">Real-time Simulation</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Test your workflows with live data processing and validation
+                </p>
+              </div>
+              <div>
+                <div className="p-3 rounded-lg bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-400 w-fit mx-auto mb-3">
+                  <Puzzle className="h-6 w-6" />
+                </div>
+                <h3 className="font-semibold">Visual State Machines</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Build complex logic flows with drag-and-drop components
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* PROBLEM SECTION */}
       {/* <section className="border-t bg-white dark:bg-black">
         <div className="container mx-auto px-6 py-16">
