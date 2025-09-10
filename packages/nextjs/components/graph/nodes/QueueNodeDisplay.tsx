@@ -13,7 +13,7 @@ const QueueNodeDisplay: React.FC<NodeProps<RFNodeData>> = ({ data, selected }) =
   return (
     <Card
       className={cn(
-        "w-52 shadow-lg transition-all duration-300",
+        "w-36 shadow-md transition-all duration-300",
         selected && "ring-2 ring-primary",
         data.isActive && "animate-pulse border-blue-400 shadow-blue-400/50 shadow-lg scale-105",
         data.error && "border-destructive shadow-destructive/50",
@@ -21,26 +21,26 @@ const QueueNodeDisplay: React.FC<NodeProps<RFNodeData>> = ({ data, selected }) =
     >
       <CardHeader
         className={cn(
-          "p-3 rounded-t-lg transition-colors duration-300",
+          "p-2 rounded-t-lg transition-colors duration-300",
           data.isActive ? "bg-blue-400/20" : "bg-green-600/10",
         )}
       >
-        <CardTitle className="text-sm font-semibold flex items-center">
+        <CardTitle className="text-xs font-semibold flex items-center">
           <Archive
             className={cn(
-              "h-4 w-4 mr-2 transition-colors duration-300",
+              "h-3 w-3 mr-1 transition-colors duration-300",
               data.isActive ? "text-blue-500" : "text-green-700",
             )}
           />
           {data.label}
-          {data.isActive && <div className="ml-auto w-2 h-2 bg-blue-500 rounded-full animate-ping" />}
+          {data.isActive && <div className="ml-auto w-1.5 h-1.5 bg-blue-500 rounded-full animate-ping" />}
         </CardTitle>
       </CardHeader>
-      <CardContent className="p-3 text-xs">
-        <p>Type: {config.type}</p>
-        <p>Window: {config.timeWindow}s</p>
-        <p>Method: {config.aggregationMethod}</p>
-        {config.capacity && <p>Capacity: {config.capacity}</p>}
+      <CardContent className="p-2 text-[10px]">
+        <p>{config.type}</p>
+        <p>Win: {config.timeWindow}s</p>
+        <p>{config.aggregationMethod}</p>
+        {config.capacity && <p>Cap: {config.capacity}</p>}
         {data.details && <p className="mt-1 text-muted-foreground">{data.details}</p>}
         {data.error && <p className="mt-1 text-destructive">{data.error}</p>}
       </CardContent>

@@ -13,7 +13,7 @@ const DataSourceNodeDisplay: React.FC<NodeProps<RFNodeData>> = ({ data, selected
   return (
     <Card
       className={cn(
-        "w-52 shadow-lg transition-all duration-300",
+        "w-36 shadow-md transition-all duration-300",
         selected && "ring-2 ring-primary",
         data.isActive && "animate-pulse border-green-400 shadow-green-400/50 shadow-lg scale-105",
         data.error && "border-destructive shadow-destructive/50",
@@ -21,26 +21,26 @@ const DataSourceNodeDisplay: React.FC<NodeProps<RFNodeData>> = ({ data, selected
     >
       <CardHeader
         className={cn(
-          "p-3 rounded-t-lg transition-colors duration-300",
+          "p-2 rounded-t-lg transition-colors duration-300",
           data.isActive ? "bg-green-400/20" : "bg-primary/10",
         )}
       >
-        <CardTitle className="text-sm font-semibold flex items-center">
+        <CardTitle className="text-xs font-semibold flex items-center">
           <DatabaseZap
             className={cn(
-              "h-4 w-4 mr-2 transition-colors duration-300",
+              "h-3 w-3 mr-1 transition-colors duration-300",
               data.isActive ? "text-green-500" : "text-primary",
             )}
           />
           {data.label}
-          {data.isActive && <div className="ml-auto w-2 h-2 bg-green-500 rounded-full animate-ping" />}
+          {data.isActive && <div className="ml-auto w-1.5 h-1.5 bg-green-500 rounded-full animate-ping" />}
         </CardTitle>
       </CardHeader>
-      <CardContent className="p-3 text-xs">
-        <p>Type: {config.type}</p>
-        <p>Interval: {config.interval}s</p>
+      <CardContent className="p-2 text-[10px]">
+        <p>{config.type}</p>
+        <p>Int: {config.interval}s</p>
         <p>
-          Value: [{config.valueMin}-{config.valueMax}]
+          [{config.valueMin}-{config.valueMax}]
         </p>
         {data.details && <p className="mt-1 text-muted-foreground">{data.details}</p>}
         {data.error && <p className="mt-1 text-destructive">{data.error}</p>}

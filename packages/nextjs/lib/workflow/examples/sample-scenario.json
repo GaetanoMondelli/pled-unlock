@@ -1,0 +1,53 @@
+{
+  "version": "1.0",
+  "nodes": [
+    {
+      "nodeId": "DataSource_A",
+      "type": "DataSource",
+      "displayName": "Source A",
+      "interval": 3,
+      "valueMin": 1,
+      "valueMax": 10,
+      "destinationNodeId": "Queue_B"
+    },
+    {
+      "nodeId": "DataSource_X",
+      "type": "DataSource",
+      "displayName": "Source X",
+      "interval": 5,
+      "valueMin": 100,
+      "valueMax": 200,
+      "destinationNodeId": "Queue_B"
+    },
+    {
+      "nodeId": "Queue_B",
+      "type": "Queue",
+      "displayName": "Queue B",
+      "timeWindow": 10,
+      "aggregationMethod": "sum",
+      "capacity": 10,
+      "destinationNodeId": "Process_C"
+    },
+    {
+      "nodeId": "Process_C",
+      "type": "ProcessNode",
+      "displayName": "Processor C",
+      "inputNodeIds": ["Queue_B"],
+      "outputs": [
+        { "formula": "inputs.Queue_B.value + 10", "destinationNodeId": "Queue_D" },
+        { "formula": "inputs.Queue_B.value * 0.5", "destinationNodeId": "Sink_E" }
+      ]
+    },
+    {
+      "nodeId": "Queue_D",
+      "type": "Queue",
+      "displayName": "Output Queue D",
+      "timeWindow": 5,
+      "aggregationMethod": "average",
+      "capacity": 5,
+      "destinationNodeId": "Sink_F"
+    },
+    { "nodeId": "Sink_E", "type": "Sink", "displayName": "Sink E (Processed 0.5*B)" },
+    { "nodeId": "Sink_F", "type": "Sink", "displayName": "Sink F (Avg D)" }
+  ]
+}

@@ -16,7 +16,7 @@ const ProcessNodeDisplay: React.FC<NodeProps<RFNodeData>> = ({ data, selected })
   return (
     <Card
       className={cn(
-        "w-60 shadow-lg transition-all duration-300",
+        "w-36 shadow-md transition-all duration-300",
         selected && "ring-2 ring-primary",
         data.isActive && "animate-pulse border-purple-400 shadow-purple-400/50 shadow-lg scale-105",
         data.error && "border-destructive shadow-destructive/50",
@@ -24,22 +24,22 @@ const ProcessNodeDisplay: React.FC<NodeProps<RFNodeData>> = ({ data, selected })
     >
       <CardHeader
         className={cn(
-          "p-3 rounded-t-lg transition-colors duration-300",
+          "p-2 rounded-t-lg transition-colors duration-300",
           data.isActive ? "bg-purple-400/20" : "bg-accent/10",
         )}
       >
-        <CardTitle className="text-sm font-semibold flex items-center">
+        <CardTitle className="text-xs font-semibold flex items-center">
           <Cpu
             className={cn(
-              "h-4 w-4 mr-2 transition-colors duration-300",
+              "h-3 w-3 mr-1 transition-colors duration-300",
               data.isActive ? "text-purple-500" : "text-accent",
             )}
           />
           {data.label}
-          {data.isActive && <div className="ml-auto w-2 h-2 bg-purple-500 rounded-full animate-ping" />}
+          {data.isActive && <div className="ml-auto w-1.5 h-1.5 bg-purple-500 rounded-full animate-ping" />}
         </CardTitle>
       </CardHeader>
-      <CardContent className="p-3 text-xs">
+      <CardContent className="p-2 text-[10px]">
         <p>Type: {config.type}</p>
         <p>Inputs: {numInputs}</p>
         <p>Outputs: {numOutputs}</p>
