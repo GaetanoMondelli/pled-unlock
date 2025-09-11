@@ -131,9 +131,31 @@ export const ScenarioSchema = z.object({
 });
 export type Scenario = z.infer<typeof ScenarioSchema>;
 
+// State machine state definitions
+export type NodeStateMachineState = 
+  | "source_idle" | "source_generating" | "source_emitting" | "source_waiting"
+  | "queue_idle" | "queue_accumulating" | "queue_processing" | "queue_emitting"
+  | "process_idle" | "process_collecting" | "process_calculating" | "process_emitting"
+  | "splitter_idle" | "splitter_evaluating" | "splitter_route_output1" | "splitter_route_output2"
+  | "sink_idle" | "sink_processing";
+
+export interface StateMachineInfo {
+  currentState: NodeStateMachineState;
+  previousState?: NodeStateMachineState;
+  stateChangedAt?: number;
+  transitionHistory: Array<{
+    from: NodeStateMachineState;
+    to: NodeStateMachineState;
+    timestamp: number;
+    trigger?: string;
+  }>;
+}
+
 // Simulation-specific state types
 export interface NodeState {
   lastProcessedTime?: number;
+  // State machine tracking
+  stateMachine?: StateMachineInfo;
   [key: string]: any;
 }
 
@@ -168,6 +190,12 @@ export interface RFNodeData {
   isActive?: boolean;
   error?: string;
   details?: string;
+  // State machine information for display
+  stateMachine?: {
+    currentState: NodeStateMachineState;
+    stateDisplayName?: string;
+    transitionCount?: number;
+  };
 }
 
 export interface RFEdgeData {

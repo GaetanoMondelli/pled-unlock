@@ -6,6 +6,7 @@ import GlobalLedgerModal from "@/components/modals/GlobalLedgerModal";
 import NodeInspectorModal from "@/components/modals/NodeInspectorModal";
 import TokenInspectorModal from "@/components/modals/TokenInspectorModal";
 import IntegratedAIAssistant from "@/components/ai/IntegratedAIAssistant";
+import StateInspectorPanel from "@/components/ui/state-inspector-panel";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -21,7 +22,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useSimulationStore } from "@/stores/simulationStore";
-import { AlertCircle, BookOpen, Edit, Pause, Play, RefreshCw, StepForward, Brain, Eye, EyeOff } from "lucide-react";
+import { AlertCircle, BookOpen, Edit, Pause, Play, RefreshCw, StepForward, Brain, Eye, EyeOff, Activity } from "lucide-react";
 import { cn } from "~~/lib/utils";
 
 export default function TemplateEditorPage() {
@@ -47,6 +48,7 @@ export default function TemplateEditorPage() {
   const [aiPanelWidth, setAIPanelWidth] = useState(320);
   const [isAIPanelVisible, setIsAIPanelVisible] = useState(true);
   const [isResizing, setIsResizing] = useState(false);
+  const [isStateInspectorOpen, setIsStateInspectorOpen] = useState(false);
   const lastErrorCountRef = useRef(0);
 
   const fetchDefaultScenarioContent = useCallback(async () => {
@@ -301,6 +303,14 @@ export default function TemplateEditorPage() {
                     className="border-slate-300 hover:bg-slate-50">
                     <RefreshCw className="mr-2 h-4 w-4" /> Reload
                   </Button>
+                  <Button 
+                    variant={isStateInspectorOpen ? "default" : "outline"} 
+                    size="sm" 
+                    onClick={() => setIsStateInspectorOpen(!isStateInspectorOpen)}
+                    className="border-slate-300 hover:bg-slate-50"
+                  >
+                    <Activity className="mr-2 h-4 w-4" /> States
+                  </Button>
                 </div>
               </>
             )}
@@ -446,6 +456,12 @@ export default function TemplateEditorPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* State Inspector Panel */}
+      <StateInspectorPanel 
+        isOpen={isStateInspectorOpen} 
+        onClose={() => setIsStateInspectorOpen(false)} 
+      />
 
       {/* Modals */}
       <NodeInspectorModal />

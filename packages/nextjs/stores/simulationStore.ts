@@ -126,20 +126,45 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       initialLogs[node.nodeId] = [];
       switch (node.type) {
         case "DataSource":
-          initialNodeStates[node.nodeId] = { lastEmissionTime: -1 } as DataSourceState;
+          initialNodeStates[node.nodeId] = { 
+            lastEmissionTime: -1,
+            stateMachine: {
+              currentState: "source_idle",
+              transitionHistory: []
+            }
+          } as DataSourceState;
           break;
         case "Queue":
-          initialNodeStates[node.nodeId] = { inputBuffer: [], outputBuffer: [], lastAggregationTime: -1 } as QueueState;
+          initialNodeStates[node.nodeId] = { 
+            inputBuffer: [], 
+            outputBuffer: [], 
+            lastAggregationTime: -1,
+            stateMachine: {
+              currentState: "queue_idle",
+              transitionHistory: []
+            }
+          } as QueueState;
           break;
         case "ProcessNode":
           const inputBuffers: Record<string, Token[]> = {};
-          initialNodeStates[node.nodeId] = { inputBuffers, lastFiredTime: -1 } as ProcessNodeState;
+          initialNodeStates[node.nodeId] = { 
+            inputBuffers, 
+            lastFiredTime: -1,
+            stateMachine: {
+              currentState: "process_idle",
+              transitionHistory: []
+            }
+          } as ProcessNodeState;
           break;
         case "Sink":
           initialNodeStates[node.nodeId] = {
             consumedTokenCount: 0,
             lastConsumedTime: -1,
             consumedTokens: [],
+            stateMachine: {
+              currentState: "sink_idle",
+              transitionHistory: []
+            }
           } as SinkState;
           break;
       }

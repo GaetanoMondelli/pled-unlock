@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -13,7 +13,191 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import NodeStateMachineDiagram from "@/components/ui/node-state-machine-diagram";
 import { useSimulationStore } from "@/stores/simulationStore";
+import { Code, Settings, Activity, ChevronDown, ChevronRight } from "lucide-react";
+import JsonView from "@uiw/react-json-view";
+
+// Helper components for enhanced Overview tab
+const ConfigSection: React.FC<{ 
+  nodeConfig: any; 
+  showJson: boolean; 
+  onToggleJson: () => void; 
+}> = ({ nodeConfig, showJson, onToggleJson }) => {
+  const [expandedFormulas, setExpandedFormulas] = useState(new Set<number>());
+
+  // Clean config (remove position and other UI stuff)
+  const cleanConfig = useMemo(() => {
+    const config = { ...nodeConfig };
+    delete config.position;
+    return config;
+  }, [nodeConfig]);
+
+  const toggleFormula = (index: number) => {
+    const newExpanded = new Set(expandedFormulas);
+    if (newExpanded.has(index)) {
+      newExpanded.delete(index);
+    } else {
+      newExpanded.add(index);
+    }
+    setExpandedFormulas(newExpanded);
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="font-semibold text-slate-700 flex items-center gap-2">
+          <Settings className="h-4 w-4" />
+          Configuration
+        </h3>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-6 px-2 text-xs"
+          onClick={onToggleJson}
+        >
+          <Code className="h-3 w-3 mr-1" />
+          {showJson ? 'Hide' : 'JSON'}
+        </Button>
+      </div>
+      
+      {showJson ? (
+        <div className="border rounded-md overflow-hidden">
+          <JsonView 
+            value={cleanConfig} 
+            collapsed={1}
+            displayDataTypes={false}
+            displayObjectSize={false}
+            style={{
+              fontSize: '12px',
+              padding: '12px',
+              backgroundColor: '#f8fafc',
+            }}
+          />
+        </div>
+      ) : (
+        <div className="bg-slate-50 p-3 rounded-md space-y-2 text-sm min-h-[calc(15rem_+_2.5rem)]">
+          <div className="space-y-2">
+            <div><span className="font-medium text-slate-600">ID:</span> <span className="font-mono text-slate-800">{nodeConfig.nodeId}</span></div>
+            <div><span className="font-medium text-slate-600">Name:</span> {nodeConfig.displayName}</div>
+            <div><span className="font-medium text-slate-600">Type:</span> {nodeConfig.type}</div>
+            
+            {nodeConfig.type === 'ProcessNode' && nodeConfig.outputs && (
+              <div>
+                <div className="font-medium text-slate-600 mb-2">Formulas ({nodeConfig.outputs.length}):</div>
+                <div className="space-y-1">
+                  {nodeConfig.outputs.map((output: any, index: number) => (
+                    <div key={index} className="border border-slate-200 rounded p-2">
+                      <button
+                        onClick={() => toggleFormula(index)}
+                        className="flex items-center gap-2 text-xs font-medium text-slate-700 hover:text-slate-900 w-full text-left"
+                      >
+                        {expandedFormulas.has(index) ? 
+                          <ChevronDown className="h-3 w-3" /> : 
+                          <ChevronRight className="h-3 w-3" />
+                        }
+                        Formula {index + 1} → {output.destinationNodeId}
+                      </button>
+                      {expandedFormulas.has(index) && (
+                        <div className="mt-2 p-2 bg-slate-100 rounded text-xs font-mono">
+                          {output.formula}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {nodeConfig.type === 'Queue' && (
+              <>
+                <div><span className="font-medium text-slate-600">Method:</span> {nodeConfig.aggregationMethod}</div>
+                <div><span className="font-medium text-slate-600">Window:</span> {nodeConfig.timeWindow}s</div>
+                {nodeConfig.capacity && <div><span className="font-medium text-slate-600">Capacity:</span> {nodeConfig.capacity}</div>}
+              </>
+            )}
+            
+            {nodeConfig.type === 'DataSource' && (
+              <>
+                <div><span className="font-medium text-slate-600">Interval:</span> {nodeConfig.interval}s</div>
+                <div><span className="font-medium text-slate-600">Range:</span> {nodeConfig.valueMin} - {nodeConfig.valueMax}</div>
+                <div><span className="font-medium text-slate-600">Destination:</span> <span className="font-mono">{nodeConfig.destinationNodeId}</span></div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const StateSection: React.FC<{ 
+  nodeState: any; 
+  showJson: boolean; 
+  onToggleJson: () => void; 
+}> = ({ nodeState, showJson, onToggleJson }) => {
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="font-semibold text-slate-700 flex items-center gap-2">
+          <Activity className="h-4 w-4" />
+          Runtime State
+        </h3>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-6 px-2 text-xs"
+          onClick={onToggleJson}
+        >
+          <Code className="h-3 w-3 mr-1" />
+          {showJson ? 'Hide' : 'JSON'}
+        </Button>
+      </div>
+      
+      {showJson ? (
+        <div className="border rounded-md overflow-hidden">
+          <JsonView 
+            value={nodeState} 
+            collapsed={2}
+            displayDataTypes={false}
+            displayObjectSize={false}
+            style={{
+              fontSize: '12px',
+              padding: '12px',
+              backgroundColor: '#f8fafc',
+            }}
+          />
+        </div>
+      ) : (
+        <div className="bg-slate-50 p-3 rounded-md space-y-2 text-sm min-h-[calc(15rem_+_2.5rem)]">
+          {nodeState?.stateMachine && (
+            <>
+              <div><span className="font-medium text-slate-600">Current State:</span> <span className="font-mono text-slate-800">{nodeState.stateMachine.currentState}</span></div>
+              <div><span className="font-medium text-slate-600">Transitions:</span> {nodeState.stateMachine.transitionHistory?.length || 0}</div>
+              {nodeState.stateMachine.stateChangedAt && (
+                <div><span className="font-medium text-slate-600">Changed At:</span> {nodeState.stateMachine.stateChangedAt}s</div>
+              )}
+              <hr className="border-slate-200 my-2" />
+            </>
+          )}
+          {nodeState?.lastProcessedTime !== undefined && (
+            <div><span className="font-medium text-slate-600">Last Processed:</span> {nodeState.lastProcessedTime}s</div>
+          )}
+          {nodeState?.consumedTokenCount !== undefined && (
+            <div><span className="font-medium text-slate-600">Tokens Consumed:</span> {nodeState.consumedTokenCount}</div>
+          )}
+          {nodeState?.inputBuffer && (
+            <div><span className="font-medium text-slate-600">Input Buffer:</span> {nodeState.inputBuffer.length} tokens</div>
+          )}
+          {nodeState?.outputBuffer && (
+            <div><span className="font-medium text-slate-600">Output Buffer:</span> {nodeState.outputBuffer.length} tokens</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const NodeActivityLog: React.FC<{ nodeId: string }> = ({ nodeId }) => {
   const nodeActivityLogs = useSimulationStore(state => state.nodeActivityLogs);
@@ -79,6 +263,8 @@ const NodeInspectorModal: React.FC = () => {
   const setSelectedNodeId = useSimulationStore(state => state.setSelectedNodeId);
 
   const [editedConfigText, setEditedConfigText] = useState<string>("");
+  const [showConfigJson, setShowConfigJson] = useState(false);
+  const [showStateJson, setShowStateJson] = useState(false);
 
   const isOpen = !!selectedNodeId;
   const nodeConfig = selectedNodeId ? nodesConfig[selectedNodeId] : null;
@@ -105,7 +291,7 @@ const NodeInspectorModal: React.FC = () => {
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col">
+      <DialogContent className="sm:max-w-5xl max-h-[90vh] flex flex-col">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle className="font-headline">Node Inspector: {nodeConfig.displayName}</DialogTitle>
           <DialogDescription>
@@ -114,33 +300,46 @@ const NodeInspectorModal: React.FC = () => {
         </DialogHeader>
 
         <div className="flex-1 min-h-0 overflow-y-auto py-4 pr-3">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 mb-4">
-            <div>
-              <h3 className="font-semibold text-primary mb-2">Configuration (Read-only)</h3>
-              <Textarea
-                value={editedConfigText}
-                readOnly
-                rows={15}
-                className="text-xs font-mono bg-muted/30 border-input w-full"
-                placeholder="Node configuration in JSON format..."
-              />
-            </div>
-            <div>
-              <h3 className="font-semibold text-primary mb-2">Current State</h3>
-              <div className="text-sm bg-muted p-3 rounded-md min-h-[calc(15rem_+_2.5rem)]">
-                <pre className="text-xs bg-muted p-2 rounded-md whitespace-pre-wrap">
-                  {JSON.stringify(nodeState, null, 2)}
-                </pre>
+          <Tabs defaultValue="overview" className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="state-machine">State Machine</TabsTrigger>
+              <TabsTrigger value="activity">Activity Log</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="overview" className="mt-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                <ConfigSection 
+                  nodeConfig={nodeConfig} 
+                  showJson={showConfigJson}
+                  onToggleJson={() => setShowConfigJson(!showConfigJson)}
+                />
+                <StateSection 
+                  nodeState={nodeState} 
+                  showJson={showStateJson}
+                  onToggleJson={() => setShowStateJson(!showStateJson)}
+                />
               </div>
-            </div>
-          </div>
+            </TabsContent>
 
-          <Separator className="my-4" />
+            <TabsContent value="state-machine" className="mt-4">
+              <div className="flex justify-center">
+                <NodeStateMachineDiagram 
+                  nodeConfig={nodeConfig} 
+                  stateMachineInfo={nodeState?.stateMachine}
+                  width={700}
+                  height={500}
+                />
+              </div>
+            </TabsContent>
 
-          <div className="flex flex-col">
-            <h3 className="font-semibold text-primary mb-2 flex-shrink-0">Activity Log</h3>
-            <NodeActivityLog nodeId={selectedNodeId} />
-          </div>
+            <TabsContent value="activity" className="mt-4">
+              <div className="flex flex-col">
+                <h3 className="font-semibold text-primary mb-2 flex-shrink-0">Activity Log</h3>
+                <NodeActivityLog nodeId={selectedNodeId} />
+              </div>
+            </TabsContent>
+          </Tabs>
         </div>
 
         <DialogFooter className="pt-4 border-t border-border mt-auto flex-shrink-0">

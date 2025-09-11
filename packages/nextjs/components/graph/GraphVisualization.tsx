@@ -195,6 +195,12 @@ const GraphVisualization: React.FC = () => {
             isActive,
             details,
             error: latestLog?.action === "FORMULA_ERROR" ? latestLog.details : undefined,
+            // Add state machine information
+            stateMachine: nodeState?.stateMachine ? {
+              currentState: nodeState.stateMachine.currentState,
+              stateDisplayName: nodeState.stateMachine.currentState.split('_')[1], // e.g., "queue_idle" -> "idle"
+              transitionCount: nodeState.stateMachine.transitionHistory?.length || 0,
+            } : undefined,
           },
         };
       }),
