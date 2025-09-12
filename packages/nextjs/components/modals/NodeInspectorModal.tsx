@@ -17,7 +17,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import NodeStateMachineDiagram from "@/components/ui/node-state-machine-diagram";
 import { useSimulationStore } from "@/stores/simulationStore";
 import { Code, Settings, Activity, ChevronDown, ChevronRight } from "lucide-react";
-import JsonView from "@uiw/react-json-view";
+
+// Simple JSON display component
+const SimpleJsonView: React.FC<{ value: any }> = ({ value }) => {
+  return (
+    <pre className="text-xs font-mono whitespace-pre-wrap bg-slate-50 p-3 rounded border overflow-auto max-h-64">
+      {JSON.stringify(value, null, 2)}
+    </pre>
+  );
+};
 
 // Helper components for enhanced Overview tab
 const ConfigSection: React.FC<{ 
@@ -63,19 +71,7 @@ const ConfigSection: React.FC<{
       </div>
       
       {showJson ? (
-        <div className="border rounded-md overflow-hidden">
-          <JsonView 
-            value={cleanConfig} 
-            collapsed={1}
-            displayDataTypes={false}
-            displayObjectSize={false}
-            style={{
-              fontSize: '12px',
-              padding: '12px',
-              backgroundColor: '#f8fafc',
-            }}
-          />
-        </div>
+        <SimpleJsonView value={cleanConfig} />
       ) : (
         <div className="bg-slate-50 p-3 rounded-md space-y-2 text-sm min-h-[calc(15rem_+_2.5rem)]">
           <div className="space-y-2">
@@ -156,19 +152,7 @@ const StateSection: React.FC<{
       </div>
       
       {showJson ? (
-        <div className="border rounded-md overflow-hidden">
-          <JsonView 
-            value={nodeState} 
-            collapsed={2}
-            displayDataTypes={false}
-            displayObjectSize={false}
-            style={{
-              fontSize: '12px',
-              padding: '12px',
-              backgroundColor: '#f8fafc',
-            }}
-          />
-        </div>
+        <SimpleJsonView value={nodeState} />
       ) : (
         <div className="bg-slate-50 p-3 rounded-md space-y-2 text-sm min-h-[calc(15rem_+_2.5rem)]">
           {nodeState?.stateMachine && (

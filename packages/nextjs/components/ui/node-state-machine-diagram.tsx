@@ -197,10 +197,6 @@ sink_processing 'logging_complete' -> sink_idle;`
     return { nodes: rfNodes, edges: rfEdges, fsl: structure.fsl };
   }, [nodeConfig.type, stateMachineInfo?.currentState]);
 
-  // Debug: Log the edges to see if they're created
-  console.log('State machine edges:', edges);
-  console.log('State machine nodes:', nodes);
-
   return (
     <div style={{ width, height }} className="border rounded-lg bg-slate-50">
       <div className="flex items-center justify-between p-2 bg-white border-b">
