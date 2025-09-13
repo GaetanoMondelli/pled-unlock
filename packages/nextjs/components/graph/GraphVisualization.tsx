@@ -166,23 +166,28 @@ const GraphVisualization: React.FC = () => {
   // Initialize nodes and edges when scenario loads
   useEffect(() => {
     if (!scenario) return;
+    const initialNodes: Node<RFNodeData>[] = scenario.nodes.map((node: AnyNode) => {
+      const position = {
+        x: node.position?.x ?? 0,
+        y: node.position?.y ?? 0,
+      };
 
-
-    const initialNodes: Node<RFNodeData>[] = scenario.nodes.map((node: AnyNode) => ({
-      id: node.nodeId,
-      type: node.type,
-      position: node.position,
-      deletable: true,
-      data: {
-        label: node.displayName,
+      return {
+        id: node.nodeId,
         type: node.type,
-        config: node,
-        isActive: false,
-        details: "",
-      },
-      sourcePosition: Position.Right,
-      targetPosition: Position.Left,
-    }));
+        position,
+        deletable: true,
+        data: {
+          label: node.displayName,
+          type: node.type,
+          config: node,
+          isActive: false,
+          details: "",
+        },
+        sourcePosition: Position.Right,
+        targetPosition: Position.Left,
+      };
+    });
     setRfNodes(initialNodes);
 
     const initialEdges: Edge<RFEdgeData>[] = [];
@@ -424,7 +429,9 @@ const GraphVisualization: React.FC = () => {
 
   const onDragLeave = useCallback((event: React.DragEvent) => {
     // Only set drag over to false if we're leaving the main container
-    if (!event.currentTarget.contains(event.relatedTarget as Node)) {
+    const current = event.currentTarget as Element;
+    const related = event.relatedTarget as Element | null;
+    if (!related || !current.contains(related)) {
       setIsDragOver(false);
     }
   }, []);

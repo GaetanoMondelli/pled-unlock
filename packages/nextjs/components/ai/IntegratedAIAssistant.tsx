@@ -460,6 +460,52 @@ export default function IntegratedAIAssistant({ className, isEditMode = false, s
       const data = await response.json();
       let responseContent = data.message;
 
+      // Check if response contains JSON patch and apply it automatically
+      if (responseContent.includes('JSON Patch:') && scenarioContent && onScenarioUpdate) {
+        try {
+          // Extract JSON patch from response
+          const patchMatch = responseContent.match(/```json\s*(\[[\s\S]*?\])\s*```/);
+          if (patchMatch) {
+            const patches = JSON.parse(patchMatch[1]);
+            const scenario = JSON.parse(scenarioContent);
+            
+            // Apply each patch operation
+            patches.forEach((patch: any) => {
+              if (patch.op === 'replace' && patch.path && patch.value !== undefined) {
+                const pathParts = patch.path.split('/').filter((p: string) => p);
+                let current = scenario;
+                
+                // Navigate to the parent object
+                for (let i = 0; i < pathParts.length - 1; i++) {
+                  const part = pathParts[i];
+                  if (Array.isArray(current) && !isNaN(parseInt(part))) {
+                    current = current[parseInt(part)];
+                  } else {
+                    current = current[part];
+                  }
+                }
+                
+                // Apply the change
+                const finalKey = pathParts[pathParts.length - 1];
+                if (Array.isArray(current) && !isNaN(parseInt(finalKey))) {
+                  current[parseInt(finalKey)] = patch.value;
+                } else {
+                  current[finalKey] = patch.value;
+                }
+              }
+            });
+            
+            const updatedScenario = JSON.stringify(scenario, null, 2);
+            onScenarioUpdate(updatedScenario);
+            
+            responseContent = responseContent + '\n\n🎉 **SCENARIO UPDATED AUTOMATICALLY!**\nThe JSON patches have been applied to your diagram.';
+          }
+        } catch (error) {
+          console.error('Failed to apply JSON patches:', error);
+          responseContent = responseContent + '\n\n❌ **Error**: Failed to apply JSON patches automatically.';
+        }
+      }
+
       // Check if the user is asking to add/modify nodes and handle scenario updates
       const lowerInput = inputValue.toLowerCase();
       if ((lowerInput.includes('add') || lowerInput.includes('create') || lowerInput.includes('new')) && lowerInput.includes('source')) {
@@ -558,13 +604,33 @@ export default function IntegratedAIAssistant({ className, isEditMode = false, s
               displayName = nameMatch[1].trim();
             }
             
+            // Smart positioning to keep nodes within visible canvas
+            const canvasWidth = 1200; // Approximate canvas width
+            const canvasHeight = 800;  // Approximate canvas height
+            const nodeWidth = 200;     // Approximate node width
+            const nodeHeight = 150;    // Approximate node height
+            const margin = 50;         // Margin from edges
+            
+            // Calculate grid-based positioning
+            const maxNodesPerRow = Math.floor((canvasWidth - 2 * margin) / (nodeWidth + 20));
+            const currentNodeIndex = scenario.nodes.length;
+            const row = Math.floor(currentNodeIndex / maxNodesPerRow);
+            const col = currentNodeIndex % maxNodesPerRow;
+            
+            const x = margin + col * (nodeWidth + 20);
+            const y = margin + row * (nodeHeight + 20);
+            
+            // Ensure we don't exceed canvas bounds
+            const finalX = Math.min(x, canvasWidth - nodeWidth - margin);
+            const finalY = Math.min(y, canvasHeight - nodeHeight - margin);
+            
             const newNode = {
               nodeId: newNodeId,
               type: "DataSource",
               displayName: displayName,
               position: {
-                x: 50,
-                y: 100 + (scenario.nodes.length * 100)
+                x: finalX,
+                y: finalY
               },
               interval: interval,
               valueMin: minVal,
@@ -624,31 +690,33 @@ export default function IntegratedAIAssistant({ className, isEditMode = false, s
 
   return (
     <div className={cn(
-      "flex flex-col h-full bg-slate-50",
+      "flex flex-col h-full bg-slate-50 min-h-0",
       className
     )}>
       {/* Messages */}
-      <ScrollArea className="flex-1 px-3 py-2">
-        <div className="space-y-1">
-          {messages.map((message) => (
-            <MessageBubble key={message.id} message={message} />
-          ))}
-          {isLoading && (
-            <div className="flex justify-start mb-2">
-              <div className="flex items-center gap-2 px-3 py-2 bg-indigo-50 border border-indigo-200 rounded-lg text-xs">
-                <div className="w-4 h-4 bg-gradient-to-br from-indigo-500 to-purple-600 rounded flex items-center justify-center">
-                  <Loader2 className="h-2 w-2 animate-spin text-white" />
+      <div className="flex-1 min-h-0 overflow-hidden">
+        <ScrollArea className="h-full px-3 py-2">
+          <div className="space-y-1">
+            {messages.map((message) => (
+              <MessageBubble key={message.id} message={message} />
+            ))}
+            {isLoading && (
+              <div className="flex justify-start mb-2">
+                <div className="flex items-center gap-2 px-3 py-2 bg-indigo-50 border border-indigo-200 rounded-lg text-xs">
+                  <div className="w-4 h-4 bg-gradient-to-br from-indigo-500 to-purple-600 rounded flex items-center justify-center">
+                    <Loader2 className="h-2 w-2 animate-spin text-white" />
+                  </div>
+                  <span className="text-indigo-700 font-medium">Analyzing...</span>
                 </div>
-                <span className="text-indigo-700 font-medium">Analyzing...</span>
               </div>
-            </div>
-          )}
-        </div>
-        <div ref={messagesEndRef} />
-      </ScrollArea>
+            )}
+          </div>
+          <div ref={messagesEndRef} />
+        </ScrollArea>
+      </div>
 
-      {/* Enhanced Input Area */}
-      <div className="p-3 bg-white border-t border-slate-200 relative">
+      {/* Enhanced Input Area - Fixed at bottom */}
+      <div className="flex-shrink-0 p-6 bg-white border-t border-slate-200 relative" style={{ minHeight: '220px', paddingBottom: '24px' }}>
         <CommandSuggestions
           input={inputValue}
           onSelect={(suggestion) => {
@@ -663,7 +731,7 @@ export default function IntegratedAIAssistant({ className, isEditMode = false, s
           }}
         />
         
-        <div className="flex gap-2">
+        <div className="flex gap-2 mb-5 mt-6">
           <div className="flex-1 relative">
             <Textarea
               ref={textareaRef}
@@ -671,7 +739,7 @@ export default function IntegratedAIAssistant({ className, isEditMode = false, s
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={handleKeyDown}
-              className="min-h-[60px] max-h-[80px] resize-none text-xs font-mono bg-slate-50 border-slate-200 focus:border-indigo-300 focus:ring-indigo-200 rounded"
+              className="min-h-[60px] max-h-[80px] resize-none text-[11px] font-mono bg-slate-50 border-slate-200 focus:border-indigo-300 focus:ring-indigo-200 rounded placeholder:text-[10px] placeholder:text-slate-400"
               disabled={isLoading}
             />
             <div className="absolute bottom-2 right-2 flex items-center gap-1 text-[10px] text-slate-400">
@@ -683,7 +751,7 @@ export default function IntegratedAIAssistant({ className, isEditMode = false, s
           <Button 
             onClick={handleSendMessage}
             disabled={!inputValue.trim() || isLoading}
-            className="self-end h-[60px] bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-medium shadow-lg"
+            className="self-end h-[60px] bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-medium shadow-lg flex-shrink-0"
           >
             {isLoading ? (
               <Loader2 className="h-3 w-3 animate-spin" />
@@ -693,7 +761,7 @@ export default function IntegratedAIAssistant({ className, isEditMode = false, s
           </Button>
         </div>
         
-        <div className="text-[10px] text-slate-500 mt-2 flex items-center justify-between">
+        <div className="text-[10px] text-slate-500 mt-5 flex items-center justify-between flex-shrink-0 mb-6">
           <div>
             <kbd className="px-1 py-0.5 bg-slate-200 rounded text-slate-600">Enter</kbd> to send
           </div>

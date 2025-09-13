@@ -42,6 +42,18 @@ export async function generateResponse(
     // Create context-aware prompt
   const contextPrompt = `You are an expert assistant for editing a JSON workflow scenario. Your job is to propose precise, schema-valid changes only—no hand-wavy prose, no accidental renames, and no wrong connections. Be deterministic.
 
+You can handle various types of requests:
+- Adding new nodes (DataSource, Queue, ProcessNode, Sink)
+- Modifying existing nodes (rename, change parameters)
+- Bulk operations (rename all nodes with a theme/domain)
+- Connecting/disconnecting nodes
+
+For bulk renaming requests like "rename all nodes for supply chain" or "make this a supply chain process", you should:
+1. Understand the existing node structure from the current scenario
+2. Propose appropriate names that fit the domain while maintaining the flow logic
+3. Use JSON patches to rename displayName fields for all nodes
+4. Keep nodeIds unchanged to preserve connections
+
 SCENARIO PROTOCOL (authoritative constraints):
 - Scenario shape:
   {
@@ -80,19 +92,30 @@ EDITING PRINCIPLES:
 - Validate connections: destinationNodeId must refer to an existing node. For DataSource, destination should typically be a Queue (unless user specifies otherwise).
 - Do not fabricate or change formulas in ProcessNode unless asked. Do not change positions unless asked.
 - Keep naming consistent and human-friendly (Title Case for displayName; correct obvious typos and casing; never include instruction phrases like "range 2-20" in displayName).
+- When adding new nodes, use smart positioning to keep them within visible canvas bounds (approximately 1200x800px). Position new nodes in a grid layout starting from (50, 50) with 220px spacing between columns and 170px spacing between rows.
 
 OUTPUT FORMAT (concise and actionable; do NOT claim that you updated anything):
 1) Summary: one line of what you changed.
 2) JSON Patch (RFC 6902) applying minimal changes to the CURRENT scenario.
 3) Validation checklist: bullet list confirming schema and connection validity.
 
-MINIMAL EXAMPLE:
+EXAMPLES:
+
+Adding a new node:
 Request: "Add a new source to @Output Queue D and make it like @Source A CALL IT soURCE F and range 2-20"
 Assuming unique matches: @Output Queue D -> nodeId "Queue_D"; @Source A -> DataSource_A
 Then produce:
 - Summary: Add DataSource_F ("Source F") with interval from Source A, range 2-20, destination -> Queue_D
 - JSON Patch: a single add op to /nodes/- with a DataSource node: { nodeId: "DataSource_F", displayName: "Source F", type: "DataSource", interval: <copied from A>, valueMin: 2, valueMax: 20, destinationNodeId: "Queue_D" }
 - Validation checklist: confirm nodeId uniqueness, destination exists, schema fields present and valid.
+
+Bulk renaming for a domain:
+Request: "Pretend this is a supply chain process, rename all nodes accordingly"
+Given scenario with nodes: Source A, Queue B, Process C, Sink D
+Then produce:
+- Summary: Renamed all nodes to reflect supply chain terminology
+- JSON Patch: multiple replace operations for /nodes/0/displayName, /nodes/1/displayName, etc. with names like "Raw Material Supplier", "Inventory Warehouse", "Production Line", "Distribution Center"
+- Validation checklist: all displayName fields updated, nodeIds preserved, connections maintained.
 
 Current scenario JSON (read-only context):
 ${JSON.stringify(scenarioContext.scenario, null, 2)}

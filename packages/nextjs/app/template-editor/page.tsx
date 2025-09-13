@@ -350,9 +350,9 @@ export default function TemplateEditorPage() {
         </div>
       </header>
 
-      <main className="flex-1 flex overflow-hidden min-h-0">
+      <main className="flex-1 flex overflow-hidden min-h-0" style={{ height: 'calc(100vh - 80px)' }}>
         {/* Graph Visualization Area */}
-        <div className="flex-grow transition-all duration-300 relative bg-white">
+        <div className="flex-grow transition-all duration-300 relative bg-white overflow-hidden">
           {errorMessages.length > 0 && (
             <div className="absolute top-4 left-4 z-10 bg-red-50 border border-red-200 text-red-800 p-4 rounded-lg shadow-lg max-w-md">
               <div className="flex items-center mb-2">
@@ -435,8 +435,12 @@ export default function TemplateEditorPage() {
         {/* Side Panel (AI Assistant or Node Library) */}
         {isAIPanelVisible && (
           <div 
-            className="border-l border-slate-200 bg-white flex flex-col"
-            style={{ width: `${aiPanelWidth}px` }}
+            className="border-l border-slate-200 bg-white flex flex-col min-h-0"
+            style={{ 
+              width: `${aiPanelWidth}px`,
+              minWidth: `${aiPanelWidth}px`,
+              maxWidth: `${aiPanelWidth}px`
+            }}
           >
             {sidePanelMode === 'ai' ? (
               <>
@@ -448,25 +452,26 @@ export default function TemplateEditorPage() {
                   </div>
                 </div>
                 
-                <IntegratedAIAssistant 
-                  className="flex-1" 
-                  isEditMode={isEditMode}
-                  scenarioContent={defaultScenarioContent}
-                  onScenarioUpdate={(newScenario) => {
-                    setDefaultScenarioContent(newScenario);
-                    try {
-                      const parsedScenario = JSON.parse(newScenario);
-                      loadScenario(parsedScenario);
-                      toast({ title: "Success", description: "Scenario updated automatically by AI" });
-                    } catch (error) {
-                      toast({ 
-                        variant: "destructive", 
-                        title: "JSON Error", 
-                        description: "AI generated invalid JSON" 
-                      });
-                    }
-                  }}
-                />
+                <div className="flex-1 min-h-0 flex flex-col">
+                  <IntegratedAIAssistant 
+                    className="flex-1 min-h-0" 
+                    isEditMode={isEditMode}
+                    scenarioContent={scenario ? JSON.stringify(scenario, null, 2) : defaultScenarioContent}
+                    onScenarioUpdate={(newScenario) => {
+                      try {
+                        const parsedScenario = JSON.parse(newScenario);
+                        loadScenario(parsedScenario);
+                        toast({ title: "Success", description: "Scenario updated automatically by AI" });
+                      } catch (error) {
+                        toast({ 
+                          variant: "destructive", 
+                          title: "JSON Error", 
+                          description: "AI generated invalid JSON" 
+                        });
+                      }
+                    }}
+                  />
+                </div>
               </>
             ) : (
               <NodeLibraryPanel 
