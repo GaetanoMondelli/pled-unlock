@@ -8,8 +8,10 @@ import ReactFlow, {
   MarkerType,
   Node,
   Position,
+  Handle,
 } from "reactflow";
 import "reactflow/dist/style.css";
+import LabeledSmoothStepEdge from "@/components/ui/edges/LabeledSmoothStepEdge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -40,23 +42,33 @@ const StateNode: React.FC<{ data: StateNodeData; selected?: boolean }> = ({ data
   };
 
   return (
-    <div
-      className={cn(
-        "px-3 py-2 rounded-lg border-2 text-sm font-medium transition-all",
-        getStateColor(),
-        selected && "ring-2 ring-primary ring-offset-1"
-      )}
-    >
-      {data.label}
-      {data.isActive && (
-        <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full animate-pulse" />
-      )}
+    <div className="relative">
+      {/* Target (incoming) */}
+      <Handle type="target" position={Position.Left} className="!bg-slate-400 w-2.5 h-2.5" />
+      <div
+        className={cn(
+          "px-3 py-2 rounded-lg border-2 text-sm font-medium transition-all",
+          getStateColor(),
+          selected && "ring-2 ring-primary ring-offset-1"
+        )}
+      >
+        {data.label}
+        {data.isActive && (
+          <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full animate-pulse" />
+        )}
+      </div>
+      {/* Source (outgoing) */}
+      <Handle type="source" position={Position.Right} className="!bg-slate-400 w-2.5 h-2.5" />
     </div>
   );
 };
 
 const nodeTypes = {
   stateNode: StateNode,
+};
+
+const edgeTypes = {
+  labeledSmooth: LabeledSmoothStepEdge,
 };
 
 export const NodeStateMachineDiagram: React.FC<NodeStateMachineDiagramProps> = ({
@@ -178,7 +190,7 @@ sink_processing 'logging_complete' -> sink_idle;`
       source: transition.from,
       target: transition.to,
       label: transition.label,
-      type: "smoothstep",
+      type: "labeledSmooth",
       animated: currentState === transition.from,
       markerEnd: {
         type: MarkerType.ArrowClosed,
@@ -190,8 +202,7 @@ sink_processing 'logging_complete' -> sink_idle;`
         stroke: currentState === transition.from ? "#475569" : "#94a3b8", 
         strokeWidth: currentState === transition.from ? 2 : 1.5
       },
-      labelBgStyle: { fill: "#ffffff", fillOpacity: 0.95 },
-      labelStyle: { fontSize: 11, fontWeight: 500, fill: "#475569" },
+      data: { active: currentState === transition.from },
     }));
 
     return { nodes: rfNodes, edges: rfEdges, fsl: structure.fsl };
@@ -237,8 +248,9 @@ sink_processing 'logging_complete' -> sink_idle;`
           nodes={nodes}
           edges={edges}
           nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
           fitView
-          fitViewOptions={{ padding: 20 }}
+          fitViewOptions={{ padding: 0.2 }}
           nodesDraggable={false}
           nodesConnectable={false}
           elementsSelectable={false}
@@ -249,7 +261,7 @@ sink_processing 'logging_complete' -> sink_idle;`
           className="bg-transparent"
           proOptions={{ hideAttribution: true }}
           defaultEdgeOptions={{
-            type: 'smoothstep',
+            type: 'labeledSmooth',
             animated: false,
           }}
         >
