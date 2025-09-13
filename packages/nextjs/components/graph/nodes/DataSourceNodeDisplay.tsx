@@ -4,9 +4,9 @@ import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { DataSourceNode, RFNodeData } from "@/lib/simulation/types";
 import { cn } from "@/lib/utils";
-import { DatabaseZap, Circle } from "lucide-react";
+import { DatabaseZap, Circle, Trash2 } from "lucide-react";
 import type { NodeProps } from "reactflow";
-import { Handle, Position } from "reactflow";
+import { Handle, Position, useReactFlow } from "reactflow";
 
 // Helper function to get state machine display info
 const getStateMachineDisplay = (currentState?: string) => {
@@ -22,18 +22,34 @@ const getStateMachineDisplay = (currentState?: string) => {
   return stateInfo[currentState] || { color: "text-gray-400", displayName: "unknown" };
 };
 
-const DataSourceNodeDisplay: React.FC<NodeProps<RFNodeData>> = ({ data, selected }) => {
+const DataSourceNodeDisplay: React.FC<NodeProps<RFNodeData>> = ({ data, selected, id }) => {
   const config = data.config as DataSourceNode;
   const stateMachineInfo = getStateMachineDisplay(data.stateMachine?.currentState);
+  const { deleteElements } = useReactFlow();
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    deleteElements({ nodes: [{ id }] });
+  };
   return (
-    <Card
-      className={cn(
-        "w-36 shadow-md transition-all duration-300",
-        selected && "ring-2 ring-primary",
-        data.isActive && "animate-pulse border-green-400 shadow-green-400/50 shadow-lg scale-105",
-        data.error && "border-destructive shadow-destructive/50",
-      )}
-    >
+    <div className="relative group">
+      {/* Delete Button */}
+      <button
+        onClick={handleDelete}
+        className="absolute -top-2 -right-2 w-5 h-5 bg-gray-400 hover:bg-gray-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10 flex items-center justify-center shadow-sm"
+        title="Delete node"
+      >
+        <Trash2 className="h-2.5 w-2.5" />
+      </button>
+      
+      <Card
+        className={cn(
+          "w-36 shadow-md transition-all duration-300",
+          selected && "ring-2 ring-primary",
+          data.isActive && "animate-pulse border-green-400 shadow-green-400/50 shadow-lg scale-105",
+          data.error && "border-destructive shadow-destructive/50",
+        )}
+      >
       <CardHeader
         className={cn(
           "p-2 rounded-t-lg transition-colors duration-300 bg-teal-600 text-white",
@@ -79,8 +95,14 @@ const DataSourceNodeDisplay: React.FC<NodeProps<RFNodeData>> = ({ data, selected
         
         {data.error && <p className="mt-1 text-destructive text-xs">{data.error}</p>}
       </CardContent>
-      <Handle type="source" position={Position.Right} className="w-3 h-3 !bg-primary" />
+      <Handle 
+        type="source" 
+        position={Position.Right} 
+        className="w-4 h-4 !bg-primary hover:!bg-primary/80 transition-all" 
+        title="Output"
+      />
     </Card>
+    </div>
   );
 };
 

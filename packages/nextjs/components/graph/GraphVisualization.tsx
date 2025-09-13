@@ -7,6 +7,7 @@ import QueueNodeDisplay from "./nodes/QueueNodeDisplay";
 import SinkNodeDisplay from "./nodes/SinkNodeDisplay";
 import { type AnyNode, type RFEdgeData, type RFNodeData } from "@/lib/simulation/types";
 import { useSimulationStore } from "@/stores/simulationStore";
+import { cn } from "@/lib/utils";
 import ReactFlow, {
   Background,
   type Connection,
@@ -22,12 +23,17 @@ import ReactFlow, {
   applyNodeChanges,
 } from "reactflow";
 import "reactflow/dist/style.css";
+import DeletableEdge from "./edges/DeletableEdge";
 
 const nodeTypes = {
   DataSource: DataSourceNodeDisplay,
   Queue: QueueNodeDisplay,
   ProcessNode: ProcessNodeDisplay,
   Sink: SinkNodeDisplay,
+};
+
+const edgeTypes = {
+  default: DeletableEdge,
 };
 
 const GraphVisualization: React.FC = () => {
@@ -37,29 +43,136 @@ const GraphVisualization: React.FC = () => {
   const currentTime = useSimulationStore(state => state.currentTime);
   const nodeActivityLogs = useSimulationStore(state => state.nodeActivityLogs);
   const setSelectedNodeId = useSimulationStore(state => state.setSelectedNodeId);
+  const loadScenario = useSimulationStore(state => state.loadScenario);
+  const saveSnapshot = useSimulationStore(state => state.saveSnapshot);
+  const undo = useSimulationStore(state => state.undo);
+  const redo = useSimulationStore(state => state.redo);
+  const canUndo = useSimulationStore(state => state.canUndo);
+  const canRedo = useSimulationStore(state => state.canRedo);
 
   const [rfNodes, setRfNodes] = useState<Node<RFNodeData>[]>([]);
   const [rfEdges, setRfEdges] = useState<Edge<RFEdgeData>[]>([]);
   const [activeNodes, setActiveNodes] = useState<Set<string>>(new Set());
   const [animatedEdges, setAnimatedEdges] = useState<Set<string>>(new Set());
+  const [isDragOver, setIsDragOver] = useState(false);
 
-  const onNodesChange: OnNodesChange = useCallback(changes => setRfNodes(nds => applyNodeChanges(changes, nds)), []);
+  const onNodesChange: OnNodesChange = useCallback((changes) => {
+    // Handle node deletions by updating the scenario
+    const nodeDeleteChanges = changes.filter(change => change.type === 'remove');
+    if (nodeDeleteChanges.length > 0 && scenario) {
+      // Save snapshot before deletion
+      saveSnapshot('Delete nodes');
+      
+      const deletedNodeIds = nodeDeleteChanges.map(change => change.id);
+      
+      // Remove nodes from scenario and clean up references
+      const updatedNodes = scenario.nodes.filter(node => !deletedNodeIds.includes(node.nodeId));
+      
+      // Clean up references in remaining nodes
+      const cleanedNodes = updatedNodes.map(node => {
+        if (node.type === 'DataSource' || node.type === 'Queue') {
+          if (deletedNodeIds.includes(node.destinationNodeId)) {
+            return { ...node, destinationNodeId: '' };
+          }
+        } else if (node.type === 'ProcessNode') {
+          const cleanedInputs = node.inputNodeIds.filter(id => !deletedNodeIds.includes(id));
+          const cleanedOutputs = node.outputs.map(output => 
+            deletedNodeIds.includes(output.destinationNodeId) 
+              ? { ...output, destinationNodeId: '' }
+              : output
+          );
+          return { ...node, inputNodeIds: cleanedInputs, outputs: cleanedOutputs };
+        }
+        return node;
+      });
+      
+      const updatedScenario = { ...scenario, nodes: cleanedNodes };
+      loadScenario(updatedScenario);
+    } else {
+      // Only apply direct visual changes if we didn't update the scenario
+      setRfNodes(nds => applyNodeChanges(changes, nds));
+    }
+  }, [scenario, loadScenario, saveSnapshot]);
 
-  const onEdgesChange: OnEdgesChange = useCallback(changes => setRfEdges(eds => applyEdgeChanges(changes, eds)), []);
+  const onEdgesChange: OnEdgesChange = useCallback((changes) => {
+    // Handle edge deletions by updating the scenario
+    const edgeDeleteChanges = changes.filter(change => change.type === 'remove');
+    if (edgeDeleteChanges.length > 0 && scenario) {
+      // Save snapshot before deletion
+      saveSnapshot('Delete edges');
+      
+      const deletedEdgeIds = edgeDeleteChanges.map(change => change.id);
+      
+      const updatedNodes = scenario.nodes.map(node => {
+        if (node.type === 'DataSource' || node.type === 'Queue') {
+          // Check if this node's edge was deleted
+          const expectedEdgeId = `e-${node.nodeId}-${node.destinationNodeId}`;
+          if (deletedEdgeIds.includes(expectedEdgeId)) {
+            return { ...node, destinationNodeId: '' };
+          }
+        } else if (node.type === 'ProcessNode') {
+          const updatedOutputs = node.outputs.map((output, index) => {
+            const expectedEdgeId = `e-${node.nodeId}-output${index}-${output.destinationNodeId}`;
+            if (deletedEdgeIds.includes(expectedEdgeId)) {
+              return { ...output, destinationNodeId: '' };
+            }
+            return output;
+          });
+          return { ...node, outputs: updatedOutputs };
+        }
+        return node;
+      });
+      
+      const updatedScenario = { ...scenario, nodes: updatedNodes };
+      loadScenario(updatedScenario);
+    } else {
+      // Only apply direct visual changes if we didn't update the scenario
+      setRfEdges(eds => applyEdgeChanges(changes, eds));
+    }
+  }, [scenario, loadScenario, saveSnapshot]);
 
   const onConnect = useCallback(
-    (params: Connection) => setRfEdges(eds => addEdge({ ...params, type: "smoothstep", animated: false }, eds)),
-    [],
+    (params: Connection) => {
+      if (!params.source || !params.target || !scenario) return;
+      
+      // Save snapshot before creating connection
+      saveSnapshot('Create connection');
+      
+      // Update the scenario JSON to reflect the new connection
+      const updatedNodes = scenario.nodes.map(node => {
+        if (node.nodeId === params.source) {
+          if (node.type === 'DataSource' || node.type === 'Queue') {
+            // For DataSource and Queue, update destinationNodeId
+            return { ...node, destinationNodeId: params.target };
+          } else if (node.type === 'ProcessNode') {
+            // For ProcessNode, update the appropriate output
+            const outputIndex = params.sourceHandle ? parseInt(params.sourceHandle.split('-')[1]) : 0;
+            const updatedOutputs = [...node.outputs];
+            if (updatedOutputs[outputIndex]) {
+              updatedOutputs[outputIndex] = { ...updatedOutputs[outputIndex], destinationNodeId: params.target };
+            }
+            return { ...node, outputs: updatedOutputs };
+          }
+        }
+        return node;
+      });
+      
+      const updatedScenario = { ...scenario, nodes: updatedNodes };
+      loadScenario(updatedScenario);
+    },
+    [scenario, saveSnapshot, loadScenario],
   );
 
   // Initialize nodes and edges when scenario loads
   useEffect(() => {
     if (!scenario) return;
 
+
     const initialNodes: Node<RFNodeData>[] = scenario.nodes.map((node: AnyNode) => ({
       id: node.nodeId,
       type: node.type,
       position: node.position,
+      deletable: true,
       data: {
         label: node.displayName,
         type: node.type,
@@ -75,27 +188,31 @@ const GraphVisualization: React.FC = () => {
     const initialEdges: Edge<RFEdgeData>[] = [];
     scenario.nodes.forEach(node => {
       if (node.type === "DataSource" || node.type === "Queue") {
-        if (node.destinationNodeId) {
+        if (node.destinationNodeId && node.destinationNodeId.trim() !== "") {
           initialEdges.push({
             id: `e-${node.nodeId}-${node.destinationNodeId}`,
             source: node.nodeId,
             target: node.destinationNodeId,
-            type: "smoothstep",
+            type: "default",
+            deletable: true,
             markerEnd: { type: MarkerType.ArrowClosed, color: "hsl(var(--foreground))" },
             data: { animated: false },
           });
         }
       } else if (node.type === "ProcessNode") {
         node.outputs.forEach((output, index) => {
-          initialEdges.push({
-            id: `e-${node.nodeId}-output${index}-${output.destinationNodeId}`,
-            source: node.nodeId,
-            sourceHandle: `output-${index}`,
-            target: output.destinationNodeId,
-            type: "smoothstep",
-            markerEnd: { type: MarkerType.ArrowClosed, color: "hsl(var(--foreground))" },
-            data: { animated: false },
-          });
+          if (output.destinationNodeId && output.destinationNodeId.trim() !== "") {
+            initialEdges.push({
+              id: `e-${node.nodeId}-output${index}-${output.destinationNodeId}`,
+              source: node.nodeId,
+              sourceHandle: `output-${index}`,
+              target: output.destinationNodeId,
+              type: "default",
+              deletable: true,
+              markerEnd: { type: MarkerType.ArrowClosed, color: "hsl(var(--foreground))" },
+              data: { animated: false },
+            });
+          }
         });
       }
     });
@@ -223,12 +340,94 @@ const GraphVisualization: React.FC = () => {
     );
   }, [animatedEdges]);
 
+  // Keyboard shortcuts for undo/redo
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === 'z' && !event.shiftKey) {
+        event.preventDefault();
+        if (canUndo()) {
+          undo();
+        }
+      } else if (((event.ctrlKey || event.metaKey) && event.key === 'y') || 
+                 ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key === 'z')) {
+        event.preventDefault();
+        if (canRedo()) {
+          redo();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [undo, redo, canUndo, canRedo]);
+
   const onNodeClick = useCallback(
     (event: React.MouseEvent, node: Node<RFNodeData>) => {
       setSelectedNodeId(node.id);
     },
     [setSelectedNodeId],
   );
+
+  const onDrop = useCallback(
+    (event: React.DragEvent) => {
+      event.preventDefault();
+      setIsDragOver(false);
+      
+      const reactFlowBounds = event.currentTarget.getBoundingClientRect();
+      const templateData = event.dataTransfer.getData('application/node-template');
+      
+      if (!templateData || !scenario) return;
+      
+      try {
+        const template = JSON.parse(templateData);
+        
+        // Save snapshot before adding node
+        saveSnapshot(`Add ${template.displayName}`);
+        
+        // Calculate position relative to ReactFlow canvas
+        const position = {
+          x: event.clientX - reactFlowBounds.left - 100,
+          y: event.clientY - reactFlowBounds.top - 50,
+        };
+        
+        // Generate unique ID
+        const timestamp = Date.now();
+        const nodeId = `${template.type}_${timestamp}`;
+        
+        // Create new node with clean template defaults - no forced connections
+        const newNode = {
+          ...template.defaultConfig,
+          nodeId,
+          displayName: `${template.displayName} ${scenario.nodes.length + 1}`,
+          position,
+        };
+        
+        // Add to scenario
+        const updatedScenario = {
+          ...scenario,
+          nodes: [...scenario.nodes, newNode],
+        };
+        
+        loadScenario(updatedScenario);
+      } catch (error) {
+        console.error('Failed to drop node:', error);
+      }
+    },
+    [scenario, loadScenario, saveSnapshot],
+  );
+
+  const onDragOver = useCallback((event: React.DragEvent) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+    setIsDragOver(true);
+  }, []);
+
+  const onDragLeave = useCallback((event: React.DragEvent) => {
+    // Only set drag over to false if we're leaving the main container
+    if (!event.currentTarget.contains(event.relatedTarget as Node)) {
+      setIsDragOver(false);
+    }
+  }, []);
 
   if (!scenario) {
     return (
@@ -239,7 +438,15 @@ const GraphVisualization: React.FC = () => {
   }
 
   return (
-    <div className="w-full h-full">
+    <div 
+      className={cn(
+        "w-full h-full relative",
+        isDragOver && "ring-2 ring-indigo-400 ring-offset-2 bg-indigo-50/50"
+      )}
+      onDrop={onDrop}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+    >
       <ReactFlow
         nodes={rfNodes}
         edges={rfEdges}
@@ -247,17 +454,27 @@ const GraphVisualization: React.FC = () => {
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         onNodeClick={onNodeClick}
         fitView
+        deleteKeyCode={["Backspace", "Delete"]}
+        multiSelectionKeyCode={["Meta", "Ctrl"]}
         className="bg-background w-full h-full"
         defaultEdgeOptions={{
-          type: "smoothstep",
+          type: "default",
           markerEnd: { type: MarkerType.ArrowClosed, color: "hsl(var(--foreground))" },
         }}
       >
         <Controls />
         <Background color="hsl(var(--border))" gap={16} />
       </ReactFlow>
+      
+      {/* Drop zone indicator */}
+      {isDragOver && (
+        <div className="absolute inset-4 border-2 border-dashed border-indigo-400 rounded-lg flex items-center justify-center pointer-events-none bg-indigo-50/80">
+          <div className="text-indigo-600 font-medium text-lg">Drop node here</div>
+        </div>
+      )}
     </div>
   );
 };

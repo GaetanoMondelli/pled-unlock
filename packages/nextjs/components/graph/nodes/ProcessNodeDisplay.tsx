@@ -4,9 +4,9 @@ import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { ProcessNode, RFNodeData } from "@/lib/simulation/types";
 import { cn } from "@/lib/utils";
-import { Cpu, Circle } from "lucide-react";
+import { Cpu, Circle, Trash2 } from "lucide-react";
 import type { NodeProps } from "reactflow";
-import { Handle, Position } from "reactflow";
+import { Handle, Position, useReactFlow } from "reactflow";
 
 // Helper function to get state machine display info
 const getStateMachineDisplay = (currentState?: string) => {
@@ -22,13 +22,29 @@ const getStateMachineDisplay = (currentState?: string) => {
   return stateInfo[currentState] || { color: "text-gray-400", displayName: "unknown" };
 };
 
-const ProcessNodeDisplay: React.FC<NodeProps<RFNodeData>> = ({ data, selected }) => {
+const ProcessNodeDisplay: React.FC<NodeProps<RFNodeData>> = ({ data, selected, id }) => {
   const config = data.config as ProcessNode;
   const numInputs = config.inputNodeIds.length;
   const numOutputs = config.outputs.length;
   const stateMachineInfo = getStateMachineDisplay(data.stateMachine?.currentState);
+  const { deleteElements } = useReactFlow();
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    deleteElements({ nodes: [{ id }] });
+  };
 
   return (
+    <div className="relative group">
+      {/* Delete Button */}
+      <button
+        onClick={handleDelete}
+        className="absolute -top-2 -right-2 w-5 h-5 bg-gray-400 hover:bg-gray-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10 flex items-center justify-center shadow-sm"
+        title="Delete node"
+      >
+        <Trash2 className="h-2.5 w-2.5" />
+      </button>
+      
     <Card
       className={cn(
         "w-36 shadow-md transition-all duration-300",
@@ -94,7 +110,8 @@ const ProcessNodeDisplay: React.FC<NodeProps<RFNodeData>> = ({ data, selected })
           position={Position.Left}
           id={`input-${inputId}`}
           style={{ top: `${(index + 1) * (100 / (numInputs + 1))}%` }}
-          className="w-3 h-3 !bg-secondary"
+          className="w-4 h-4 !bg-secondary hover:!bg-secondary/80 transition-all"
+          title={`Input ${index + 1}${inputId ? ` (${inputId})` : ''}`}
         />
       ))}
       {/* Output Handles */}
@@ -105,10 +122,12 @@ const ProcessNodeDisplay: React.FC<NodeProps<RFNodeData>> = ({ data, selected })
           position={Position.Right}
           id={`output-${index}`}
           style={{ top: `${(index + 1) * (100 / (numOutputs + 1))}%` }}
-          className="w-3 h-3 !bg-primary"
+          className="w-4 h-4 !bg-primary hover:!bg-primary/80 transition-all"
+          title={`Output ${index + 1}${output.destinationNodeId ? ` → ${output.destinationNodeId}` : ''}`}
         />
       ))}
     </Card>
+    </div>
   );
 };
 

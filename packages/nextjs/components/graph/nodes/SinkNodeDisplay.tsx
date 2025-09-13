@@ -4,9 +4,9 @@ import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { RFNodeData, SinkNode } from "@/lib/simulation/types";
 import { cn } from "@/lib/utils";
-import { Trash2, Circle } from "lucide-react";
+import { Trash, Circle, Trash2 } from "lucide-react";
 import type { NodeProps } from "reactflow";
-import { Handle, Position } from "reactflow";
+import { Handle, Position, useReactFlow } from "reactflow";
 
 // Helper function to get state machine display info
 const getStateMachineDisplay = (currentState?: string) => {
@@ -20,10 +20,27 @@ const getStateMachineDisplay = (currentState?: string) => {
   return stateInfo[currentState] || { color: "text-gray-400", displayName: "unknown" };
 };
 
-const SinkNodeDisplay: React.FC<NodeProps<RFNodeData>> = ({ data, selected }) => {
+const SinkNodeDisplay: React.FC<NodeProps<RFNodeData>> = ({ data, selected, id }) => {
   const config = data.config as SinkNode;
   const stateMachineInfo = getStateMachineDisplay(data.stateMachine?.currentState);
+  const { deleteElements } = useReactFlow();
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    deleteElements({ nodes: [{ id }] });
+  };
+
   return (
+    <div className="relative group">
+      {/* Delete Button */}
+      <button
+        onClick={handleDelete}
+        className="absolute -top-2 -right-2 w-5 h-5 bg-gray-400 hover:bg-gray-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10 flex items-center justify-center shadow-sm"
+        title="Delete node"
+      >
+        <Trash2 className="h-2.5 w-2.5" />
+      </button>
+      
     <Card
       className={cn(
         "w-36 shadow-md transition-all duration-300",
@@ -38,7 +55,7 @@ const SinkNodeDisplay: React.FC<NodeProps<RFNodeData>> = ({ data, selected }) =>
         )}
       >
         <CardTitle className="text-xs font-semibold flex items-center text-white">
-          <Trash2 className="h-3 w-3 mr-1" />
+          <Trash className="h-3 w-3 mr-1" />
           {data.label}
           {/* State Machine Indicator */}
           {stateMachineInfo && (
@@ -75,8 +92,14 @@ const SinkNodeDisplay: React.FC<NodeProps<RFNodeData>> = ({ data, selected }) =>
         
         {data.error && <p className="mt-1 text-destructive text-xs">{data.error}</p>}
       </CardContent>
-      <Handle type="target" position={Position.Left} className="w-3 h-3 !bg-secondary" />
+      <Handle 
+        type="target" 
+        position={Position.Left} 
+        className="w-4 h-4 !bg-secondary hover:!bg-secondary/80 transition-all" 
+        title="Input"
+      />
     </Card>
+    </div>
   );
 };
 

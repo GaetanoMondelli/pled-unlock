@@ -16,7 +16,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import NodeStateMachineDiagram from "@/components/ui/node-state-machine-diagram";
 import { useSimulationStore } from "@/stores/simulationStore";
-import { Code, Settings, Activity, ChevronDown, ChevronRight } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { Code, Settings, Activity, ChevronDown, ChevronRight, Save, RefreshCw } from "lucide-react";
 
 // Simple JSON display component
 const SimpleJsonView: React.FC<{ value: any }> = ({ value }) => {
@@ -31,8 +32,13 @@ const SimpleJsonView: React.FC<{ value: any }> = ({ value }) => {
 const ConfigSection: React.FC<{ 
   nodeConfig: any; 
   showJson: boolean; 
-  onToggleJson: () => void; 
-}> = ({ nodeConfig, showJson, onToggleJson }) => {
+  onToggleJson: () => void;
+  editedConfigText: string;
+  onConfigTextChange: (text: string) => void;
+  onSaveConfig: () => void;
+  hasUnsavedChanges: boolean;
+  onResetConfig: () => void;
+}> = ({ nodeConfig, showJson, onToggleJson, editedConfigText, onConfigTextChange, onSaveConfig, hasUnsavedChanges, onResetConfig }) => {
   const [expandedFormulas, setExpandedFormulas] = useState(new Set<number>());
 
   // Clean config (remove position and other UI stuff)
@@ -58,20 +64,54 @@ const ConfigSection: React.FC<{
         <h3 className="font-semibold text-slate-700 flex items-center gap-2">
           <Settings className="h-4 w-4" />
           Configuration
+          {hasUnsavedChanges && showJson && (
+            <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-medium">
+              Unsaved
+            </span>
+          )}
         </h3>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-6 px-2 text-xs"
-          onClick={onToggleJson}
-        >
-          <Code className="h-3 w-3 mr-1" />
-          {showJson ? 'Hide' : 'JSON'}
-        </Button>
+        <div className="flex gap-1">
+          {showJson && hasUnsavedChanges && (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-xs text-slate-500 hover:text-slate-700"
+                onClick={onResetConfig}
+              >
+                <RefreshCw className="h-3 w-3 mr-1" />
+                Reset
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                onClick={onSaveConfig}
+              >
+                <Save className="h-3 w-3 mr-1" />
+                Apply
+              </Button>
+            </>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-xs"
+            onClick={onToggleJson}
+          >
+            <Code className="h-3 w-3 mr-1" />
+            {showJson ? 'Hide' : 'Edit JSON'}
+          </Button>
+        </div>
       </div>
       
       {showJson ? (
-        <SimpleJsonView value={cleanConfig} />
+        <Textarea
+          value={editedConfigText}
+          onChange={(e) => onConfigTextChange(e.target.value)}
+          className="font-mono text-xs h-64 resize-none bg-slate-50 border-slate-200 focus:border-emerald-300 focus:ring-emerald-200"
+          placeholder="Edit node configuration JSON..."
+        />
       ) : (
         <div className="bg-slate-50 p-3 rounded-md space-y-2 text-sm min-h-[calc(15rem_+_2.5rem)]">
           <div className="space-y-2">
@@ -245,10 +285,15 @@ const NodeInspectorModal: React.FC = () => {
   const nodesConfig = useSimulationStore(state => state.nodesConfig);
   const nodeStates = useSimulationStore(state => state.nodeStates);
   const setSelectedNodeId = useSimulationStore(state => state.setSelectedNodeId);
+  const scenario = useSimulationStore(state => state.scenario);
+  const loadScenario = useSimulationStore(state => state.loadScenario);
+  
+  const { toast } = useToast();
 
   const [editedConfigText, setEditedConfigText] = useState<string>("");
   const [showConfigJson, setShowConfigJson] = useState(false);
   const [showStateJson, setShowStateJson] = useState(false);
+  const [originalConfigText, setOriginalConfigText] = useState<string>("");
 
   const isOpen = !!selectedNodeId;
   const nodeConfig = selectedNodeId ? nodesConfig[selectedNodeId] : null;
@@ -256,16 +301,68 @@ const NodeInspectorModal: React.FC = () => {
 
   useEffect(() => {
     if (nodeConfig) {
-      setEditedConfigText(JSON.stringify(nodeConfig, null, 2));
+      const configText = JSON.stringify(nodeConfig, null, 2);
+      setEditedConfigText(configText);
+      setOriginalConfigText(configText);
     } else {
       setEditedConfigText("");
+      setOriginalConfigText("");
     }
   }, [nodeConfig]);
+
+  const hasUnsavedChanges = editedConfigText !== originalConfigText;
+
+  const handleSaveConfig = async () => {
+    if (!selectedNodeId || !scenario) return;
+
+    try {
+      const parsedConfig = JSON.parse(editedConfigText);
+      
+      // Validate that essential properties are maintained
+      if (parsedConfig.nodeId !== selectedNodeId) {
+        toast({
+          variant: "destructive",
+          title: "Invalid Configuration",
+          description: "Node ID cannot be changed through this editor."
+        });
+        return;
+      }
+
+      // Create updated scenario with modified node
+      const updatedScenario = {
+        ...scenario,
+        nodes: scenario.nodes.map((node: any) =>
+          node.nodeId === selectedNodeId ? parsedConfig : node
+        )
+      };
+
+      // Apply the changes
+      await loadScenario(updatedScenario);
+      setOriginalConfigText(editedConfigText);
+      
+      toast({
+        title: "Configuration Updated",
+        description: `Node ${parsedConfig.displayName} has been updated successfully.`
+      });
+
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Invalid JSON",
+        description: error instanceof Error ? error.message : "Please check your JSON syntax."
+      });
+    }
+  };
+
+  const handleResetConfig = () => {
+    setEditedConfigText(originalConfigText);
+  };
 
   const handleOpenChange = (open: boolean) => {
     if (!open) {
       setSelectedNodeId(null);
       setEditedConfigText("");
+      setOriginalConfigText("");
     }
   };
 
@@ -297,6 +394,11 @@ const NodeInspectorModal: React.FC = () => {
                   nodeConfig={nodeConfig} 
                   showJson={showConfigJson}
                   onToggleJson={() => setShowConfigJson(!showConfigJson)}
+                  editedConfigText={editedConfigText}
+                  onConfigTextChange={setEditedConfigText}
+                  onSaveConfig={handleSaveConfig}
+                  hasUnsavedChanges={hasUnsavedChanges}
+                  onResetConfig={handleResetConfig}
                 />
                 <StateSection 
                   nodeState={nodeState} 

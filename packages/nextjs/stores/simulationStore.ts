@@ -36,6 +36,12 @@ const MAX_SINK_TOKENS_STORED = 50;
 const MAX_NODE_ACTIVITY_LOGS = 500;
 const MAX_GLOBAL_ACTIVITY_LOGS = 1000;
 
+interface ScenarioSnapshot {
+  scenario: Scenario | null;
+  timestamp: number;
+  description: string;
+}
+
 interface SimulationState {
   scenario: Scenario | null;
   nodesConfig: Record<string, AnyNode>;
@@ -50,6 +56,10 @@ interface SimulationState {
   selectedToken: Token | null;
   isGlobalLedgerOpen: boolean;
   errorMessages: string[];
+  
+  // Undo/Redo system
+  undoHistory: ScenarioSnapshot[];
+  redoHistory: ScenarioSnapshot[];
 
   // Actions
   loadScenario: (scenarioData: any) => Promise<void>;
@@ -62,6 +72,13 @@ interface SimulationState {
   clearErrors: () => void;
   updateNodeConfigInStore: (nodeId: string, newConfigData: any) => boolean;
   toggleGlobalLedger: () => void;
+  
+  // Undo/Redo actions
+  undo: () => void;
+  redo: () => void;
+  canUndo: () => boolean;
+  canRedo: () => boolean;
+  saveSnapshot: (description: string) => void;
 
   // Helper functions
   _updateNodeState: (nodeId: string, partialState: Partial<AnyNodeState>) => void;
@@ -71,6 +88,7 @@ interface SimulationState {
     timestamp: number,
   ) => HistoryEntry;
   _createToken: (originNodeId: string, value: any, timestamp: number, sourceTokens?: Token[]) => Token;
+  _restoreScenarioState: (scenario: Scenario) => void;
 }
 
 export const useSimulationStore = create<SimulationState>((set, get) => ({
@@ -88,6 +106,8 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
   selectedToken: null,
   isGlobalLedgerOpen: false,
   errorMessages: [],
+  undoHistory: [],
+  redoHistory: [],
 
   // Actions
   loadScenario: async (scenarioData: any) => {
@@ -696,6 +716,80 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
     return true;
   },
 
+  // Undo/Redo implementations
+  saveSnapshot: (description) => {
+    const currentState = get();
+    if (currentState.scenario) {
+      const snapshot: ScenarioSnapshot = {
+        scenario: JSON.parse(JSON.stringify(currentState.scenario)),
+        timestamp: Date.now(),
+        description,
+      };
+      
+      
+      set(state => ({
+        undoHistory: [...state.undoHistory, snapshot].slice(-20), // Keep last 20 snapshots
+        redoHistory: [], // Clear redo history when new action is taken
+      }));
+    }
+  },
+
+  undo: () => {
+    const state = get();
+    if (state.undoHistory.length === 0) return;
+    
+    
+    // Save current state to redo history before undoing
+    if (state.scenario) {
+      const currentSnapshot: ScenarioSnapshot = {
+        scenario: JSON.parse(JSON.stringify(state.scenario)),
+        timestamp: Date.now(),
+        description: "Current state before undo",
+      };
+      
+      const lastSnapshot = state.undoHistory[state.undoHistory.length - 1];
+      
+      set(prevState => ({
+        redoHistory: [currentSnapshot, ...prevState.redoHistory].slice(0, 20),
+        undoHistory: prevState.undoHistory.slice(0, -1),
+      }));
+      
+      // Restore the complete scenario state
+      if (lastSnapshot.scenario) {
+        get()._restoreScenarioState(lastSnapshot.scenario);
+      }
+    }
+  },
+
+  redo: () => {
+    const state = get();
+    if (state.redoHistory.length === 0) return;
+    
+    // Save current state to undo history before redoing
+    if (state.scenario) {
+      const currentSnapshot: ScenarioSnapshot = {
+        scenario: JSON.parse(JSON.stringify(state.scenario)),
+        timestamp: Date.now(),
+        description: "Current state before redo",
+      };
+      
+      const nextSnapshot = state.redoHistory[0];
+      
+      set(prevState => ({
+        undoHistory: [...prevState.undoHistory, currentSnapshot].slice(-20),
+        redoHistory: prevState.redoHistory.slice(1),
+      }));
+      
+      // Restore the complete scenario state
+      if (nextSnapshot.scenario) {
+        get()._restoreScenarioState(nextSnapshot.scenario);
+      }
+    }
+  },
+
+  canUndo: () => get().undoHistory.length > 0,
+  canRedo: () => get().redoHistory.length > 0,
+
   _updateNodeState: (nodeId, partialState) => {
     set(state => ({
       nodeStates: {
@@ -784,5 +878,84 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
     );
     newToken.history.push(createLog);
     return newToken;
+  },
+
+  _restoreScenarioState: (scenario) => {
+    
+    const { validateScenario } = require('@/lib/simulation/validation');
+    const { scenario: parsedScenario, errors } = validateScenario(scenario);
+    
+    if (parsedScenario && errors.length === 0) {
+      
+      const nodesConfig: Record<string, AnyNode> = {};
+      const initialNodeStates: Record<string, AnyNodeState> = {};
+      const initialLogs: Record<string, HistoryEntry[]> = {};
+
+      parsedScenario.nodes.forEach(node => {
+        nodesConfig[node.nodeId] = node;
+        initialLogs[node.nodeId] = [];
+        switch (node.type) {
+          case "DataSource":
+            initialNodeStates[node.nodeId] = { 
+              lastEmissionTime: -1,
+              stateMachine: {
+                currentState: "source_idle",
+                transitionHistory: []
+              }
+            } as DataSourceState;
+            break;
+          case "Queue":
+            initialNodeStates[node.nodeId] = { 
+              inputBuffer: [], 
+              outputBuffer: [], 
+              lastAggregationTime: -1,
+              stateMachine: {
+                currentState: "queue_idle",
+                transitionHistory: []
+              }
+            } as QueueState;
+            break;
+          case "ProcessNode":
+            const inputBuffers: Record<string, Token[]> = {};
+            initialNodeStates[node.nodeId] = { 
+              inputBuffers, 
+              lastFiredTime: -1,
+              stateMachine: {
+                currentState: "process_idle",
+                transitionHistory: []
+              }
+            } as ProcessNodeState;
+            break;
+          case "Sink":
+            initialNodeStates[node.nodeId] = {
+              consumedTokenCount: 0,
+              lastConsumedTime: -1,
+              consumedTokens: [],
+              stateMachine: {
+                currentState: "sink_idle",
+                transitionHistory: []
+              }
+            } as SinkState;
+            break;
+        }
+      });
+
+      set({
+        scenario: parsedScenario,
+        nodesConfig,
+        nodeStates: initialNodeStates,
+        currentTime: 0,
+        isRunning: false,
+        nodeActivityLogs: initialLogs,
+        globalActivityLog: [],
+        errorMessages: [],
+        selectedNodeId: null,
+        selectedToken: null,
+        isGlobalLedgerOpen: false,
+        eventCounter: 0,
+      });
+      
+    } else {
+    }
   },
 }));

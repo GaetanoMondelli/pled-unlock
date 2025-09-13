@@ -6,6 +6,7 @@ import GlobalLedgerModal from "@/components/modals/GlobalLedgerModal";
 import NodeInspectorModal from "@/components/modals/NodeInspectorModal";
 import TokenInspectorModal from "@/components/modals/TokenInspectorModal";
 import IntegratedAIAssistant from "@/components/ai/IntegratedAIAssistant";
+import NodeLibraryPanel from "@/components/library/NodeLibraryPanel";
 import StateInspectorPanel from "@/components/ui/state-inspector-panel";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,7 +23,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useSimulationStore } from "@/stores/simulationStore";
-import { AlertCircle, BookOpen, Edit, Pause, Play, RefreshCw, StepForward, Brain, Eye, EyeOff, Activity } from "lucide-react";
+import { AlertCircle, BookOpen, Edit, Pause, Play, RefreshCw, StepForward, Brain, Eye, EyeOff, Activity, Library, Undo2, Redo2 } from "lucide-react";
 import { cn } from "~~/lib/utils";
 
 export default function TemplateEditorPage() {
@@ -38,6 +39,10 @@ export default function TemplateEditorPage() {
   const simulationSpeed = useSimulationStore(state => state.simulationSpeed);
   const scenario = useSimulationStore(state => state.scenario);
   const toggleGlobalLedger = useSimulationStore(state => state.toggleGlobalLedger);
+  const undo = useSimulationStore(state => state.undo);
+  const redo = useSimulationStore(state => state.redo);
+  const canUndo = useSimulationStore(state => state.canUndo);
+  const canRedo = useSimulationStore(state => state.canRedo);
 
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
@@ -49,6 +54,7 @@ export default function TemplateEditorPage() {
   const [isAIPanelVisible, setIsAIPanelVisible] = useState(true);
   const [isResizing, setIsResizing] = useState(false);
   const [isStateInspectorOpen, setIsStateInspectorOpen] = useState(false);
+  const [sidePanelMode, setSidePanelMode] = useState<'ai' | 'library'>('ai');
   const lastErrorCountRef = useRef(0);
 
   const fetchDefaultScenarioContent = useCallback(async () => {
@@ -148,7 +154,9 @@ export default function TemplateEditorPage() {
   };
 
   const handleOpenScenarioEditor = () => {
-    setScenarioEditText(defaultScenarioContent);
+    // Use current scenario from store instead of defaultScenarioContent
+    const currentScenarioText = scenario ? JSON.stringify(scenario, null, 2) : defaultScenarioContent;
+    setScenarioEditText(currentScenarioText);
     setIsScenarioEditorOpen(true);
   };
 
@@ -290,6 +298,16 @@ export default function TemplateEditorPage() {
                     className="border-slate-300 hover:bg-slate-50">
                     <StepForward className="mr-2 h-4 w-4" /> Step
                   </Button>
+                  
+                  <Button variant="outline" size="sm" onClick={undo} disabled={!canUndo() || isRunning}
+                    className="border-slate-300 hover:bg-slate-50" title="Undo (Ctrl/Cmd+Z)">
+                    <Undo2 className="h-4 w-4" />
+                  </Button>
+                  
+                  <Button variant="outline" size="sm" onClick={redo} disabled={!canRedo() || isRunning}
+                    className="border-slate-300 hover:bg-slate-50" title="Redo (Ctrl/Cmd+Y)">
+                    <Redo2 className="h-4 w-4" />
+                  </Button>
                 </div>
                 
                 <div className="h-6 w-px bg-slate-300"></div>
@@ -357,17 +375,47 @@ export default function TemplateEditorPage() {
             </div>
           )}
 
-          {/* AI Panel Toggle Button */}
-          <button
-            onClick={() => setIsAIPanelVisible(!isAIPanelVisible)}
-            className="absolute top-4 right-4 z-10 w-8 h-8 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-lg flex items-center justify-center transition-colors"
-          >
-            {isAIPanelVisible ? (
-              <EyeOff className="h-4 w-4 text-slate-600" />
-            ) : (
-              <Eye className="h-4 w-4 text-slate-600" />
+          {/* Side Panel Toggle Buttons */}
+          <div className="absolute top-4 right-4 z-10 flex gap-1">
+            {isAIPanelVisible && (
+              <div className="flex bg-white border border-slate-200 rounded-lg shadow-sm">
+                <button
+                  onClick={() => setSidePanelMode('ai')}
+                  className={cn(
+                    "px-2 py-1 text-xs font-medium rounded-l-lg transition-all flex items-center gap-1",
+                    sidePanelMode === 'ai'
+                      ? "bg-slate-600 text-white" 
+                      : "text-slate-600 hover:text-slate-800 hover:bg-slate-50"
+                  )}
+                >
+                  <Brain className="h-3 w-3" />
+                  AI
+                </button>
+                <button
+                  onClick={() => setSidePanelMode('library')}
+                  className={cn(
+                    "px-2 py-1 text-xs font-medium rounded-r-lg transition-all flex items-center gap-1",
+                    sidePanelMode === 'library'
+                      ? "bg-indigo-600 text-white" 
+                      : "text-slate-600 hover:text-slate-800 hover:bg-slate-50"
+                  )}
+                >
+                  <Library className="h-3 w-3" />
+                  Library
+                </button>
+              </div>
             )}
-          </button>
+            <button
+              onClick={() => setIsAIPanelVisible(!isAIPanelVisible)}
+              className="w-8 h-8 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-lg flex items-center justify-center transition-colors"
+            >
+              {isAIPanelVisible ? (
+                <EyeOff className="h-4 w-4 text-slate-600" />
+              ) : (
+                <Eye className="h-4 w-4 text-slate-600" />
+              )}
+            </button>
+          </div>
 
           <div className="h-full w-full">
             <GraphVisualization />
@@ -384,40 +432,51 @@ export default function TemplateEditorPage() {
           </div>
         )}
 
-        {/* AI Assistant Integrated Panel */}
+        {/* Side Panel (AI Assistant or Node Library) */}
         {isAIPanelVisible && (
           <div 
             className="border-l border-slate-200 bg-white flex flex-col"
             style={{ width: `${aiPanelWidth}px` }}
           >
-          <div className="px-3 py-1.5 border-b border-slate-200 bg-slate-50 flex-shrink-0">
-            <div className="flex items-center justify-center">
-              <div className="w-8 h-8 bg-gradient-to-br from-slate-600 to-slate-800 rounded-full flex items-center justify-center shadow-sm">
-                <Brain className="h-4 w-4 text-white" />
-              </div>
-            </div>
-            
-          </div>
-          
-            <IntegratedAIAssistant 
-              className="flex-1" 
-              isEditMode={isEditMode}
-              scenarioContent={defaultScenarioContent}
-              onScenarioUpdate={(newScenario) => {
-                setDefaultScenarioContent(newScenario);
-                try {
-                  const parsedScenario = JSON.parse(newScenario);
-                  loadScenario(parsedScenario);
-                  toast({ title: "Success", description: "Scenario updated automatically by AI" });
-                } catch (error) {
-                  toast({ 
-                    variant: "destructive", 
-                    title: "JSON Error", 
-                    description: "AI generated invalid JSON" 
-                  });
-                }
-              }}
-            />
+            {sidePanelMode === 'ai' ? (
+              <>
+                <div className="px-3 py-1.5 border-b border-slate-200 bg-slate-50 flex-shrink-0">
+                  <div className="flex items-center justify-center">
+                    <div className="w-8 h-8 bg-gradient-to-br from-slate-600 to-slate-800 rounded-full flex items-center justify-center shadow-sm">
+                      <Brain className="h-4 w-4 text-white" />
+                    </div>
+                  </div>
+                </div>
+                
+                <IntegratedAIAssistant 
+                  className="flex-1" 
+                  isEditMode={isEditMode}
+                  scenarioContent={defaultScenarioContent}
+                  onScenarioUpdate={(newScenario) => {
+                    setDefaultScenarioContent(newScenario);
+                    try {
+                      const parsedScenario = JSON.parse(newScenario);
+                      loadScenario(parsedScenario);
+                      toast({ title: "Success", description: "Scenario updated automatically by AI" });
+                    } catch (error) {
+                      toast({ 
+                        variant: "destructive", 
+                        title: "JSON Error", 
+                        description: "AI generated invalid JSON" 
+                      });
+                    }
+                  }}
+                />
+              </>
+            ) : (
+              <NodeLibraryPanel 
+                className="flex-1"
+                onNodeDrop={(nodeType, position) => {
+                  // TODO: Implement node drop functionality
+                  console.log('Node drop:', nodeType, position);
+                }}
+              />
+            )}
           </div>
         )}
       </main>

@@ -4,9 +4,9 @@ import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { QueueNode, RFNodeData } from "@/lib/simulation/types";
 import { cn } from "@/lib/utils";
-import { Archive, Circle } from "lucide-react";
+import { Archive, Circle, Trash2 } from "lucide-react";
 import type { NodeProps } from "reactflow";
-import { Handle, Position } from "reactflow";
+import { Handle, Position, useReactFlow } from "reactflow";
 
 // Helper function to get state machine display info
 const getStateMachineDisplay = (currentState?: string) => {
@@ -22,12 +22,29 @@ const getStateMachineDisplay = (currentState?: string) => {
   return stateInfo[currentState] || { color: "text-gray-400", displayName: "unknown" };
 };
 
-const QueueNodeDisplay: React.FC<NodeProps<RFNodeData>> = ({ data, selected }) => {
+const QueueNodeDisplay: React.FC<NodeProps<RFNodeData>> = ({ data, selected, id }) => {
   const config = data.config as QueueNode;
   const stateMachineInfo = getStateMachineDisplay(data.stateMachine?.currentState);
+  const { deleteElements } = useReactFlow();
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    deleteElements({ nodes: [{ id }] });
+  };
+
   return (
-    <Card
-      className={cn(
+    <div className="relative group">
+      {/* Delete Button */}
+      <button
+        onClick={handleDelete}
+        className="absolute -top-2 -right-2 w-5 h-5 bg-gray-400 hover:bg-gray-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10 flex items-center justify-center shadow-sm"
+        title="Delete node"
+      >
+        <Trash2 className="h-2.5 w-2.5" />
+      </button>
+      
+      <Card
+        className={cn(
         "w-36 shadow-md transition-all duration-300",
         selected && "ring-2 ring-primary",
         data.isActive && "animate-pulse border-blue-400 shadow-blue-400/50 shadow-lg scale-105",
@@ -79,9 +96,20 @@ const QueueNodeDisplay: React.FC<NodeProps<RFNodeData>> = ({ data, selected }) =
         
         {data.error && <p className="mt-1 text-destructive text-xs">{data.error}</p>}
       </CardContent>
-      <Handle type="target" position={Position.Left} className="w-3 h-3 !bg-secondary" />
-      <Handle type="source" position={Position.Right} className="w-3 h-3 !bg-primary" />
+      <Handle 
+        type="target" 
+        position={Position.Left} 
+        className="w-4 h-4 !bg-secondary hover:!bg-secondary/80 transition-all"
+        title="Input"
+      />
+      <Handle 
+        type="source" 
+        position={Position.Right} 
+        className="w-4 h-4 !bg-primary hover:!bg-primary/80 transition-all"
+        title="Output"
+      />
     </Card>
+    </div>
   );
 };
 

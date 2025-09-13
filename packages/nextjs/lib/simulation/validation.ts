@@ -16,7 +16,7 @@ export function validateScenario(data: any): { scenario: Scenario | null; errors
   scenario.nodes.forEach(node => {
     switch (node.type) {
       case "DataSource":
-        if (!nodeIds.has(node.destinationNodeId)) {
+        if (node.destinationNodeId && node.destinationNodeId.trim() !== "" && !nodeIds.has(node.destinationNodeId)) {
           errors.push(`DataSource "${node.nodeId}": destinationNodeId "${node.destinationNodeId}" does not exist.`);
         }
         if (node.valueMin > node.valueMax) {
@@ -24,18 +24,18 @@ export function validateScenario(data: any): { scenario: Scenario | null; errors
         }
         break;
       case "Queue":
-        if (!nodeIds.has(node.destinationNodeId)) {
+        if (node.destinationNodeId && node.destinationNodeId.trim() !== "" && !nodeIds.has(node.destinationNodeId)) {
           errors.push(`Queue "${node.nodeId}": destinationNodeId "${node.destinationNodeId}" does not exist.`);
         }
         break;
       case "ProcessNode":
         node.inputNodeIds.forEach(inputId => {
-          if (!nodeIds.has(inputId)) {
+          if (inputId && inputId.trim() !== "" && !nodeIds.has(inputId)) {
             errors.push(`ProcessNode "${node.nodeId}": inputNodeId "${inputId}" does not exist.`);
           }
         });
         node.outputs.forEach(output => {
-          if (!nodeIds.has(output.destinationNodeId)) {
+          if (output.destinationNodeId && output.destinationNodeId.trim() !== "" && !nodeIds.has(output.destinationNodeId)) {
             errors.push(
               `ProcessNode "${node.nodeId}" output: destinationNodeId "${output.destinationNodeId}" does not exist.`,
             );
