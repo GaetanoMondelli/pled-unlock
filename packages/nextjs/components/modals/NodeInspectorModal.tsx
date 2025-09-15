@@ -241,8 +241,8 @@ const NodeActivityLog: React.FC<{ nodeId: string }> = ({ nodeId }) => {
           <div className="flex-1 min-w-0">Details</div>
         </div>
       </div>
-      <ScrollArea className="max-h-64">
-        <div className="divide-y">
+      <ScrollArea className="h-64 w-full">
+        <div className="divide-y min-h-0">
           {logs
             .slice(-30)
             .reverse()
