@@ -17,7 +17,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import NodeStateMachineDiagram from "@/components/ui/node-state-machine-diagram";
 import { useSimulationStore } from "@/stores/simulationStore";
 import { useToast } from "@/hooks/use-toast";
-import { Code, Settings, Activity, ChevronDown, ChevronRight, Save, RefreshCw } from "lucide-react";
+// import { MessageInterfaces } from "@/lib/simulation/message-interfaces";
+// import { InterfaceCompatibilityValidator } from "@/lib/simulation/enhanced-node-schema";
+import { Code, Settings, Activity, ChevronDown, ChevronRight, Save, RefreshCw, MessageSquare, ArrowRight, ArrowLeft, CheckCircle, AlertTriangle, Info, Eye, EyeOff } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 // Simple JSON display component
 const SimpleJsonView: React.FC<{ value: any }> = ({ value }) => {
@@ -25,6 +28,456 @@ const SimpleJsonView: React.FC<{ value: any }> = ({ value }) => {
     <pre className="text-xs font-mono whitespace-pre-wrap bg-slate-50 p-3 rounded border overflow-auto max-h-64">
       {JSON.stringify(value, null, 2)}
     </pre>
+  );
+};
+
+// Helper function to determine message interfaces for a node
+const getNodeMessageInterfaces = (nodeConfig: any) => {
+  // Check if node has enhanced interface definitions
+  if (nodeConfig.inputInterface || nodeConfig.outputInterface || nodeConfig.inputs || nodeConfig.outputs) {
+    return {
+      inputs: getNodeInputInterfaces(nodeConfig),
+      outputs: getNodeOutputInterfaces(nodeConfig)
+    };
+  }
+
+  // Fallback to defaults for legacy nodes
+  const defaults = {
+    DataSource: {
+      inputs: [],
+      outputs: ["SimpleValue"]
+    },
+    Queue: {
+      inputs: ["SimpleValue"],
+      outputs: ["AggregationResult"]
+    },
+    ProcessNode: {
+      inputs: ["SimpleValue", "AggregationResult"],
+      outputs: ["TransformationResult"]
+    },
+    Sink: {
+      inputs: ["SimpleValue", "AggregationResult", "TransformationResult", "ValidationResult"],
+      outputs: []
+    }
+  };
+
+  return defaults[nodeConfig.type as keyof typeof defaults] || { inputs: [], outputs: [] };
+};
+
+// Extract input interfaces from enhanced node config
+const getNodeInputInterfaces = (nodeConfig: any): string[] => {
+  const interfaces: string[] = [];
+
+  // Single input interface
+  if (nodeConfig.inputInterface?.type) {
+    interfaces.push(nodeConfig.inputInterface.type);
+  }
+
+  // Multiple inputs (ProcessNode style)
+  if (nodeConfig.inputs && Array.isArray(nodeConfig.inputs)) {
+    nodeConfig.inputs.forEach((input: any) => {
+      if (input.interface?.type) {
+        interfaces.push(input.interface.type);
+      }
+    });
+  }
+
+  return [...new Set(interfaces)];
+};
+
+// Extract output interfaces from enhanced node config
+const getNodeOutputInterfaces = (nodeConfig: any): string[] => {
+  const interfaces: string[] = [];
+
+  // Single output interface
+  if (nodeConfig.outputInterface?.type) {
+    interfaces.push(nodeConfig.outputInterface.type);
+  }
+
+  // Multiple outputs (ProcessNode style)
+  if (nodeConfig.outputs && Array.isArray(nodeConfig.outputs)) {
+    nodeConfig.outputs.forEach((output: any) => {
+      if (output.interface?.type) {
+        interfaces.push(output.interface.type);
+      }
+    });
+  }
+
+  // Routes (Splitter style)
+  if (nodeConfig.routes && Array.isArray(nodeConfig.routes)) {
+    nodeConfig.routes.forEach((route: any) => {
+      if (route.outputInterface?.type) {
+        interfaces.push(route.outputInterface.type);
+      }
+    });
+  }
+
+  // Default route (Splitter style)
+  if (nodeConfig.defaultRoute?.outputInterface?.type) {
+    interfaces.push(nodeConfig.defaultRoute.outputInterface.type);
+  }
+
+  return [...new Set(interfaces)];
+};
+
+// Detailed interface contract display component
+const InterfaceContractView: React.FC<{
+  contract: any;
+  direction: 'input' | 'output';
+  isExpanded: boolean;
+  onToggle: () => void;
+}> = ({ contract, direction, isExpanded, onToggle }) => {
+  if (!contract) return null;
+
+  const bgColor = direction === 'input' ? 'bg-green-50' : 'bg-blue-50';
+  const borderColor = direction === 'input' ? 'border-green-200' : 'border-blue-200';
+  const textColor = direction === 'input' ? 'text-green-700' : 'text-blue-700';
+  const badgeColor = direction === 'input' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700';
+
+  return (
+    <div className={`border rounded-lg p-3 ${borderColor} ${bgColor}`}>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className={`text-xs ${badgeColor} border-0`}>
+            {contract.type}
+          </Badge>
+          {contract.description && (
+            <span className="text-xs text-slate-600 truncate max-w-48" title={contract.description}>
+              {contract.description}
+            </span>
+          )}
+        </div>
+        <button
+          onClick={onToggle}
+          className={`p-1 rounded hover:bg-white/50 ${textColor}`}
+        >
+          {isExpanded ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+        </button>
+      </div>
+
+      {isExpanded && (
+        <div className="mt-3 space-y-2">
+          {contract.requiredFields && contract.requiredFields.length > 0 && (
+            <div>
+              <div className="text-xs font-medium text-slate-700 mb-1">Required Fields:</div>
+              <div className="flex flex-wrap gap-1">
+                {contract.requiredFields.map((field: string, index: number) => (
+                  <code key={index} className="text-xs bg-white/60 px-1.5 py-0.5 rounded border">
+                    {field}
+                  </code>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {contract.validation && (
+            <div>
+              <div className="text-xs font-medium text-slate-700 mb-1">Validation:</div>
+              <code className="text-xs bg-white/60 px-2 py-1 rounded border block">
+                {contract.validation}
+              </code>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Enhanced message interface display component
+const MessageInterfaceSection: React.FC<{ nodeConfig: any }> = ({ nodeConfig }) => {
+  const interfaces = getNodeMessageInterfaces(nodeConfig);
+  const [expandedContracts, setExpandedContracts] = useState(new Set<string>());
+  const [showDetailed, setShowDetailed] = useState(false);
+
+  const toggleContract = (contractId: string) => {
+    const newExpanded = new Set(expandedContracts);
+    if (newExpanded.has(contractId)) {
+      newExpanded.delete(contractId);
+    } else {
+      newExpanded.add(contractId);
+    }
+    setExpandedContracts(newExpanded);
+  };
+
+  const hasEnhancedInterfaces = nodeConfig && ((nodeConfig as any).inputInterface || (nodeConfig as any).outputInterface ||
+    (nodeConfig as any).inputs || (nodeConfig as any).outputs || (nodeConfig as any).routes);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h4 className="font-medium text-slate-700 flex items-center gap-2">
+          <MessageSquare className="h-4 w-4" />
+          Message Interfaces
+          {hasEnhancedInterfaces && (
+            <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200">
+              Enhanced
+            </Badge>
+          )}
+        </h4>
+        {hasEnhancedInterfaces && (
+          <button
+            onClick={() => setShowDetailed(!showDetailed)}
+            className="text-xs text-slate-500 hover:text-slate-700 flex items-center gap-1"
+          >
+            {showDetailed ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+            {showDetailed ? 'Simple' : 'Detailed'}
+          </button>
+        )}
+      </div>
+
+      {showDetailed && hasEnhancedInterfaces ? (
+        <div className="space-y-3">
+          {/* Enhanced Input Interface Details */}
+          {nodeConfig.inputInterface && (
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <ArrowRight className="h-3 w-3 text-slate-500" />
+                <span className="text-xs font-medium text-slate-600">Input Interface</span>
+              </div>
+              <InterfaceContractView
+                contract={nodeConfig.inputInterface}
+                direction="input"
+                isExpanded={expandedContracts.has('input')}
+                onToggle={() => toggleContract('input')}
+              />
+            </div>
+          )}
+
+          {/* Multiple Inputs (ProcessNode) */}
+          {nodeConfig.inputs && Array.isArray(nodeConfig.inputs) && (
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <ArrowRight className="h-3 w-3 text-slate-500" />
+                <span className="text-xs font-medium text-slate-600">Input Interfaces ({nodeConfig.inputs.length})</span>
+              </div>
+              <div className="space-y-2">
+                {nodeConfig.inputs.map((input: any, index: number) => (
+                  <div key={index} className="ml-3">
+                    <div className="text-xs text-slate-600 mb-1">
+                      <code className="font-mono">{input.alias || input.nodeId}</code>
+                      {input.required === false && <span className="text-slate-400 ml-1">(optional)</span>}
+                    </div>
+                    <InterfaceContractView
+                      contract={input.interface}
+                      direction="input"
+                      isExpanded={expandedContracts.has(`input-${index}`)}
+                      onToggle={() => toggleContract(`input-${index}`)}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Enhanced Output Interface Details */}
+          {nodeConfig.outputInterface && (
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <ArrowLeft className="h-3 w-3 text-slate-500 rotate-180" />
+                <span className="text-xs font-medium text-slate-600">Output Interface</span>
+              </div>
+              <InterfaceContractView
+                contract={nodeConfig.outputInterface}
+                direction="output"
+                isExpanded={expandedContracts.has('output')}
+                onToggle={() => toggleContract('output')}
+              />
+            </div>
+          )}
+
+          {/* Multiple Outputs (ProcessNode) */}
+          {nodeConfig.outputs && Array.isArray(nodeConfig.outputs) && (
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <ArrowLeft className="h-3 w-3 text-slate-500 rotate-180" />
+                <span className="text-xs font-medium text-slate-600">Output Interfaces ({nodeConfig.outputs.length})</span>
+              </div>
+              <div className="space-y-2">
+                {nodeConfig.outputs.map((output: any, index: number) => (
+                  <div key={index} className="ml-3">
+                    <div className="text-xs text-slate-600 mb-1">
+                      <span className="font-mono">→ {output.destinationNodeId}</span>
+                      {output.name && <span className="text-slate-400 ml-1">({output.name})</span>}
+                    </div>
+                    <InterfaceContractView
+                      contract={output.interface}
+                      direction="output"
+                      isExpanded={expandedContracts.has(`output-${index}`)}
+                      onToggle={() => toggleContract(`output-${index}`)}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Routes (Splitter) */}
+          {nodeConfig.routes && Array.isArray(nodeConfig.routes) && (
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <ArrowLeft className="h-3 w-3 text-slate-500 rotate-180" />
+                <span className="text-xs font-medium text-slate-600">Route Interfaces ({nodeConfig.routes.length})</span>
+              </div>
+              <div className="space-y-2">
+                {nodeConfig.routes.map((route: any, index: number) => (
+                  <div key={index} className="ml-3">
+                    <div className="text-xs text-slate-600 mb-1">
+                      <span className="font-mono">→ {route.destinationNodeId}</span>
+                      <span className="text-slate-400 ml-1">(priority: {route.priority || 'default'})</span>
+                    </div>
+                    {route.condition && (
+                      <div className="text-xs text-slate-500 mb-1">
+                        <code className="bg-yellow-50 px-1 py-0.5 rounded text-yellow-700">{route.condition}</code>
+                      </div>
+                    )}
+                    <InterfaceContractView
+                      contract={route.outputInterface}
+                      direction="output"
+                      isExpanded={expandedContracts.has(`route-${index}`)}
+                      onToggle={() => toggleContract(`route-${index}`)}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        /* Simple Interface Display */
+        <div className="space-y-3">
+          {/* Input Interfaces */}
+          {interfaces.inputs.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <ArrowRight className="h-3 w-3 text-slate-500" />
+                <span className="text-xs font-medium text-slate-600">Accepts</span>
+              </div>
+              <div className="flex flex-wrap gap-1 ml-5">
+              </div>
+            </div>
+          )}
+
+          {/* Output Interfaces */}
+          {interfaces.outputs.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <ArrowLeft className="h-3 w-3 text-slate-500 rotate-180" />
+                <span className="text-xs font-medium text-slate-600">Produces</span>
+              </div>
+              <div className="flex flex-wrap gap-1 ml-5">
+                {/* {interfaces.outputs.map((interfaceName: string) => {
+                  const messageInterface = MessageInterfaces[interfaceName];
+                  return (
+                    <div
+                      key={interfaceName}
+                      className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium cursor-help"
+                      title={messageInterface?.description || `${interfaceName} message type`}
+                    >
+                      {interfaceName}
+                    </div>
+                  );
+                })} */}
+              </div>
+            </div>
+          )}
+
+          {interfaces.inputs.length === 0 && interfaces.outputs.length === 0 && (
+            <div className="text-xs text-slate-500 italic">
+              No message interfaces defined for this node type
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Interface validation display component
+const InterfaceValidationSection: React.FC<{ nodeConfig: any }> = ({ nodeConfig }) => {
+  const scenario = useSimulationStore(state => state.scenario);
+  const [validationResult, setValidationResult] = useState<any>(null);
+
+  useEffect(() => {
+    if (scenario && nodeConfig) {
+      try {
+        // Mock validation for enhanced nodes
+        if (nodeConfig.inputInterface || nodeConfig.outputInterface || nodeConfig.inputs || nodeConfig.outputs) {
+          const result = InterfaceCompatibilityValidator.validateNode(nodeConfig, scenario);
+          setValidationResult(result);
+        } else {
+          setValidationResult(null);
+        }
+      } catch (error) {
+        console.warn('Interface validation error:', error);
+        setValidationResult(null);
+      }
+    }
+  }, [nodeConfig, scenario]);
+
+  if (!validationResult) {
+    return null;
+  }
+
+  const hasErrors = validationResult.errors && validationResult.errors.length > 0;
+  const hasWarnings = validationResult.warnings && validationResult.warnings.length > 0;
+
+  return (
+    <div className="space-y-3">
+      <h4 className="font-medium text-slate-700 flex items-center gap-2">
+        {validationResult.valid ? (
+          <CheckCircle className="h-4 w-4 text-green-600" />
+        ) : (
+          <AlertTriangle className="h-4 w-4 text-red-600" />
+        )}
+        Interface Validation
+        <Badge
+          variant="outline"
+          className={`text-xs ${
+            validationResult.valid
+              ? 'bg-green-50 text-green-700 border-green-200'
+              : 'bg-red-50 text-red-700 border-red-200'
+          }`}
+        >
+          {validationResult.valid ? 'Valid' : 'Invalid'}
+        </Badge>
+      </h4>
+
+      {hasErrors && (
+        <div className="space-y-1">
+          <div className="text-xs font-medium text-red-700 flex items-center gap-1">
+            <AlertTriangle className="h-3 w-3" />
+            Errors ({validationResult.errors.length})
+          </div>
+          {validationResult.errors.map((error: string, index: number) => (
+            <div key={index} className="text-xs text-red-600 bg-red-50 p-2 rounded border border-red-100">
+              {error}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {hasWarnings && (
+        <div className="space-y-1">
+          <div className="text-xs font-medium text-orange-700 flex items-center gap-1">
+            <Info className="h-3 w-3" />
+            Warnings ({validationResult.warnings.length})
+          </div>
+          {validationResult.warnings.map((warning: string, index: number) => (
+            <div key={index} className="text-xs text-orange-600 bg-orange-50 p-2 rounded border border-orange-100">
+              {warning}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!hasErrors && !hasWarnings && (
+        <div className="text-xs text-green-600 bg-green-50 p-2 rounded border border-green-100 flex items-center gap-2">
+          <CheckCircle className="h-3 w-3" />
+          All interface contracts are valid
+        </div>
+      )}
+    </div>
   );
 };
 
