@@ -24,7 +24,7 @@ const getStateMachineDisplay = (currentState?: string) => {
 
 const ProcessNodeDisplay: React.FC<NodeProps<RFNodeData>> = ({ data, selected, id }) => {
   const config = data.config as ProcessNode;
-  const numInputs = config.inputNodeIds.length;
+  const numInputs = config.inputs.length;
   const numOutputs = config.outputs.length;
   const stateMachineInfo = getStateMachineDisplay(data.stateMachine?.currentState);
   const { deleteElements } = useReactFlow();
@@ -80,8 +80,8 @@ const ProcessNodeDisplay: React.FC<NodeProps<RFNodeData>> = ({ data, selected, i
           <p>Inputs: {numInputs}</p>
           <p>Outputs: {numOutputs}</p>
           {config.outputs.map((out, i) => (
-            <p key={i} className="truncate font-mono text-[9px]" title={out.formula}>
-              {out.formula}
+            <p key={i} className="truncate font-mono text-[9px]" title={out.transformation?.formula || 'No formula'}>
+              {out.transformation?.formula || 'No formula'}
             </p>
           ))}
         </div>
@@ -103,27 +103,27 @@ const ProcessNodeDisplay: React.FC<NodeProps<RFNodeData>> = ({ data, selected, i
         {data.error && <p className="mt-1 text-destructive text-xs">{data.error}</p>}
       </CardContent>
       {/* Input Handles */}
-      {config.inputNodeIds.map((inputId, index) => (
+      {config.inputs.map((input, index) => (
         <Handle
-          key={`input-${inputId}-${index}`}
+          key={`input-${input.name}-${index}`}
           type="target"
           position={Position.Left}
-          id={`input-${inputId}`}
+          id={`input-${input.name}`}
           style={{ top: `${(index + 1) * (100 / (numInputs + 1))}%` }}
           className="w-4 h-4 !bg-secondary hover:!bg-secondary/80 transition-all"
-          title={`Input ${index + 1}${inputId ? ` (${inputId})` : ''}`}
+          title={`Input ${index + 1} (${input.alias || input.name})`}
         />
       ))}
       {/* Output Handles */}
       {config.outputs.map((output, index) => (
         <Handle
-          key={`output-${index}`}
+          key={`output-${output.name}-${index}`}
           type="source"
           position={Position.Right}
-          id={`output-${index}`}
+          id={`output-${output.name}`}
           style={{ top: `${(index + 1) * (100 / (numOutputs + 1))}%` }}
           className="w-4 h-4 !bg-primary hover:!bg-primary/80 transition-all"
-          title={`Output ${index + 1}${output.destinationNodeId ? ` → ${output.destinationNodeId}` : ''}`}
+          title={`Output ${output.name} → ${output.destinationNodeId}`}
         />
       ))}
     </Card>

@@ -75,8 +75,8 @@ const QueueNodeDisplay: React.FC<NodeProps<RFNodeData>> = ({ data, selected, id 
         {/* Config Section */}
         <div className="space-y-0.5">
           <p className="font-medium text-muted-foreground">CONFIG:</p>
-          <p>Win: {config.timeWindow}s</p>
-          <p>{config.aggregationMethod}</p>
+          <p>Win: {config.aggregation.trigger.window}s</p>
+          <p>{config.aggregation.method}</p>
           {config.capacity && <p>Cap: {config.capacity}</p>}
         </div>
         

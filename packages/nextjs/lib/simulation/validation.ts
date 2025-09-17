@@ -16,48 +16,44 @@ export function validateScenario(data: any): { scenario: Scenario | null; errors
   scenario.nodes.forEach(node => {
     switch (node.type) {
       case "DataSource":
-        if (node.destinationNodeId && node.destinationNodeId.trim() !== "" && !nodeIds.has(node.destinationNodeId)) {
-          errors.push(`DataSource "${node.nodeId}": destinationNodeId "${node.destinationNodeId}" does not exist.`);
+        // Validate generation config
+        if (node.generation.valueMin > node.generation.valueMax) {
+          errors.push(`DataSource "${node.nodeId}": generation valueMin cannot be greater than valueMax.`);
         }
-        if (node.valueMin > node.valueMax) {
-          errors.push(`DataSource "${node.nodeId}": valueMin cannot be greater than valueMax.`);
-        }
-        break;
-      case "Queue":
-        if (node.destinationNodeId && node.destinationNodeId.trim() !== "" && !nodeIds.has(node.destinationNodeId)) {
-          errors.push(`Queue "${node.nodeId}": destinationNodeId "${node.destinationNodeId}" does not exist.`);
-        }
-        break;
-      case "ProcessNode":
-        node.inputNodeIds.forEach(inputId => {
-          if (inputId && inputId.trim() !== "" && !nodeIds.has(inputId)) {
-            errors.push(`ProcessNode "${node.nodeId}": inputNodeId "${inputId}" does not exist.`);
-          }
-        });
+        // Validate outputs
         node.outputs.forEach(output => {
-          if (output.destinationNodeId && output.destinationNodeId.trim() !== "" && !nodeIds.has(output.destinationNodeId)) {
-            errors.push(
-              `ProcessNode "${node.nodeId}" output: destinationNodeId "${output.destinationNodeId}" does not exist.`,
-            );
+          if (!nodeIds.has(output.destinationNodeId)) {
+            errors.push(`DataSource "${node.nodeId}": output destinationNodeId "${output.destinationNodeId}" does not exist.`);
           }
         });
-        // Check if nodes targeting this ProcessNode are consistent with inputNodeIds
-        const sourcesForProcessNode = scenario.nodes
-          .filter(n => {
-            if (n.type === "DataSource" || n.type === "Queue") return n.destinationNodeId === node.nodeId;
-            if (n.type === "ProcessNode") return n.outputs.some(o => o.destinationNodeId === node.nodeId);
-            return false;
-          })
-          .map(n => n.nodeId);
+        break;
 
-        node.inputNodeIds.forEach(inputId => {
-          if (!sourcesForProcessNode.includes(inputId)) {
-            // This check might be too strict if graph can be partially defined or built dynamically
-            // For now, it's a good sanity check
-            // errors.push(`ProcessNode "${node.nodeId}": inputNodeId "${inputId}" is declared but no node targets it as a destination for this ProcessNode.`);
+      case "Queue":
+        // Validate outputs
+        node.outputs.forEach(output => {
+          if (!nodeIds.has(output.destinationNodeId)) {
+            errors.push(`Queue "${node.nodeId}": output destinationNodeId "${output.destinationNodeId}" does not exist.`);
           }
         });
+        break;
 
+      case "ProcessNode":
+        // Validate inputs reference existing nodes
+        node.inputs.forEach(input => {
+          if (input.nodeId && !nodeIds.has(input.nodeId)) {
+            errors.push(`ProcessNode "${node.nodeId}": input nodeId "${input.nodeId}" does not exist.`);
+          }
+        });
+        // Validate outputs
+        node.outputs.forEach(output => {
+          if (!nodeIds.has(output.destinationNodeId)) {
+            errors.push(`ProcessNode "${node.nodeId}": output destinationNodeId "${output.destinationNodeId}" does not exist.`);
+          }
+        });
+        break;
+
+      case "Sink":
+        // Sink nodes don't need additional validation beyond schema
         break;
     }
   });

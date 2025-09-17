@@ -567,52 +567,147 @@ const ConfigSection: React.FC<{
         />
       ) : (
         <div className="bg-slate-50 p-3 rounded-md space-y-2 text-sm min-h-[calc(15rem_+_2.5rem)]">
-          <div className="space-y-2">
-            <div><span className="font-medium text-slate-600">ID:</span> <span className="font-mono text-slate-800">{nodeConfig.nodeId}</span></div>
-            <div><span className="font-medium text-slate-600">Name:</span> {nodeConfig.displayName}</div>
-            <div><span className="font-medium text-slate-600">Type:</span> {nodeConfig.type}</div>
-            
-            {nodeConfig.type === 'ProcessNode' && nodeConfig.outputs && (
-              <div>
-                <div className="font-medium text-slate-600 mb-2">Formulas ({nodeConfig.outputs.length}):</div>
-                <div className="space-y-1">
-                  {nodeConfig.outputs.map((output: any, index: number) => (
-                    <div key={index} className="border border-slate-200 rounded p-2">
-                      <button
-                        onClick={() => toggleFormula(index)}
-                        className="flex items-center gap-2 text-xs font-medium text-slate-700 hover:text-slate-900 w-full text-left"
-                      >
-                        {expandedFormulas.has(index) ? 
-                          <ChevronDown className="h-3 w-3" /> : 
-                          <ChevronRight className="h-3 w-3" />
-                        }
-                        Formula {index + 1} → {output.destinationNodeId}
-                      </button>
-                      {expandedFormulas.has(index) && (
-                        <div className="mt-2 p-2 bg-slate-100 rounded text-xs font-mono">
-                          {output.formula}
+          <div className="space-y-4">
+            {/* Basic Info */}
+            <div className="space-y-2">
+              <div><span className="font-medium text-slate-600">ID:</span> <span className="font-mono text-slate-800">{nodeConfig.nodeId}</span></div>
+              <div><span className="font-medium text-slate-600">Name:</span> {nodeConfig.displayName}</div>
+              <div><span className="font-medium text-slate-600">Type:</span> {nodeConfig.type}</div>
+            </div>
+
+            {/* Node-specific Configuration */}
+            <div className="border-t pt-4">
+              <h4 className="font-semibold text-slate-700 mb-2">Configuration</h4>
+              <div className="space-y-2">
+                {nodeConfig.type === 'DataSource' && (
+                  <>
+                    <div><span className="font-medium text-slate-600">Interval:</span> {nodeConfig.interval}s</div>
+                    <div><span className="font-medium text-slate-600">Generation Type:</span> {nodeConfig.generation.type}</div>
+                    <div><span className="font-medium text-slate-600">Value Range:</span> {nodeConfig.generation.valueMin} - {nodeConfig.generation.valueMax}</div>
+                  </>
+                )}
+
+                {nodeConfig.type === 'Queue' && (
+                  <>
+                    <div><span className="font-medium text-slate-600">Aggregation Method:</span> {nodeConfig.aggregation.method}</div>
+                    <div><span className="font-medium text-slate-600">Time Window:</span> {nodeConfig.aggregation.trigger.window}s</div>
+                    <div><span className="font-medium text-slate-600">Trigger Type:</span> {nodeConfig.aggregation.trigger.type}</div>
+                    {nodeConfig.capacity && <div><span className="font-medium text-slate-600">Capacity:</span> {nodeConfig.capacity}</div>}
+                    <div className="mt-2 p-2 bg-slate-100 rounded text-xs">
+                      <span className="font-medium">Formula:</span> <span className="font-mono">{nodeConfig.aggregation.formula}</span>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Inputs Section */}
+            {nodeConfig.inputs && nodeConfig.inputs.length > 0 && (
+              <div className="border-t pt-4">
+                <h4 className="font-semibold text-slate-700 mb-2">Inputs ({nodeConfig.inputs.length})</h4>
+                <div className="space-y-3">
+                  {nodeConfig.inputs.map((input: any, index: number) => (
+                    <div key={index} className="border border-slate-200 rounded p-3 bg-slate-50">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-sm text-slate-700">{input.name}</span>
+                          {input.alias && <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">alias: {input.alias}</span>}
+                          {input.required && <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded">required</span>}
                         </div>
-                      )}
+                        {input.nodeId && (
+                          <div className="text-xs text-slate-600">
+                            <span className="font-medium">Source:</span> {input.nodeId}
+                            {input.sourceOutputName && <span> → {input.sourceOutputName}</span>}
+                          </div>
+                        )}
+                        <div className="text-xs">
+                          <span className="font-medium text-slate-600">Interface:</span> {input.interface.type}
+                          {input.interface.requiredFields && input.interface.requiredFields.length > 0 && (
+                            <div className="mt-1 ml-2">
+                              <span className="text-slate-500">Required fields:</span>
+                              <ul className="list-disc list-inside ml-2 text-slate-500">
+                                {input.interface.requiredFields.map((field: string, i: number) => (
+                                  <li key={i} className="font-mono text-xs">{field}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>
               </div>
             )}
-            
-            {nodeConfig.type === 'Queue' && (
-              <>
-                <div><span className="font-medium text-slate-600">Method:</span> {nodeConfig.aggregationMethod}</div>
-                <div><span className="font-medium text-slate-600">Window:</span> {nodeConfig.timeWindow}s</div>
-                {nodeConfig.capacity && <div><span className="font-medium text-slate-600">Capacity:</span> {nodeConfig.capacity}</div>}
-              </>
-            )}
-            
-            {nodeConfig.type === 'DataSource' && (
-              <>
-                <div><span className="font-medium text-slate-600">Interval:</span> {nodeConfig.interval}s</div>
-                <div><span className="font-medium text-slate-600">Range:</span> {nodeConfig.valueMin} - {nodeConfig.valueMax}</div>
-                <div><span className="font-medium text-slate-600">Destination:</span> <span className="font-mono">{nodeConfig.destinationNodeId}</span></div>
-              </>
+
+            {/* Outputs Section */}
+            {nodeConfig.outputs && nodeConfig.outputs.length > 0 && (
+              <div className="border-t pt-4">
+                <h4 className="font-semibold text-slate-700 mb-2">Outputs ({nodeConfig.outputs.length})</h4>
+                <div className="space-y-3">
+                  {nodeConfig.outputs.map((output: any, index: number) => (
+                    <div key={index} className="border border-slate-200 rounded p-3 bg-slate-50">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-sm text-slate-700">{output.name}</span>
+                          <span className="text-xs text-slate-500">→ {output.destinationNodeId}</span>
+                        </div>
+                        {output.destinationInputName && (
+                          <div className="text-xs text-slate-600">
+                            <span className="font-medium">Target Input:</span> {output.destinationInputName}
+                          </div>
+                        )}
+                        <div className="text-xs">
+                          <span className="font-medium text-slate-600">Interface:</span> {output.interface.type}
+                          {output.interface.requiredFields && output.interface.requiredFields.length > 0 && (
+                            <div className="mt-1 ml-2">
+                              <span className="text-slate-500">Required fields:</span>
+                              <ul className="list-disc list-inside ml-2 text-slate-500">
+                                {output.interface.requiredFields.map((field: string, i: number) => (
+                                  <li key={i} className="font-mono text-xs">{field}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                        {output.transformation && (
+                          <div className="mt-2 p-2 bg-white border rounded">
+                            <button
+                              onClick={() => toggleFormula(index)}
+                              className="flex items-center gap-2 text-xs font-medium text-slate-700 hover:text-slate-900 w-full text-left"
+                            >
+                              {expandedFormulas.has(index) ?
+                                <ChevronDown className="h-3 w-3" /> :
+                                <ChevronRight className="h-3 w-3" />
+                              }
+                              Transformation Formula
+                            </button>
+                            {expandedFormulas.has(index) && (
+                              <div className="mt-2 space-y-2">
+                                <div className="p-2 bg-slate-100 rounded text-xs font-mono">
+                                  {output.transformation.formula}
+                                </div>
+                                {output.transformation.fieldMapping && (
+                                  <div>
+                                    <span className="text-xs font-medium text-slate-600">Field Mapping:</span>
+                                    <div className="mt-1 p-2 bg-slate-100 rounded text-xs">
+                                      {Object.entries(output.transformation.fieldMapping).map(([key, value]) => (
+                                        <div key={key} className="font-mono">
+                                          <span className="text-blue-600">{key}</span> = <span className="text-green-600">{value as string}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
         </div>

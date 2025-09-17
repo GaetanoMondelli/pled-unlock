@@ -1,94 +1,227 @@
 {
+  "version": "3.0",
   "nodes": [
     {
       "nodeId": "DataSource_A",
-      "type": "DataSource",
       "displayName": "Source A",
       "position": {
-        "x": 50,
+        "x": 100,
         "y": 100
       },
+      "type": "DataSource",
       "interval": 3,
-      "valueMin": 1,
-      "valueMax": 10,
-      "destinationNodeId": "Queue_B"
+      "outputs": [
+        {
+          "name": "output",
+          "destinationNodeId": "Queue_B",
+          "destinationInputName": "input",
+          "interface": {
+            "type": "SimpleValue",
+            "requiredFields": ["data.value"]
+          }
+        }
+      ],
+      "generation": {
+        "type": "random",
+        "valueMin": 1,
+        "valueMax": 10
+      }
     },
     {
       "nodeId": "DataSource_X",
-      "type": "DataSource",
       "displayName": "Source X",
       "position": {
-        "x": 50,
-        "y": 300
+        "x": 100,
+        "y": 350
       },
+      "type": "DataSource",
       "interval": 5,
-      "valueMin": 100,
-      "valueMax": 200,
-      "destinationNodeId": "Queue_B"
+      "outputs": [
+        {
+          "name": "output",
+          "destinationNodeId": "Queue_B",
+          "destinationInputName": "input",
+          "interface": {
+            "type": "SimpleValue",
+            "requiredFields": ["data.value"]
+          }
+        }
+      ],
+      "generation": {
+        "type": "random",
+        "valueMin": 100,
+        "valueMax": 200
+      }
     },
     {
       "nodeId": "Queue_B",
-      "type": "Queue",
       "displayName": "Queue B",
       "position": {
-        "x": 300,
-        "y": 100
+        "x": 400,
+        "y": 200
       },
-      "timeWindow": 10,
-      "aggregationMethod": "sum",
-      "capacity": 10,
-      "destinationNodeId": "Process_C"
+      "type": "Queue",
+      "inputs": [
+        {
+          "name": "input",
+          "interface": {
+            "type": "SimpleValue",
+            "requiredFields": ["data.value"]
+          },
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "destinationNodeId": "Process_C",
+          "destinationInputName": "inputA",
+          "interface": {
+            "type": "AggregationResult",
+            "requiredFields": ["data.aggregatedValue"]
+          }
+        }
+      ],
+      "aggregation": {
+        "method": "sum",
+        "formula": "sum(input.data.value)",
+        "trigger": {
+          "type": "time",
+          "window": 10
+        }
+      },
+      "capacity": 10
     },
     {
       "nodeId": "Process_C",
-      "type": "ProcessNode",
       "displayName": "Processor C",
       "position": {
-        "x": 550,
+        "x": 700,
         "y": 200
       },
-      "inputNodeIds": ["Queue_B"],
+      "type": "ProcessNode",
+      "inputs": [
+        {
+          "name": "inputA",
+          "nodeId": "Queue_B",
+          "sourceOutputName": "output",
+          "interface": {
+            "type": "AggregationResult",
+            "requiredFields": ["data.aggregatedValue"]
+          },
+          "alias": "queueB",
+          "required": true
+        }
+      ],
       "outputs": [
         {
-          "formula": "inputs.Queue_B.value + 10",
-          "destinationNodeId": "Queue_D"
+          "name": "output1",
+          "destinationNodeId": "Queue_D",
+          "destinationInputName": "input",
+          "interface": {
+            "type": "TransformationResult",
+            "requiredFields": ["data.transformedValue"]
+          },
+          "transformation": {
+            "formula": "queueB.data.aggregatedValue + 10",
+            "fieldMapping": {
+              "data.transformedValue": "queueB.data.aggregatedValue + 10"
+            }
+          }
         },
         {
-          "formula": "inputs.Queue_B.value * 0.5",
-          "destinationNodeId": "Sink_E"
+          "name": "output2",
+          "destinationNodeId": "Sink_E",
+          "destinationInputName": "input",
+          "interface": {
+            "type": "TransformationResult",
+            "requiredFields": ["data.transformedValue"]
+          },
+          "transformation": {
+            "formula": "queueB.data.aggregatedValue * 0.5",
+            "fieldMapping": {
+              "data.transformedValue": "queueB.data.aggregatedValue * 0.5"
+            }
+          }
         }
       ]
     },
     {
       "nodeId": "Queue_D",
-      "type": "Queue",
       "displayName": "Output Queue D",
       "position": {
-        "x": 800,
+        "x": 1000,
         "y": 100
       },
-      "timeWindow": 5,
-      "aggregationMethod": "average",
-      "capacity": 5,
-      "destinationNodeId": "Sink_F"
+      "type": "Queue",
+      "inputs": [
+        {
+          "name": "input",
+          "interface": {
+            "type": "TransformationResult",
+            "requiredFields": ["data.transformedValue"]
+          },
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "destinationNodeId": "Sink_F",
+          "destinationInputName": "input",
+          "interface": {
+            "type": "AggregationResult",
+            "requiredFields": ["data.aggregatedValue"]
+          }
+        }
+      ],
+      "aggregation": {
+        "method": "average",
+        "formula": "avg(input.data.transformedValue)",
+        "trigger": {
+          "type": "time",
+          "window": 5
+        }
+      },
+      "capacity": 5
     },
     {
       "nodeId": "Sink_E",
-      "type": "Sink",
       "displayName": "Sink E (Processed 0.5*B)",
       "position": {
-        "x": 800,
-        "y": 300
-      }
+        "x": 1000,
+        "y": 350
+      },
+      "type": "Sink",
+      "inputs": [
+        {
+          "name": "input",
+          "interface": {
+            "type": "Any",
+            "requiredFields": ["metadata.timestamp"]
+          },
+          "required": true
+        }
+      ]
     },
     {
       "nodeId": "Sink_F",
-      "type": "Sink",
       "displayName": "Sink F (Avg D)",
       "position": {
-        "x": 1050,
+        "x": 1300,
         "y": 100
-      }
+      },
+      "type": "Sink",
+      "inputs": [
+        {
+          "name": "input",
+          "interface": {
+            "type": "Any",
+            "requiredFields": ["metadata.timestamp"]
+          },
+          "required": true
+        }
+      ]
     }
   ]
 }

@@ -75,8 +75,8 @@ const DataSourceNodeDisplay: React.FC<NodeProps<RFNodeData>> = ({ data, selected
         <div className="space-y-0.5">
           <p className="font-medium text-muted-foreground">CONFIG:</p>
           <p>Int: {config.interval}s</p>
-          <p>Range: [{config.valueMin}-{config.valueMax}]</p>
-          <p>To: {config.destinationNodeId}</p>
+          <p>Range: [{config.generation.valueMin}-{config.generation.valueMax}]</p>
+          <p>To: {config.outputs[0]?.destinationNodeId || 'None'}</p>
         </div>
         
         {/* Separator */}

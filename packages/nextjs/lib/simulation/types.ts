@@ -84,49 +84,100 @@ const BaseNodeSchema = z.object({
   position: PositionSchema,
 });
 
+// V3 Schema Components
+export const InterfaceSchema = z.object({
+  type: z.string(),
+  requiredFields: z.array(z.string()),
+});
+export type Interface = z.infer<typeof InterfaceSchema>;
+
+export const GenerationConfigSchema = z.object({
+  type: z.string(),
+  valueMin: z.number(),
+  valueMax: z.number(),
+});
+export type GenerationConfig = z.infer<typeof GenerationConfigSchema>;
+
+export const AggregationTriggerSchema = z.object({
+  type: z.string(),
+  window: z.number().positive(),
+});
+export type AggregationTrigger = z.infer<typeof AggregationTriggerSchema>;
+
+export const AggregationConfigSchema = z.object({
+  method: z.string(),
+  formula: z.string(),
+  trigger: AggregationTriggerSchema,
+});
+export type AggregationConfig = z.infer<typeof AggregationConfigSchema>;
+
+export const TransformationConfigSchema = z.object({
+  formula: z.string(),
+  fieldMapping: z.record(z.string(), z.string()),
+});
+export type TransformationConfig = z.infer<typeof TransformationConfigSchema>;
+
+// V3 Input/Output schemas
+export const InputV3Schema = z.object({
+  name: z.string(),
+  nodeId: z.string().optional(),
+  sourceOutputName: z.string().optional(),
+  interface: InterfaceSchema,
+  alias: z.string().optional(),
+  required: z.boolean(),
+});
+export type InputV3 = z.infer<typeof InputV3Schema>;
+
+export const OutputV3Schema = z.object({
+  name: z.string(),
+  destinationNodeId: z.string(),
+  destinationInputName: z.string(),
+  interface: InterfaceSchema,
+  transformation: TransformationConfigSchema.optional(),
+});
+export type OutputV3 = z.infer<typeof OutputV3Schema>;
+
+// DataSource Schema
 export const DataSourceNodeSchema = BaseNodeSchema.extend({
   type: z.literal("DataSource"),
   interval: z.number().positive(),
-  valueMin: z.number(),
-  valueMax: z.number(),
-  destinationNodeId: z.string(),
+  outputs: z.array(OutputV3Schema),
+  generation: GenerationConfigSchema,
 });
 export type DataSourceNode = z.infer<typeof DataSourceNodeSchema>;
 
-export const AggregationMethodSchema = z.enum(["sum", "average", "count", "first", "last"]);
-export type AggregationMethod = z.infer<typeof AggregationMethodSchema>;
-
+// Queue Schema
 export const QueueNodeSchema = BaseNodeSchema.extend({
   type: z.literal("Queue"),
-  timeWindow: z.number().positive(),
-  aggregationMethod: AggregationMethodSchema,
+  inputs: z.array(InputV3Schema),
+  outputs: z.array(OutputV3Schema),
+  aggregation: AggregationConfigSchema,
   capacity: z.number().positive().optional(),
-  destinationNodeId: z.string(),
 });
 export type QueueNode = z.infer<typeof QueueNodeSchema>;
 
-export const ProcessNodeOutputSchema = z.object({
-  formula: z.string(),
-  destinationNodeId: z.string(),
-});
-export type ProcessNodeOutput = z.infer<typeof ProcessNodeOutputSchema>;
-
+// ProcessNode Schema
 export const ProcessNodeSchema = BaseNodeSchema.extend({
   type: z.literal("ProcessNode"),
-  inputNodeIds: z.array(z.string()).min(1),
-  outputs: z.array(ProcessNodeOutputSchema).min(1),
+  inputs: z.array(InputV3Schema),
+  outputs: z.array(OutputV3Schema),
 });
 export type ProcessNode = z.infer<typeof ProcessNodeSchema>;
 
+// Sink Schema
 export const SinkNodeSchema = BaseNodeSchema.extend({
   type: z.literal("Sink"),
+  inputs: z.array(InputV3Schema),
 });
 export type SinkNode = z.infer<typeof SinkNodeSchema>;
 
+// Union type for all nodes
 export const AnyNodeSchema = z.union([DataSourceNodeSchema, QueueNodeSchema, ProcessNodeSchema, SinkNodeSchema]);
 export type AnyNode = z.infer<typeof AnyNodeSchema>;
 
+// Scenario Schema
 export const ScenarioSchema = z.object({
+  version: z.string(),
   nodes: z.array(AnyNodeSchema),
 });
 export type Scenario = z.infer<typeof ScenarioSchema>;

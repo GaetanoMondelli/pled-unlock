@@ -70,18 +70,19 @@ const GraphVisualization: React.FC = () => {
       
       // Clean up references in remaining nodes
       const cleanedNodes = updatedNodes.map(node => {
-        if (node.type === 'DataSource' || node.type === 'Queue') {
-          if (deletedNodeIds.includes(node.destinationNodeId)) {
-            return { ...node, destinationNodeId: '' };
-          }
-        } else if (node.type === 'ProcessNode') {
-          const cleanedInputs = node.inputNodeIds.filter(id => !deletedNodeIds.includes(id));
-          const cleanedOutputs = node.outputs.map(output => 
-            deletedNodeIds.includes(output.destinationNodeId) 
+        if (node.outputs) {
+          // Clean up outputs that reference deleted nodes
+          const cleanedOutputs = node.outputs.map(output =>
+            deletedNodeIds.includes(output.destinationNodeId)
               ? { ...output, destinationNodeId: '' }
               : output
           );
-          return { ...node, inputNodeIds: cleanedInputs, outputs: cleanedOutputs };
+          return { ...node, outputs: cleanedOutputs };
+        }
+        if (node.inputs) {
+          // Clean up inputs that reference deleted nodes
+          const cleanedInputs = node.inputs.filter(input => input.nodeId && !deletedNodeIds.includes(input.nodeId));
+          return { ...node, inputs: cleanedInputs };
         }
         return node;
       });
@@ -104,15 +105,10 @@ const GraphVisualization: React.FC = () => {
       const deletedEdgeIds = edgeDeleteChanges.map(change => change.id);
       
       const updatedNodes = scenario.nodes.map(node => {
-        if (node.type === 'DataSource' || node.type === 'Queue') {
-          // Check if this node's edge was deleted
-          const expectedEdgeId = `e-${node.nodeId}-${node.destinationNodeId}`;
-          if (deletedEdgeIds.includes(expectedEdgeId)) {
-            return { ...node, destinationNodeId: '' };
-          }
-        } else if (node.type === 'ProcessNode') {
-          const updatedOutputs = node.outputs.map((output, index) => {
-            const expectedEdgeId = `e-${node.nodeId}-output${index}-${output.destinationNodeId}`;
+        if (node.outputs) {
+          // Check if any of this node's edges were deleted
+          const updatedOutputs = node.outputs.map((output) => {
+            const expectedEdgeId = `e-${node.nodeId}-${output.name}-${output.destinationNodeId}`;
             if (deletedEdgeIds.includes(expectedEdgeId)) {
               return { ...output, destinationNodeId: '' };
             }
@@ -140,19 +136,16 @@ const GraphVisualization: React.FC = () => {
       
       // Update the scenario JSON to reflect the new connection
       const updatedNodes = scenario.nodes.map(node => {
-        if (node.nodeId === params.source) {
-          if (node.type === 'DataSource' || node.type === 'Queue') {
-            // For DataSource and Queue, update destinationNodeId
-            return { ...node, destinationNodeId: params.target };
-          } else if (node.type === 'ProcessNode') {
-            // For ProcessNode, update the appropriate output
-            const outputIndex = params.sourceHandle ? parseInt(params.sourceHandle.split('-')[1]) : 0;
-            const updatedOutputs = [...node.outputs];
-            if (updatedOutputs[outputIndex]) {
-              updatedOutputs[outputIndex] = { ...updatedOutputs[outputIndex], destinationNodeId: params.target };
+        if (node.nodeId === params.source && node.outputs) {
+          // All nodes use outputs array in v3
+          const outputName = params.sourceHandle ? params.sourceHandle.replace('output-', '') : 'output';
+          const updatedOutputs = node.outputs.map(output => {
+            if (output.name === outputName) {
+              return { ...output, destinationNodeId: params.target };
             }
-            return { ...node, outputs: updatedOutputs };
-          }
+            return output;
+          });
+          return { ...node, outputs: updatedOutputs };
         }
         return node;
       });
@@ -192,25 +185,15 @@ const GraphVisualization: React.FC = () => {
 
     const initialEdges: Edge<RFEdgeData>[] = [];
     scenario.nodes.forEach(node => {
-      if (node.type === "DataSource" || node.type === "Queue") {
-        if (node.destinationNodeId && node.destinationNodeId.trim() !== "") {
-          initialEdges.push({
-            id: `e-${node.nodeId}-${node.destinationNodeId}`,
-            source: node.nodeId,
-            target: node.destinationNodeId,
-            type: "default",
-            deletable: true,
-            markerEnd: { type: MarkerType.ArrowClosed, color: "hsl(var(--foreground))" },
-            data: { animated: false },
-          });
-        }
-      } else if (node.type === "ProcessNode") {
+      // All nodes now use outputs array in v3
+      if (node.outputs) {
         node.outputs.forEach((output, index) => {
           if (output.destinationNodeId && output.destinationNodeId.trim() !== "") {
+            const sourceHandle = node.type === "ProcessNode" ? `output-${output.name}` : undefined;
             initialEdges.push({
-              id: `e-${node.nodeId}-output${index}-${output.destinationNodeId}`,
+              id: `e-${node.nodeId}-${output.name}-${output.destinationNodeId}`,
               source: node.nodeId,
-              sourceHandle: `output-${index}`,
+              sourceHandle,
               target: output.destinationNodeId,
               type: "default",
               deletable: true,
@@ -247,16 +230,11 @@ const GraphVisualization: React.FC = () => {
           ) {
             // Find edges from this node and animate them
             const nodeConfig = nodesConfig[nodeId];
-            if (nodeConfig) {
-              if (nodeConfig.type === "DataSource" || nodeConfig.type === "Queue") {
-                if (nodeConfig.destinationNodeId) {
-                  newAnimatedEdges.add(`e-${nodeId}-${nodeConfig.destinationNodeId}`);
-                }
-              } else if (nodeConfig.type === "ProcessNode") {
-                nodeConfig.outputs.forEach((output, index) => {
-                  newAnimatedEdges.add(`e-${nodeId}-output${index}-${output.destinationNodeId}`);
-                });
-              }
+            if (nodeConfig && nodeConfig.outputs) {
+              // All nodes use outputs array in v3
+              nodeConfig.outputs.forEach((output) => {
+                newAnimatedEdges.add(`e-${nodeId}-${output.name}-${output.destinationNodeId}`);
+              });
             }
           }
         });
