@@ -133,6 +133,17 @@ export default function DocsPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [copiedCode, setCopiedCode] = useState("");
 
+  // Prevent overscroll behavior on the entire document
+  React.useEffect(() => {
+    document.body.style.overscrollBehavior = 'none';
+    document.documentElement.style.overscrollBehavior = 'none';
+
+    return () => {
+      document.body.style.overscrollBehavior = '';
+      document.documentElement.style.overscrollBehavior = '';
+    };
+  }, []);
+
   const toggleSection = (href: string) => {
     const sectionId = href.replace("#", "");
     setExpandedSections(prev =>
@@ -221,7 +232,7 @@ export default function DocsPage() {
   );
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="h-screen bg-slate-900 overflow-hidden" style={{ overscrollBehavior: 'none' }}>
       {/* Mobile Menu Button */}
       <div className="lg:hidden fixed top-4 left-4 z-50">
         <Button
@@ -234,15 +245,15 @@ export default function DocsPage() {
         </Button>
       </div>
 
-      <div className="flex">
-        {/* Sidebar */}
+      <div className="flex h-full" style={{ overscrollBehavior: 'none' }}>
+        {/* Sidebar - Fixed */}
         <aside className={cn(
-          "fixed inset-y-0 left-0 z-40 w-64 bg-slate-50 border-r border-slate-200 transform transition-transform duration-200 ease-in-out lg:translate-x-0 lg:static lg:z-0",
+          "fixed inset-y-0 left-0 z-40 w-64 bg-slate-50 border-r border-slate-200 transform transition-transform duration-200 ease-in-out lg:translate-x-0 lg:relative lg:z-0",
           mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
-        )}>
-          <div className="h-full flex flex-col">
+        )} style={{ overscrollBehavior: 'none' }}>
+          <div className="h-full flex flex-col" style={{ overscrollBehavior: 'none' }}>
             {/* Header */}
-            <div className="p-6 border-b border-slate-200">
+            <div className="p-6 border-b border-slate-200 flex-shrink-0">
               <div className="flex items-center space-x-3">
                 <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
                   <BookOpen className="h-4 w-4 text-white" />
@@ -255,7 +266,7 @@ export default function DocsPage() {
             </div>
 
             {/* Search */}
-            <div className="p-4 border-b border-slate-200">
+            <div className="p-4 border-b border-slate-200 flex-shrink-0">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input
@@ -268,7 +279,7 @@ export default function DocsPage() {
             </div>
 
             {/* Navigation */}
-            <ScrollArea className="flex-1 p-4">
+            <ScrollArea className="flex-1 p-4" style={{ overscrollBehavior: 'none' }}>
               <nav className="space-y-2">
                 {navigation.map((item, index) => (
                   <NavItem key={index} item={item} />
@@ -277,7 +288,7 @@ export default function DocsPage() {
             </ScrollArea>
 
             {/* Footer */}
-            <div className="p-4 border-t border-slate-200">
+            <div className="p-4 border-t border-slate-200 flex-shrink-0">
               <div className="text-center">
                 <Badge variant="outline" className="text-blue-600 border-blue-200">
                   Schema v3.0
@@ -303,9 +314,10 @@ export default function DocsPage() {
           />
         )}
 
-        {/* Main Content */}
-        <main className="flex-1 lg:ml-0">
-          <div className="max-w-4xl mx-auto px-6 py-8 lg:px-8">
+        {/* Main Content - Scrollable */}
+        <main className="flex-1 overflow-y-auto bg-white lg:ml-0" style={{ overscrollBehavior: 'none' }}>
+          <div className="bg-white">
+            <div className="max-w-4xl mx-auto px-6 py-8 lg:px-8">
             {/* Introduction */}
             <section id="introduction" className="mb-12">
               <div className="mb-6">
@@ -758,6 +770,58 @@ export default function DocsPage() {
                 </CardContent>
               </Card>
             </section>
+            </div>
+
+            {/* Footer */}
+            <footer className="bg-slate-900 text-white py-12 mt-16">
+              <div className="max-w-4xl mx-auto px-6 lg:px-8">
+                <div className="grid md:grid-cols-3 gap-8">
+                  <div>
+                    <div className="flex items-center space-x-3 mb-4">
+                      <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
+                        <BookOpen className="h-4 w-4 text-white" />
+                      </div>
+                      <h3 className="font-semibold">DocuSign Unlocked</h3>
+                    </div>
+                    <p className="text-slate-400 text-sm">
+                      Advanced workflow simulation platform with AI-powered assistance and real-time monitoring.
+                    </p>
+                  </div>
+
+                  <div>
+                    <h4 className="font-semibold mb-4">Documentation</h4>
+                    <ul className="space-y-2 text-sm text-slate-400">
+                      <li><a href="#getting-started" className="hover:text-white transition-colors">Getting Started</a></li>
+                      <li><a href="#node-types" className="hover:text-white transition-colors">Node Types</a></li>
+                      <li><a href="#configuration" className="hover:text-white transition-colors">Configuration</a></li>
+                      <li><a href="#ai-assistant" className="hover:text-white transition-colors">AI Assistant</a></li>
+                    </ul>
+                  </div>
+
+                  <div>
+                    <h4 className="font-semibold mb-4">Tools</h4>
+                    <ul className="space-y-2 text-sm text-slate-400">
+                      <li>
+                        <Link href="/template-editor" className="hover:text-white transition-colors">
+                          Template Editor
+                        </Link>
+                      </li>
+                      <li><a href="#json-schema" className="hover:text-white transition-colors">JSON Schema</a></li>
+                      <li><a href="#examples" className="hover:text-white transition-colors">Examples</a></li>
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-800 mt-8 pt-8 flex items-center justify-between">
+                  <p className="text-slate-400 text-sm">
+                    Schema v3.0 • Built with modern workflow simulation
+                  </p>
+                  <Badge variant="outline" className="border-slate-700 text-slate-300">
+                    Latest Version
+                  </Badge>
+                </div>
+              </div>
+            </footer>
           </div>
         </main>
       </div>
