@@ -13,7 +13,7 @@ const Circle = forwardRef<
     <div
       ref={ref}
       className={cn(
-        "z-10 flex size-12 items-center justify-center rounded-full border-2 border-border bg-white p-3 shadow-[0_0_20px_-12px_rgba(0,0,0,0.8)]",
+        "z-10 flex size-10 sm:size-12 items-center justify-center rounded-full border-2 border-border bg-white p-2 sm:p-3 shadow-[0_0_20px_-12px_rgba(0,0,0,0.8)]",
         className,
       )}
     >
@@ -37,59 +37,59 @@ const ArchitectureDiagram = () => {
 
   return (
     <div
-      className="relative flex h-[500px] w-full items-center justify-center overflow-hidden p-10"
+      className="relative flex h-[400px] sm:h-[450px] lg:h-[500px] w-full items-center justify-center overflow-hidden p-4 sm:p-6 lg:p-10"
       ref={containerRef}
     >
-      <div className="flex size-full max-w-4xl flex-row items-stretch justify-between gap-6">
-        <div className="flex flex-col justify-center gap-3">
+      <div className="flex size-full max-w-4xl flex-row items-stretch justify-between gap-3 sm:gap-4 lg:gap-6">
+        <div className="flex flex-col justify-center gap-2 sm:gap-3">
           <div className="flex flex-col items-center gap-1">
             <Circle ref={div1Ref} className="bg-red-50 border-red-200">
-              <Mail className="w-6 h-6 text-red-600" />
+              <Mail className="w-4 h-4 sm:w-6 sm:h-6 text-red-600" />
             </Circle>
-            <span className="text-xs font-medium text-gray-600">Emails</span>
+            <span className="text-[10px] sm:text-xs font-medium text-gray-600">Emails</span>
           </div>
           <div className="flex flex-col items-center gap-1">
             <Circle ref={div2Ref} className="bg-blue-50 border-blue-200">
-              <FileText className="w-6 h-6 text-blue-600" />
+              <FileText className="w-4 h-4 sm:w-6 sm:h-6 text-blue-600" />
             </Circle>
-            <span className="text-xs font-medium text-gray-600">Documents</span>
+            <span className="text-[10px] sm:text-xs font-medium text-gray-600">Documents</span>
           </div>
           <div className="flex flex-col items-center gap-1">
             <Circle ref={div3Ref} className="bg-green-50 border-green-200">
-              <Radio className="w-6 h-6 text-green-600" />
+              <Radio className="w-4 h-4 sm:w-6 sm:h-6 text-green-600" />
             </Circle>
-            <span className="text-xs font-medium text-gray-600">IoT</span>
+            <span className="text-[10px] sm:text-xs font-medium text-gray-600">IoT</span>
           </div>
           <div className="flex flex-col items-center gap-1">
             <Circle ref={div4Ref} className="bg-purple-50 border-purple-200">
-              <Code className="w-6 h-6 text-purple-600" />
+              <Code className="w-4 h-4 sm:w-6 sm:h-6 text-purple-600" />
             </Circle>
-            <span className="text-xs font-medium text-gray-600">API</span>
+            <span className="text-[10px] sm:text-xs font-medium text-gray-600">API</span>
           </div>
           <div className="flex flex-col items-center gap-1">
             <Circle ref={div5Ref} className="bg-sky-50 border-sky-200">
-              <Twitter className="w-6 h-6 text-sky-600" />
+              <Twitter className="w-4 h-4 sm:w-6 sm:h-6 text-sky-600" />
             </Circle>
-            <span className="text-xs font-medium text-gray-600">Socials</span>
+            <span className="text-[10px] sm:text-xs font-medium text-gray-600">Socials</span>
           </div>
         </div>
-        <div className="flex flex-col items-center justify-center gap-2">
-          <Circle ref={div6Ref} className="size-16 bg-orange-50 border-orange-200">
-            <Settings className="w-6 h-6 text-orange-600" />
+        <div className="flex flex-col items-center justify-center gap-1 sm:gap-2">
+          <Circle ref={div6Ref} className="size-12 sm:size-16 bg-orange-50 border-orange-200">
+            <Settings className="w-4 h-4 sm:w-6 sm:h-6 text-orange-600" />
           </Circle>
-          <span className="text-sm font-semibold text-gray-700">Rules Engine</span>
+          <span className="hidden sm:block text-xs sm:text-sm font-semibold text-gray-700 text-center">Rules Engine</span>
         </div>
-        <div className="flex flex-col items-center justify-center gap-2">
-          <Circle ref={div7Ref} className="size-28 bg-cyan-50 border-cyan-200">
-            <Cpu className="w-12 h-12 text-cyan-600" />
+        <div className="flex flex-col items-center justify-center gap-1 sm:gap-2">
+          <Circle ref={div7Ref} className="size-20 sm:size-28 bg-cyan-50 border-cyan-200">
+            <Cpu className="w-8 h-8 sm:w-12 sm:h-12 text-cyan-600" />
           </Circle>
-          <span className="text-sm font-semibold text-gray-700">Digital Twins</span>
+          <span className="text-xs sm:text-sm font-semibold text-gray-700 text-center">Digital Twins</span>
         </div>
-        <div className="flex flex-col items-center justify-center gap-2">
-          <Circle ref={div8Ref} className="size-16 bg-emerald-50 border-emerald-200">
-            <Zap className="w-6 h-6 text-emerald-600" />
+        <div className="flex flex-col items-center justify-center gap-1 sm:gap-2">
+          <Circle ref={div8Ref} className="size-12 sm:size-16 bg-emerald-50 border-emerald-200">
+            <Zap className="w-4 h-4 sm:w-6 sm:h-6 text-emerald-600" />
           </Circle>
-          <span className="text-sm font-semibold text-gray-700">Actions</span>
+          <span className="text-xs sm:text-sm font-semibold text-gray-700 text-center">Actions</span>
         </div>
       </div>
 

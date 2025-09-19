@@ -242,12 +242,13 @@ Tokenization promises to transform global markets and unlock trillions in value.
             </p>
           </BlurFade>
 
+
           {/* TOKENIZATION POTENTIAL MARQUEE */}
           <div className="mb-16">
             <Marquee className="[--duration:120s]" pauseOnHover speed="slow">
-              <div className="flex items-center space-x-3 bg-white dark:bg-gray-900 px-5 py-3 rounded-lg shadow-sm border mx-3 min-w-[280px] max-w-[350px]">
-                <img src="/logos/blackrock.png" alt="BlackRock" className="w-20 h-20 object-contain flex-shrink-0" />
-                <div className="text-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3 bg-white dark:bg-gray-900 px-2 py-1.5 sm:px-5 sm:py-3 rounded-lg shadow-sm border mx-3 min-w-[260px] max-w-[320px]">
+                <img src="/logos/blackrock.png" alt="BlackRock" className="w-16 h-16 sm:w-20 sm:h-20 object-contain flex-shrink-0 mx-auto sm:mx-0 mb-0 sm:mb-0" />
+                <div className="text-xs text-center sm:text-left">
                   <p className="font-medium text-gray-900 dark:text-gray-100 leading-relaxed">
                     "The next step will be{" "}
                     <Highlighter action="underline" color="#22c55e">
@@ -258,9 +259,9 @@ Tokenization promises to transform global markets and unlock trillions in value.
                   <p className="text-gray-600 dark:text-gray-400 mt-1">— Larry Fink, BlackRock</p>
                 </div>
               </div>
-              <div className="flex items-center space-x-3 bg-white dark:bg-gray-900 px-5 py-3 rounded-lg shadow-sm border mx-3 min-w-[280px] max-w-[350px]">
-                <img src="/logos/bcg.png" alt="BCG" className="w-20 h-20 object-contain flex-shrink-0" />
-                <div className="text-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3 bg-white dark:bg-gray-900 px-2 py-1.5 sm:px-5 sm:py-3 rounded-lg shadow-sm border mx-3 min-w-[260px] max-w-[320px]">
+                <img src="/logos/bcg.png" alt="BCG" className="w-16 h-16 sm:w-20 sm:h-20 object-contain flex-shrink-0 mx-auto sm:mx-0 mb-0 sm:mb-0" />
+                <div className="text-xs text-center sm:text-left">
                   <p className="font-medium text-gray-900 dark:text-gray-100 leading-relaxed">
                     "
                     <Highlighter action="underline" color="#22c55e">
@@ -275,13 +276,13 @@ Tokenization promises to transform global markets and unlock trillions in value.
                   <p className="text-gray-600 dark:text-gray-400 mt-1">— Boston Consulting Group</p>
                 </div>
               </div>
-              <div className="flex items-center space-x-3 bg-white dark:bg-gray-900 px-5 py-3 rounded-lg shadow-sm border mx-3 min-w-[280px] max-w-[350px]">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3 bg-white dark:bg-gray-900 px-2 py-1.5 sm:px-5 sm:py-3 rounded-lg shadow-sm border mx-3 min-w-[260px] max-w-[320px]">
                 <img
                   src="/logos/wef.png"
                   alt="World Economic Forum"
-                  className="w-20 h-20 object-contain flex-shrink-0"
+                  className="w-16 h-16 sm:w-20 sm:h-20 object-contain flex-shrink-0 mx-auto sm:mx-0 mb-0 sm:mb-0"
                 />
-                <div className="text-xs">
+                <div className="text-xs text-center sm:text-left">
                   <p className="font-medium text-gray-900 dark:text-gray-100 leading-relaxed">
                     "Trade-offs between{" "}
                     <Highlighter action="underline" color="#22c55e">
@@ -296,9 +297,9 @@ Tokenization promises to transform global markets and unlock trillions in value.
                   <p className="text-gray-600 dark:text-gray-400 mt-1">— World Economic Forum</p>
                 </div>
               </div>
-              <div className="flex items-center space-x-3 bg-white dark:bg-gray-900 px-5 py-3 rounded-lg shadow-sm border mx-3 min-w-[280px] max-w-[350px]">
-                <img src="/logos/mckkinsey.png" alt="McKinsey" className="w-16 h-16 object-contain flex-shrink-0" />
-                <div className="text-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3 bg-white dark:bg-gray-900 px-2 py-1.5 sm:px-5 sm:py-3 rounded-lg shadow-sm border mx-3 min-w-[260px] max-w-[320px]">
+                <img src="/logos/mckkinsey.png" alt="McKinsey" className="w-16 h-16 sm:w-20 sm:h-20 object-contain flex-shrink-0 mx-auto sm:mx-0 mb-0 sm:mb-0" />
+                <div className="text-xs text-center sm:text-left">
                   <p className="font-medium text-gray-900 dark:text-gray-100 leading-relaxed">
                     "Realizing benefits requires assembling{" "}
                     <Highlighter action="underline" color="#22c55e">
@@ -316,7 +317,7 @@ Tokenization promises to transform global markets and unlock trillions in value.
             </Marquee>
           </div>
 
-          <BentoGrid className="max-w-none mx-auto mb-24 grid-cols-1 lg:grid-cols-3 gap-8 text-left">
+          <BentoGrid className="max-w-none mx-auto mb-12 grid-cols-1 lg:grid-cols-3 gap-8 text-left">
             <BorderBeam className="col-span-1" colorFrom="#ef4444" colorTo="#f97316" duration={8}>
               <BentoGridItem
                 className="col-span-1 border-0 bg-white dark:bg-gray-950 p-8"
@@ -385,7 +386,7 @@ Tokenization promises to transform global markets and unlock trillions in value.
 
       {/* HOW IT WORKS - simple two-column layout with left placeholder */}
       <section className="border-t bg-muted/30">
-        <div className="container mx-auto px-6 py-20">
+        <div className="container mx-auto px-6 py-16">
           <BlurFade delay={0.1}>
             <h2 className="text-2xl sm:text-3xl font-bold">Pled turns digital mess into living digital twins</h2>
             <p className="mt-3 max-w-3xl text-muted-foreground">
