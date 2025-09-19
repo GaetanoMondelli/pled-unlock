@@ -27,6 +27,20 @@ function Landing() {
   // Keep hero visual height in sync with text for a balanced layout
   const heroMeasureRef = useRef<HTMLDivElement>(null);
   const [heroHeight, setHeroHeight] = useState<number | null>(null);
+  const [screenSize, setScreenSize] = useState<'mobile' | 'tablet' | 'desktop'>('desktop');
+
+  useEffect(() => {
+    const checkScreenSize = () => {
+      const width = window.innerWidth;
+      if (width < 640) setScreenSize('mobile');
+      else if (width < 1024) setScreenSize('tablet');
+      else setScreenSize('desktop');
+    };
+    checkScreenSize();
+    window.addEventListener("resize", checkScreenSize);
+    return () => window.removeEventListener("resize", checkScreenSize);
+  }, []);
+
   useEffect(() => {
     const measure = () => {
       if (!heroMeasureRef.current) return;
@@ -77,7 +91,7 @@ function Landing() {
           <div className="absolute -bottom-40 -left-24 h-96 w-96 rounded-full bg-blue-400/20 blur-3xl" />
         </div>
         <div className="container mx-auto px-6 pt-14 sm:pt-20 pb-10 sm:pb-12">
-          <div className="grid lg:grid-cols-2 gap-10 items-stretch">
+          <div className="grid lg:grid-cols-2 gap-6 lg:gap-10 items-stretch">
             <motion.div ref={heroMeasureRef} variants={stagger} initial="hidden" animate="show" className="self-center">
               <motion.h1
                 id="hero-title"
@@ -106,7 +120,13 @@ function Landing() {
             </motion.div>
             <div
               className="relative overflow-hidden rounded-xl lg:mr-[-32px] xl:mr-[-40px] bg-muted/20"
-              style={{ height: heroHeight ? `${heroHeight}px` : undefined, minHeight: "18rem" }}
+              style={{
+                height: screenSize === 'mobile' ? "160px" :
+                       screenSize === 'tablet' ? "240px" :
+                       (heroHeight ? `${heroHeight}px` : "18rem"),
+                minHeight: screenSize === 'mobile' ? "160px" :
+                          screenSize === 'tablet' ? "240px" : "18rem"
+              }}
             >
               <div className="absolute inset-0">
                 <SafeHeroFsmAnimation />
@@ -114,8 +134,8 @@ function Landing() {
             </div>
           </div>
           {/* bottom ledger strip to mirror previous hero section */}
-          <div>
-            <div className="grid lg:grid-cols-2 items-start">
+          <div className="mt-6 lg:mt-0">
+            <div className="lg:grid lg:grid-cols-2 lg:items-start">
               <div className="hidden lg:block" />
               <div className="lg:mr-[-32px] xl:mr-[-40px]">
                 <BottomLedger />
