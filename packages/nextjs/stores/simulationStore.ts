@@ -333,6 +333,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
         const pnState = currentNodeState as ProcessNodeState;
         let canFire = true;
         const inputsDataForFormula: Record<string, Token> = {};
+        const aliasToSourceNodeId: Record<string, string> = {};
 
         for (const input of pnConfig.inputs) {
           const inputSourceNodeId = input.nodeId;
@@ -347,17 +348,20 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
             break;
           }
 
+          const aliasKey = input.alias || inputSourceNodeId;
+          aliasToSourceNodeId[aliasKey] = inputSourceNodeId;
+
           if (sourceNodeConfig.type === "Queue") {
             const qState = get().nodeStates[inputSourceNodeId] as QueueState;
             if (qState.outputBuffer.length > 0) {
-              inputsDataForFormula[input.alias || inputSourceNodeId] = qState.outputBuffer[0];
+              inputsDataForFormula[aliasKey] = qState.outputBuffer[0];
             } else {
               canFire = false;
               break;
             }
           } else {
             if (pnState.inputBuffers[inputSourceNodeId] && pnState.inputBuffers[inputSourceNodeId].length > 0) {
-              inputsDataForFormula[input.alias || inputSourceNodeId] = pnState.inputBuffers[inputSourceNodeId][0];
+              inputsDataForFormula[aliasKey] = pnState.inputBuffers[inputSourceNodeId][0];
             } else {
               canFire = false;
               break;
@@ -384,10 +388,10 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
             tokenToConsume.history.push(consumptionLog);
 
             const sourceNodeConfig = nodesConfig[inputNodeId];
-            if (sourceNodeConfig.type === "Queue") {
+            if (sourceNodeConfig && sourceNodeConfig.type === "Queue") {
               const qState = get().nodeStates[inputNodeId] as QueueState;
               _updateNodeState(inputNodeId, { outputBuffer: qState.outputBuffer.slice(1) });
-            } else {
+            } else if (sourceNodeConfig) {
               const buffer = (nextPnInputBuffers[inputNodeId] as Token[]) || [];
               buffer.shift();
               nextPnInputBuffers[inputNodeId] = buffer;
@@ -396,14 +400,14 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
           _updateNodeState(pnConfig.nodeId, { inputBuffers: nextPnInputBuffers, lastFiredTime: newTime });
 
           const formulaContext: Record<string, any> = { inputs: {} };
-          Object.entries(inputsDataForFormula).forEach(([node_id, token]) => {
-            formulaContext.inputs[node_id] = { value: token.value };
+          Object.entries(inputsDataForFormula).forEach(([aliasKey, token]) => {
+            formulaContext.inputs[aliasKey] = { value: token.value };
             // Add support for aliases and v3 data structure
-            const sourceNodeConfig = nodesConfig[node_id];
+            const sourceNodeId = aliasToSourceNodeId[aliasKey];
+            const sourceNodeConfig = nodesConfig[sourceNodeId];
             if (sourceNodeConfig) {
-              // For v3 compatibility, add alias context
-              const alias = sourceNodeConfig.displayName.replace(/\s+/g, '').toLowerCase();
-              formulaContext[alias] = {
+              // Add the alias directly as a top-level context variable
+              formulaContext[aliasKey] = {
                 data: {
                   value: token.value,
                   aggregatedValue: token.value,
@@ -411,18 +415,18 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
                 }
               };
               // Also add the raw alias without data wrapper for simpler formulas
-              formulaContext[alias + 'Value'] = token.value;
+              formulaContext[aliasKey + 'Value'] = token.value;
             }
           });
 
           pnConfig.outputs.forEach((output, index) => {
-            const { value: outputValue, error } = evaluateFormula(output.formula, formulaContext);
+            const { value: outputValue, error } = evaluateFormula(output.transformation?.formula || "", formulaContext);
             if (error) {
               _logNodeActivity(
                 pnConfig.nodeId,
                 {
                   action: "FORMULA_ERROR",
-                  details: `Output ${index} ('${output.formula}'): ${error}. Context: ${JSON.stringify(formulaContext)}`,
+                  details: `Output ${index} ('${output.transformation?.formula || ""}'): ${error}. Context: ${JSON.stringify(formulaContext)}`,
                   operationType: "transformation",
                 },
                 newTime,
@@ -438,7 +442,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
 
               // Create detailed transformation breakdown
               const transformationDetails = createTransformationDetails(
-                output.formula,
+                output.transformation?.formula || "",
                 formulaContext.inputs,
                 outputValue,
               );
