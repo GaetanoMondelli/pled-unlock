@@ -828,6 +828,128 @@ const getActionColor = (action: string): string => {
   return "bg-gray-100 text-gray-800";
 };
 
+// Enhanced activity log with clickable events and state transitions
+const NodeActivityLogWithStateTransitions: React.FC<{
+  nodeId: string;
+  stateMachineInfo?: StateMachineInfo;
+  onEventClick?: (event: any, stateAtTime?: NodeStateMachineState) => void;
+}> = ({ nodeId, stateMachineInfo, onEventClick }) => {
+  const nodeActivityLogs = useSimulationStore(state => state.nodeActivityLogs);
+  const logs = nodeActivityLogs[nodeId] || [];
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+
+  if (logs.length === 0) {
+    return <p className="text-sm text-muted-foreground p-3 border rounded-md">No activity logged yet for this node.</p>;
+  }
+
+  // Create a map of timestamp to state for quick lookup
+  const stateAtTime = useMemo(() => {
+    const stateMap = new Map<number, NodeStateMachineState>();
+    if (stateMachineInfo?.transitionHistory) {
+      stateMachineInfo.transitionHistory.forEach(transition => {
+        stateMap.set(transition.timestamp, transition.to);
+      });
+    }
+    return stateMap;
+  }, [stateMachineInfo]);
+
+  const getStateAtTime = (timestamp: number): NodeStateMachineState | undefined => {
+    // Find the latest state transition at or before this timestamp
+    let latestState: NodeStateMachineState | undefined;
+    let latestTime = -1;
+
+    stateAtTime.forEach((state, time) => {
+      if (time <= timestamp && time > latestTime) {
+        latestState = state;
+        latestTime = time;
+      }
+    });
+
+    return latestState || (stateMachineInfo?.currentState);
+  };
+
+  const handleEventClick = (log: any) => {
+    const eventId = `${log.sequence}-${log.timestamp}`;
+    setSelectedEventId(selectedEventId === eventId ? null : eventId);
+    const stateAtEventTime = getStateAtTime(log.timestamp);
+    onEventClick?.(log, stateAtEventTime);
+  };
+
+  return (
+    <div className="border rounded-md">
+      <div className="bg-muted/50 px-3 py-2 text-xs font-medium border-b">
+        <div className="flex gap-4">
+          <div className="w-16 flex-shrink-0">Time</div>
+          <div className="w-40 flex-shrink-0">Action</div>
+          <div className="w-16 flex-shrink-0">Value</div>
+          <div className="w-24 flex-shrink-0">State</div>
+          <div className="flex-1 min-w-0">Details</div>
+        </div>
+      </div>
+      <ScrollArea className="h-64 w-full">
+        <div className="divide-y min-h-0">
+          {logs
+            .slice(-30)
+            .reverse()
+            .map((log, index) => {
+              const eventId = `${log.sequence}-${log.timestamp}`;
+              const isSelected = selectedEventId === eventId;
+              const stateAtEventTime = getStateAtTime(log.timestamp);
+
+              return (
+                <div
+                  key={eventId}
+                  className={`px-3 py-2 text-xs cursor-pointer transition-colors ${
+                    isSelected ? 'bg-blue-50 border-l-4 border-blue-500' : 'hover:bg-muted/30'
+                  }`}
+                  onClick={() => handleEventClick(log)}
+                  title="Click to see state at this time"
+                >
+                  <div className="flex gap-4 items-start">
+                    <div className="w-16 flex-shrink-0 font-mono text-muted-foreground">{log.timestamp}s</div>
+                    <div className="w-40 flex-shrink-0">
+                      <span
+                        className={`px-1.5 py-0.5 rounded text-xs font-medium ${getActionColor(log.action)} block truncate`}
+                        title={log.action}
+                      >
+                        {log.action}
+                      </span>
+                    </div>
+                    <div className="w-16 flex-shrink-0 font-mono text-right">
+                      {log.value !== undefined ? String(log.value) : "-"}
+                    </div>
+                    <div className="w-24 flex-shrink-0">
+                      {stateAtEventTime && (
+                        <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-800 block truncate">
+                          {stateAtEventTime.replace(/_/g, ' ').toUpperCase()}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0 text-muted-foreground break-words">{log.details || "-"}</div>
+                  </div>
+
+                  {isSelected && stateAtEventTime && (
+                    <div className="mt-2 p-2 bg-blue-50 rounded text-xs border-l-2 border-blue-300">
+                      <div className="font-medium text-blue-800 mb-1">State at this time:</div>
+                      <div className="text-blue-600">
+                        <strong>{stateAtEventTime.replace(/_/g, ' ').toUpperCase()}</strong>
+                      </div>
+                      {stateMachineInfo?.transitionHistory && (
+                        <div className="mt-1 text-blue-500">
+                          Sequence: {log.sequence} | Timestamp: {log.timestamp}s
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+        </div>
+      </ScrollArea>
+    </div>
+  );
+};
+
 const NodeInspectorModal: React.FC = () => {
   const selectedNodeId = useSimulationStore(state => state.selectedNodeId);
   const nodesConfig = useSimulationStore(state => state.nodesConfig);
@@ -930,10 +1052,9 @@ const NodeInspectorModal: React.FC = () => {
 
         <div className="flex-1 min-h-0 overflow-y-auto py-4 pr-3">
           <Tabs defaultValue="overview" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="state-machine">State Machine</TabsTrigger>
-              <TabsTrigger value="activity">Activity Log</TabsTrigger>
+              <TabsTrigger value="state-activity">State Machine & Activity</TabsTrigger>
             </TabsList>
             
             <TabsContent value="overview" className="mt-4">
@@ -956,21 +1077,33 @@ const NodeInspectorModal: React.FC = () => {
               </div>
             </TabsContent>
 
-            <TabsContent value="state-machine" className="mt-4">
-              <div className="flex justify-center">
-                <NodeStateMachineDiagram 
-                  nodeConfig={nodeConfig} 
-                  stateMachineInfo={nodeState?.stateMachine}
-                  width={700}
-                  height={500}
-                />
-              </div>
-            </TabsContent>
+            <TabsContent value="state-activity" className="mt-4">
+              <div className="flex flex-col space-y-3">
+                {/* State Machine on top */}
+                <div>
+                  <h3 className="font-semibold text-primary mb-2">State Machine</h3>
+                  <div className="flex justify-center bg-muted/20 border rounded-lg p-2">
+                    <NodeStateMachineDiagram
+                      nodeConfig={nodeConfig}
+                      stateMachineInfo={nodeState?.stateMachine}
+                      width={600}
+                      height={200}
+                    />
+                  </div>
+                </div>
 
-            <TabsContent value="activity" className="mt-4">
-              <div className="flex flex-col">
-                <h3 className="font-semibold text-primary mb-2 flex-shrink-0">Activity Log</h3>
-                <NodeActivityLog nodeId={selectedNodeId} />
+                {/* Activity Log below */}
+                <div className="flex flex-col">
+                  <h3 className="font-semibold text-primary mb-2 flex-shrink-0">Activity Log (Click events to see state changes)</h3>
+                  <NodeActivityLogWithStateTransitions
+                    nodeId={selectedNodeId}
+                    stateMachineInfo={nodeState?.stateMachine}
+                    onEventClick={(event, stateAtTime) => {
+                      // Handle event click to show state at that time
+                      console.log('Event clicked:', event, 'State at time:', stateAtTime);
+                    }}
+                  />
+                </div>
               </div>
             </TabsContent>
           </Tabs>

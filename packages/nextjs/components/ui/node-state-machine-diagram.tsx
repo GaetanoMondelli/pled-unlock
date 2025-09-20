@@ -47,7 +47,7 @@ const StateNode: React.FC<{ data: StateNodeData; selected?: boolean }> = ({ data
       <Handle type="target" position={Position.Left} className="!bg-slate-400 w-2.5 h-2.5" />
       <div
         className={cn(
-          "px-3 py-2 rounded-lg border-2 text-sm font-medium transition-all",
+          "px-2 py-1 rounded-lg border-2 text-xs font-medium transition-all",
           getStateColor(),
           selected && "ring-2 ring-primary ring-offset-1"
         )}
@@ -250,7 +250,7 @@ sink_processing 'logging_complete' -> sink_idle;`
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           fitView
-          fitViewOptions={{ padding: 0.2 }}
+          fitViewOptions={{ padding: 0.4, minZoom: 0.5, maxZoom: 1.5 }}
           nodesDraggable={false}
           nodesConnectable={false}
           elementsSelectable={false}
