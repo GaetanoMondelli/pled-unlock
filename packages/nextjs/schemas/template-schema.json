@@ -194,7 +194,7 @@
         },
         "type": {
           "type": "string",
-          "enum": ["DataSource", "Queue", "ProcessNode", "Sink"]
+          "enum": ["DataSource", "Queue", "ProcessNode", "FSMProcessNode", "Sink"]
         }
       }
     },
@@ -297,6 +297,208 @@
         }
       ]
     },
+    "FSMProcessNode": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/BaseNode"
+        },
+        {
+          "type": "object",
+          "required": ["inputs", "fsm"],
+          "properties": {
+            "type": {
+              "const": "FSMProcessNode"
+            },
+            "inputs": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Input"
+              },
+              "description": "Array of input connections"
+            },
+            "fsm": {
+              "$ref": "#/definitions/FSMDefinition",
+              "description": "Finite State Machine definition with dynamic outputs"
+            },
+            "fsl": {
+              "type": "string",
+              "description": "Raw FSL (Finite State Language) code for editing and display"
+            }
+          }
+        }
+      ]
+    },
+    "FSMOutputConfig": {
+      "type": "object",
+      "required": ["name", "interface"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Output name referenced in emit actions"
+        },
+        "interface": {
+          "$ref": "#/definitions/Interface"
+        },
+        "destinationNodeId": {
+          "type": "string",
+          "description": "Target node ID (can be connected later)"
+        },
+        "destinationInputName": {
+          "type": "string",
+          "description": "Target input name"
+        }
+      }
+    },
+    "FSMStateActions": {
+      "type": "object",
+      "properties": {
+        "onEntry": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Output formulas to execute on state entry"
+        },
+        "onExit": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Output formulas to execute on state exit"
+        },
+        "logs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Log messages for this state"
+        }
+      }
+    },
+    "FSMDefinition": {
+      "type": "object",
+      "required": ["states", "initialState", "transitions"],
+      "properties": {
+        "states": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Array of state names"
+        },
+        "initialState": {
+          "type": "string",
+          "description": "Name of the initial state"
+        },
+        "transitions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/FSMTransition"
+          },
+          "description": "Array of FSM transitions"
+        },
+        "variables": {
+          "type": "object",
+          "description": "FSM state variables",
+          "additionalProperties": true
+        },
+        "stateActions": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/FSMStateActions"
+          },
+          "description": "Actions mapped per state"
+        },
+        "outputs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Output names that can be emitted"
+        }
+      }
+    },
+    "FSMState": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "State name identifier"
+        },
+        "isInitial": {
+          "type": "boolean",
+          "description": "Whether this is the initial state"
+        },
+        "isFinal": {
+          "type": "boolean",
+          "description": "Whether this is a final state"
+        },
+        "onEntry": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/FSMAction"
+          },
+          "description": "Actions to execute when entering this state"
+        },
+        "onExit": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/FSMAction"
+          },
+          "description": "Actions to execute when exiting this state"
+        }
+      }
+    },
+    "FSMTransition": {
+      "type": "object",
+      "required": ["from", "to", "trigger"],
+      "properties": {
+        "from": {
+          "type": "string",
+          "description": "Source state name"
+        },
+        "to": {
+          "type": "string",
+          "description": "Target state name"
+        },
+        "trigger": {
+          "type": "string",
+          "enum": ["token_received", "timer", "condition", "emission_complete", "manual"],
+          "description": "Event that triggers this transition"
+        },
+        "condition": {
+          "type": "string",
+          "description": "Optional condition formula that must be true for transition"
+        },
+        "guard": {
+          "type": "string",
+          "description": "Additional guard condition"
+        }
+      }
+    },
+    "FSMAction": {
+      "type": "object",
+      "required": ["action"],
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["emit", "log", "set_variable", "increment", "decrement"],
+          "description": "Type of action to perform"
+        },
+        "target": {
+          "type": "string",
+          "description": "Target output name (for emit) or variable name (for set_variable)"
+        },
+        "value": {
+          "description": "Value to emit or set (can be any type)"
+        },
+        "formula": {
+          "type": "string",
+          "description": "Formula to evaluate for dynamic value"
+        }
+      }
+    },
     "SinkNode": {
       "allOf": [
         {
@@ -330,6 +532,9 @@
         },
         {
           "$ref": "#/definitions/ProcessNode"
+        },
+        {
+          "$ref": "#/definitions/FSMProcessNode"
         },
         {
           "$ref": "#/definitions/SinkNode"

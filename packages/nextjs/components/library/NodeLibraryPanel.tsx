@@ -5,16 +5,17 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { 
-  Database, 
-  Cpu, 
-  Layers, 
+import {
+  Database,
+  Cpu,
+  Layers,
   Target,
   Plus,
   Info,
   ChevronRight,
   Sparkles,
-  X
+  X,
+  Settings
 } from "lucide-react";
 import {
   Dialog,
@@ -25,7 +26,7 @@ import {
 } from "@/components/ui/dialog";
 
 interface NodeTemplate {
-  type: "DataSource" | "Queue" | "ProcessNode" | "Sink";
+  type: "DataSource" | "Queue" | "ProcessNode" | "FSMProcessNode" | "Sink";
   displayName: string;
   description: string;
   icon: React.ReactNode;
@@ -77,7 +78,7 @@ const NODE_TEMPLATES: NodeTemplate[] = [
     displayName: "Processor",
     description: "Applies formulas to inputs and generates multiple outputs",
     icon: <Cpu className="h-4 w-4" />,
-    category: "processing", 
+    category: "processing",
     color: "bg-purple-100 text-purple-700 border-purple-200",
     defaultConfig: {
       type: "ProcessNode",
@@ -89,6 +90,60 @@ const NODE_TEMPLATES: NodeTemplate[] = [
           destinationNodeId: ""
         }
       ]
+    }
+  },
+  {
+    type: "FSMProcessNode",
+    displayName: "FSM Processor",
+    description: "Finite State Machine processor with dynamic outputs based on FSM actions",
+    icon: <Settings className="h-4 w-4" />,
+    category: "processing",
+    color: "bg-orange-100 text-orange-700 border-orange-200",
+    defaultConfig: {
+      type: "FSMProcessNode",
+      displayName: "New FSM Processor",
+      inputs: [
+        {
+          name: "input",
+          interface: { type: "SimpleValue", requiredFields: ["data.value"] },
+          required: true
+        }
+      ],
+      fsm: {
+        states: ["idle", "processing", "emitting"],
+        initialState: "idle",
+        transitions: [
+          {
+            from: "idle",
+            to: "processing",
+            trigger: "token_received"
+          },
+          {
+            from: "processing",
+            to: "emitting",
+            trigger: "condition",
+            condition: "input.data.value > 0"
+          },
+          {
+            from: "emitting",
+            to: "idle",
+            trigger: "emission_complete"
+          }
+        ],
+        variables: {},
+        stateActions: {
+          "processing": {
+            logs: ["Processing started"]
+          },
+          "emitting": {
+            onEntry: {
+              "output": "input.data.value"
+            }
+          }
+        },
+        outputs: ["output"]
+      },
+      fsl: "state idle { on token_received -> processing }\nstate processing { \n  on_entry { log(\"Processing started\") }\n  on input.data.value > 0 -> emitting\n}\nstate emitting {\n  on_entry { emit(output, input.data.value) }\n  on emission_complete -> idle\n}"
     }
   },
   {

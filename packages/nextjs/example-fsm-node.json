@@ -1,0 +1,99 @@
+{
+  "nodeId": "FSM_Example",
+  "displayName": "FSM Processor",
+  "position": { "x": 400, "y": 200 },
+  "type": "FSMProcessNode",
+  "inputs": [
+    {
+      "name": "inputA",
+      "interface": { "type": "SimpleValue", "requiredFields": ["data.value"] },
+      "required": true
+    }
+  ],
+  "outputs": [
+    {
+      "name": "outputHigh",
+      "destinationNodeId": "Sink_High",
+      "destinationInputName": "input",
+      "interface": { "type": "ProcessedValue", "requiredFields": ["data.result"] }
+    },
+    {
+      "name": "outputLow",
+      "destinationNodeId": "Sink_Low",
+      "destinationInputName": "input",
+      "interface": { "type": "ProcessedValue", "requiredFields": ["data.result"] }
+    }
+  ],
+  "fsm": {
+    "states": [
+      {
+        "name": "idle",
+        "isInitial": true
+      },
+      {
+        "name": "evaluating",
+        "onEntry": [
+          {
+            "action": "log",
+            "value": "Starting evaluation"
+          }
+        ]
+      },
+      {
+        "name": "emit_high",
+        "onEntry": [
+          {
+            "action": "emit",
+            "target": "outputHigh",
+            "formula": "inputA.data.value * 2"
+          }
+        ]
+      },
+      {
+        "name": "emit_low",
+        "onEntry": [
+          {
+            "action": "emit",
+            "target": "outputLow",
+            "formula": "inputA.data.value * 0.5"
+          }
+        ]
+      }
+    ],
+    "transitions": [
+      {
+        "from": "idle",
+        "to": "evaluating",
+        "trigger": "token_received"
+      },
+      {
+        "from": "evaluating",
+        "to": "emit_high",
+        "trigger": "condition",
+        "condition": "inputA.data.value > 50"
+      },
+      {
+        "from": "evaluating",
+        "to": "emit_low",
+        "trigger": "condition",
+        "condition": "inputA.data.value <= 50"
+      },
+      {
+        "from": "emit_high",
+        "to": "idle",
+        "trigger": "emission_complete"
+      },
+      {
+        "from": "emit_low",
+        "to": "idle",
+        "trigger": "emission_complete"
+      }
+    ],
+    "variables": {
+      "threshold": 50,
+      "multiplier_high": 2,
+      "multiplier_low": 0.5
+    }
+  },
+  "fsl": "state idle { on token_received -> evaluating }\nstate evaluating { \n  on_entry { log(\"Starting evaluation\") }\n  on inputA.data.value > 50 -> emit_high\n  on inputA.data.value <= 50 -> emit_low\n}\nstate emit_high {\n  on_entry { emit(outputHigh, inputA.data.value * 2) }\n  on emission_complete -> idle\n}\nstate emit_low {\n  on_entry { emit(outputLow, inputA.data.value * 0.5) }\n  on emission_complete -> idle\n}"
+}

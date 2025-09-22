@@ -5,6 +5,7 @@ import DataSourceNodeDisplay from "./nodes/DataSourceNodeDisplay";
 import ProcessNodeDisplay from "./nodes/ProcessNodeDisplay";
 import QueueNodeDisplay from "./nodes/QueueNodeDisplay";
 import SinkNodeDisplay from "./nodes/SinkNodeDisplay";
+import FSMProcessNodeDisplay from "./nodes/FSMProcessNodeDisplay";
 import { type AnyNode, type RFEdgeData, type RFNodeData } from "@/lib/simulation/types";
 import { useSimulationStore } from "@/stores/simulationStore";
 import { cn } from "@/lib/utils";
@@ -29,6 +30,7 @@ const nodeTypes = {
   DataSource: DataSourceNodeDisplay,
   Queue: QueueNodeDisplay,
   ProcessNode: ProcessNodeDisplay,
+  FSMProcessNode: FSMProcessNodeDisplay,
   Sink: SinkNodeDisplay,
 };
 
@@ -281,6 +283,14 @@ const GraphVisualization: React.FC = () => {
               );
               details = `Inputs: ${totalInputs}, Last fired: ${pState.lastFiredTime >= 0 ? pState.lastFiredTime + "s" : "Never"}`;
               break;
+            case "FSMProcessNode":
+              const fsmState = nodeState as any;
+              const fsmInputs = Object.values(fsmState.inputBuffers || {}).reduce(
+                (sum: number, buffer: any) => sum + (buffer?.length || 0),
+                0,
+              );
+              details = `State: ${fsmState.currentFSMState || 'unknown'}, Inputs: ${fsmInputs}`;
+              break;
             case "Sink":
               const sState = nodeState as any;
               details = `Consumed: ${sState.consumedTokenCount || 0} tokens`;
@@ -301,6 +311,8 @@ const GraphVisualization: React.FC = () => {
               stateDisplayName: nodeState.stateMachine.currentState.split('_')[1], // e.g., "queue_idle" -> "idle"
               transitionCount: nodeState.stateMachine.transitionHistory?.length || 0,
             } : undefined,
+            // Add full node state for FSM nodes
+            nodeState: node.data.config.type === "FSMProcessNode" ? nodeState : undefined,
           },
         };
       }),

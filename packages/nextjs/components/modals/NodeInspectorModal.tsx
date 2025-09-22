@@ -20,6 +20,8 @@ import { useToast } from "@/hooks/use-toast";
 // import { MessageInterfaces } from "@/lib/simulation/message-interfaces";
 // import { InterfaceCompatibilityValidator } from "@/lib/simulation/enhanced-node-schema";
 import { Code, Settings, Activity, ChevronDown, ChevronRight, Save, RefreshCw, MessageSquare, ArrowRight, ArrowLeft, CheckCircle, AlertTriangle, Info, Eye, EyeOff } from "lucide-react";
+import type { NodeStateMachineState, StateMachineInfo } from "@/lib/simulation/types";
+// FSLGenerator removed - using simulation store state machine directly
 import { Badge } from "@/components/ui/badge";
 
 // Simple JSON display component
@@ -820,52 +822,43 @@ const NodeActivityLog: React.FC<{ nodeId: string }> = ({ nodeId }) => {
 };
 
 const getActionColor = (action: string): string => {
-  if (action.includes("CREATED") || action.includes("EMITTED")) return "bg-green-100 text-green-800";
-  if (action.includes("AGGREGATED") || action.includes("CONSUMED")) return "bg-blue-100 text-blue-800";
-  if (action.includes("OUTPUT") || action.includes("GENERATED")) return "bg-purple-100 text-purple-800";
-  if (action.includes("ERROR")) return "bg-red-100 text-red-800";
-  if (action.includes("ARRIVED") || action.includes("ADDED")) return "bg-orange-100 text-orange-800";
-  return "bg-gray-100 text-gray-800";
+  // Simplified state-based event colors
+  if (action === "accumulating") return "bg-orange-100 text-orange-800";
+  if (action === "processing") return "bg-blue-100 text-blue-800";
+  if (action === "emitting") return "bg-green-100 text-green-800";
+  if (action === "token_received") return "bg-cyan-100 text-cyan-800";
+  if (action === "firing") return "bg-purple-100 text-purple-800";
+  if (action === "consuming") return "bg-pink-100 text-pink-800";
+  if (action === "idle") return "bg-gray-100 text-gray-600";
+  if (action === "error") return "bg-red-100 text-red-800";
+  if (action === "token_dropped") return "bg-yellow-100 text-yellow-800";
+  return "bg-slate-100 text-slate-700";
 };
 
-// Enhanced activity log with clickable events and state transitions
+// Actions are now clean canonical events - no mapping needed
+
+// FSM-AUTHORITATIVE activity log with computed states
 const NodeActivityLogWithStateTransitions: React.FC<{
   nodeId: string;
   stateMachineInfo?: StateMachineInfo;
   onEventClick?: (event: any, stateAtTime?: NodeStateMachineState) => void;
 }> = ({ nodeId, stateMachineInfo, onEventClick }) => {
   const nodeActivityLogs = useSimulationStore(state => state.nodeActivityLogs);
+  const nodesConfig = useSimulationStore(state => state.nodesConfig);
   const logs = nodeActivityLogs[nodeId] || [];
+  const nodeConfig = nodesConfig[nodeId];
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+
+  // FSM state comes directly from simulation store - NO external analysis needed
 
   if (logs.length === 0) {
     return <p className="text-sm text-muted-foreground p-3 border rounded-md">No activity logged yet for this node.</p>;
   }
 
-  // Create a map of timestamp to state for quick lookup
-  const stateAtTime = useMemo(() => {
-    const stateMap = new Map<number, NodeStateMachineState>();
-    if (stateMachineInfo?.transitionHistory) {
-      stateMachineInfo.transitionHistory.forEach(transition => {
-        stateMap.set(transition.timestamp, transition.to);
-      });
-    }
-    return stateMap;
-  }, [stateMachineInfo]);
-
+  // State comes directly from log entries - simulation store is authoritative
   const getStateAtTime = (timestamp: number): NodeStateMachineState | undefined => {
-    // Find the latest state transition at or before this timestamp
-    let latestState: NodeStateMachineState | undefined;
-    let latestTime = -1;
-
-    stateAtTime.forEach((state, time) => {
-      if (time <= timestamp && time > latestTime) {
-        latestState = state;
-        latestTime = time;
-      }
-    });
-
-    return latestState || (stateMachineInfo?.currentState);
+    const logEntry = logs.find(log => log.timestamp === timestamp);
+    return logEntry?.state as NodeStateMachineState;
   };
 
   const handleEventClick = (log: any) => {
@@ -877,13 +870,15 @@ const NodeActivityLogWithStateTransitions: React.FC<{
 
   return (
     <div className="border rounded-md">
-      <div className="bg-muted/50 px-3 py-2 text-xs font-medium border-b">
-        <div className="flex gap-4">
-          <div className="w-16 flex-shrink-0">Time</div>
-          <div className="w-40 flex-shrink-0">Action</div>
-          <div className="w-16 flex-shrink-0">Value</div>
+      <div className="bg-muted/50 px-2 py-1 text-xs font-medium border-b">
+        <div className="flex gap-2">
+          <div className="w-12 flex-shrink-0">Time</div>
+          <div className="w-28 flex-shrink-0">Event</div>
+          <div className="w-10 flex-shrink-0">Val</div>
           <div className="w-24 flex-shrink-0">State</div>
+          <div className="w-16 flex-shrink-0">Buf/Out</div>
           <div className="flex-1 min-w-0">Details</div>
+          <div className="w-4 flex-shrink-0"></div>
         </div>
       </div>
       <ScrollArea className="h-64 w-full">
@@ -896,47 +891,61 @@ const NodeActivityLogWithStateTransitions: React.FC<{
               const isSelected = selectedEventId === eventId;
               const stateAtEventTime = getStateAtTime(log.timestamp);
 
+              // State comes directly from simulation store
+
               return (
                 <div
                   key={eventId}
-                  className={`px-3 py-2 text-xs cursor-pointer transition-colors ${
+                  className={`px-2 py-1 text-xs cursor-pointer transition-colors ${
                     isSelected ? 'bg-blue-50 border-l-4 border-blue-500' : 'hover:bg-muted/30'
                   }`}
                   onClick={() => handleEventClick(log)}
-                  title="Click to see state at this time"
+                  title="Click to see details and update state machine"
                 >
-                  <div className="flex gap-4 items-start">
-                    <div className="w-16 flex-shrink-0 font-mono text-muted-foreground">{log.timestamp}s</div>
-                    <div className="w-40 flex-shrink-0">
+                  {/* Compact main row */}
+                  <div className="flex gap-2 items-center">
+                    <div className="w-12 flex-shrink-0 font-mono text-muted-foreground text-xs">{log.timestamp}s</div>
+                    <div className="w-28 flex-shrink-0">
                       <span
-                        className={`px-1.5 py-0.5 rounded text-xs font-medium ${getActionColor(log.action)} block truncate`}
+                        className={`px-1 py-0.5 rounded text-xs font-medium ${getActionColor(log.action)} block truncate`}
                         title={log.action}
                       >
                         {log.action}
                       </span>
                     </div>
-                    <div className="w-16 flex-shrink-0 font-mono text-right">
+                    <div className="w-10 flex-shrink-0 font-mono text-right text-xs">
                       {log.value !== undefined ? String(log.value) : "-"}
                     </div>
                     <div className="w-24 flex-shrink-0">
-                      {stateAtEventTime && (
-                        <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-800 block truncate">
-                          {stateAtEventTime.replace(/_/g, ' ').toUpperCase()}
-                        </span>
-                      )}
+                      <span className="px-1 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 block truncate" title={`State: ${log.state}`}>
+                        {log.state?.split('_')[1] || log.state}
+                      </span>
                     </div>
-                    <div className="flex-1 min-w-0 text-muted-foreground break-words">{log.details || "-"}</div>
+                    <div className="w-16 flex-shrink-0 text-xs text-gray-600 font-mono">
+                      {log.bufferSize || 0}/{log.outputBufferSize || 0}
+                    </div>
+                    <div className="flex-1 min-w-0 text-muted-foreground text-xs truncate">
+                      {log.details || "-"}
+                    </div>
+                    <div className="w-4 flex-shrink-0 text-muted-foreground">
+                      {isSelected ? "−" : "+"}
+                    </div>
                   </div>
 
-                  {isSelected && stateAtEventTime && (
-                    <div className="mt-2 p-2 bg-blue-50 rounded text-xs border-l-2 border-blue-300">
-                      <div className="font-medium text-blue-800 mb-1">State at this time:</div>
-                      <div className="text-blue-600">
-                        <strong>{stateAtEventTime.replace(/_/g, ' ').toUpperCase()}</strong>
+                  {/* Expandable details */}
+                  {isSelected && (
+                    <div className="mt-1 p-2 bg-blue-50 rounded text-xs border-l-2 border-blue-300">
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div><strong>Event:</strong> {log.action}</div>
+                        <div><strong>State:</strong> {log.state}</div>
+                        <div><strong>Sequence:</strong> {log.sequence}</div>
+                        <div><strong>Timestamp:</strong> {log.timestamp}s</div>
+                        <div><strong>Buffer Size:</strong> {log.bufferSize || 0}</div>
+                        <div><strong>Output Buffer:</strong> {log.outputBufferSize || 0}</div>
                       </div>
-                      {stateMachineInfo?.transitionHistory && (
-                        <div className="mt-1 text-blue-500">
-                          Sequence: {log.sequence} | Timestamp: {log.timestamp}s
+                      {log.details && (
+                        <div className="mt-2">
+                          <strong>Details:</strong> {log.details}
                         </div>
                       )}
                     </div>
@@ -950,10 +959,13 @@ const NodeActivityLogWithStateTransitions: React.FC<{
   );
 };
 
+// FSLAnalysisSection component REMOVED - user requested clean implementation without FSLGenerator
+
 const NodeInspectorModal: React.FC = () => {
   const selectedNodeId = useSimulationStore(state => state.selectedNodeId);
   const nodesConfig = useSimulationStore(state => state.nodesConfig);
   const nodeStates = useSimulationStore(state => state.nodeStates);
+  const nodeActivityLogs = useSimulationStore(state => state.nodeActivityLogs);
   const setSelectedNodeId = useSimulationStore(state => state.setSelectedNodeId);
   const scenario = useSimulationStore(state => state.scenario);
   const loadScenario = useSimulationStore(state => state.loadScenario);
@@ -964,10 +976,20 @@ const NodeInspectorModal: React.FC = () => {
   const [showConfigJson, setShowConfigJson] = useState(false);
   const [showStateJson, setShowStateJson] = useState(false);
   const [originalConfigText, setOriginalConfigText] = useState<string>("");
+  const [selectedEventState, setSelectedEventState] = useState<NodeStateMachineState | null>(null);
+  const [selectedLogEntry, setSelectedLogEntry] = useState<any | null>(null);
+  const [showStateMachine, setShowStateMachine] = useState(false);
 
   const isOpen = !!selectedNodeId;
   const nodeConfig = selectedNodeId ? nodesConfig[selectedNodeId] : null;
   const nodeState = selectedNodeId ? nodeStates[selectedNodeId] : null;
+  const logs = selectedNodeId ? nodeActivityLogs[selectedNodeId] || [] : [];
+
+  // Reset selected event state when node changes
+  useEffect(() => {
+    setSelectedEventState(null);
+    setSelectedLogEntry(null);
+  }, [selectedNodeId]);
 
   useEffect(() => {
     if (nodeConfig) {
@@ -1052,9 +1074,12 @@ const NodeInspectorModal: React.FC = () => {
 
         <div className="flex-1 min-h-0 overflow-y-auto py-4 pr-3">
           <Tabs defaultValue="overview" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className={`grid w-full ${nodeConfig.type === 'FSMProcessNode' ? 'grid-cols-3' : 'grid-cols-2'}`}>
               <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="state-activity">State Machine & Activity</TabsTrigger>
+              {nodeConfig.type === 'FSMProcessNode' && (
+                <TabsTrigger value="fsm">FSM</TabsTrigger>
+              )}
+              <TabsTrigger value="activity">Activity</TabsTrigger>
             </TabsList>
             
             <TabsContent value="overview" className="mt-4">
@@ -1077,30 +1102,148 @@ const NodeInspectorModal: React.FC = () => {
               </div>
             </TabsContent>
 
-            <TabsContent value="state-activity" className="mt-4">
-              <div className="flex flex-col space-y-3">
-                {/* State Machine on top */}
-                <div>
-                  <h3 className="font-semibold text-primary mb-2">State Machine</h3>
-                  <div className="flex justify-center bg-muted/20 border rounded-lg p-2">
-                    <NodeStateMachineDiagram
-                      nodeConfig={nodeConfig}
-                      stateMachineInfo={nodeState?.stateMachine}
-                      width={600}
-                      height={200}
-                    />
+            {/* FSM Tab - only for FSMProcessNode */}
+            {nodeConfig.type === 'FSMProcessNode' && (
+              <TabsContent value="fsm" className="mt-4">
+                <div className="space-y-4">
+                  {/* FSL Code Section */}
+                  <div>
+                    <h3 className="font-semibold text-primary mb-2 flex items-center gap-2">
+                      <Code className="w-4 h-4" />
+                      FSL Definition
+                    </h3>
+                    <div className="bg-slate-50 border rounded-lg p-3">
+                      <pre className="text-sm font-mono whitespace-pre-wrap text-slate-800">
+                        {nodeConfig.fsl || '// No FSL definition provided'}
+                      </pre>
+                    </div>
+                  </div>
+
+                  {/* FSM Configuration */}
+                  <div>
+                    <h3 className="font-semibold text-primary mb-2 flex items-center gap-2">
+                      <Settings className="w-4 h-4" />
+                      FSM Configuration
+                    </h3>
+
+                    {/* States */}
+                    <div className="mb-4">
+                      <h4 className="font-medium text-sm mb-2">States ({nodeConfig.fsm?.states?.length || 0})</h4>
+                      <div className="space-y-2">
+                        {nodeConfig.fsm?.states?.map((state, index) => (
+                          <div key={index} className="bg-white border rounded p-2">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Badge variant={state.isInitial ? "default" : "secondary"} className="text-xs">
+                                {state.name}
+                              </Badge>
+                              {state.isInitial && <span className="text-xs text-green-600">Initial</span>}
+                              {state.isFinal && <span className="text-xs text-blue-600">Final</span>}
+                            </div>
+                            {state.onEntry && state.onEntry.length > 0 && (
+                              <div className="text-xs text-slate-600">
+                                On Entry: {state.onEntry.map(action => `${action.action}(${action.target || action.value || ''})`).join(', ')}
+                              </div>
+                            )}
+                          </div>
+                        )) || <div className="text-sm text-slate-500">No states defined</div>}
+                      </div>
+                    </div>
+
+                    {/* Transitions */}
+                    <div className="mb-4">
+                      <h4 className="font-medium text-sm mb-2">Transitions ({nodeConfig.fsm?.transitions?.length || 0})</h4>
+                      <div className="space-y-1">
+                        {nodeConfig.fsm?.transitions?.map((transition, index) => (
+                          <div key={index} className="text-xs bg-white border rounded p-2 flex items-center justify-between">
+                            <span className="font-mono">
+                              {transition.from} → {transition.to}
+                            </span>
+                            <span className="text-slate-600">
+                              {transition.trigger}
+                              {transition.condition && ` (${transition.condition})`}
+                            </span>
+                          </div>
+                        )) || <div className="text-sm text-slate-500">No transitions defined</div>}
+                      </div>
+                    </div>
+
+                    {/* Variables */}
+                    {nodeConfig.fsm?.variables && Object.keys(nodeConfig.fsm.variables).length > 0 && (
+                      <div>
+                        <h4 className="font-medium text-sm mb-2">Variables</h4>
+                        <div className="bg-white border rounded p-2">
+                          <SimpleJsonView value={nodeConfig.fsm.variables} />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
+              </TabsContent>
+            )}
 
-                {/* Activity Log below */}
+            <TabsContent value="activity" className="mt-4">
+              <div className="flex flex-col space-y-3">
+                {/* State Machine - prominent for FSM nodes, toggleable for others */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      {nodeConfig.type === 'FSMProcessNode' ? (
+                        <h3 className="font-semibold text-primary">State Machine Behavior</h3>
+                      ) : (
+                        <>
+                          <h3 className="font-semibold text-primary">Activity Log</h3>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-xs h-6 px-2"
+                            onClick={() => setShowStateMachine(!showStateMachine)}
+                          >
+                            {showStateMachine ? <EyeOff className="w-3 h-3 mr-1" /> : <Eye className="w-3 h-3 mr-1" />}
+                            State Machine
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                    {selectedEventState && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs h-6"
+                        onClick={() => setSelectedEventState(null)}
+                      >
+                        Clear Selection
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* State Machine - always visible for FSM nodes, toggleable for others */}
+                  {(nodeConfig.type === 'FSMProcessNode' || showStateMachine) && (
+                    <div className="flex justify-center bg-muted/20 border rounded-lg p-2 mb-3">
+                      <NodeStateMachineDiagram
+                        nodeConfig={nodeConfig}
+                        stateMachineInfo={nodeState?.stateMachine}
+                        width={600}
+                        height={nodeConfig.type === 'FSMProcessNode' ? 300 : 200}
+                        overrideActiveState={selectedEventState}
+                        showVariables={true}
+                        activityLogs={logs}
+                        selectedLogEntry={selectedLogEntry}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Activity Log */}
                 <div className="flex flex-col">
-                  <h3 className="font-semibold text-primary mb-2 flex-shrink-0">Activity Log (Click events to see state changes)</h3>
+                  <h4 className="font-medium text-sm mb-2 flex-shrink-0 text-muted-foreground">Click events to see state changes</h4>
                   <NodeActivityLogWithStateTransitions
                     nodeId={selectedNodeId}
                     stateMachineInfo={nodeState?.stateMachine}
                     onEventClick={(event, stateAtTime) => {
                       // Handle event click to show state at that time
                       console.log('Event clicked:', event, 'State at time:', stateAtTime);
+                      setSelectedEventState(stateAtTime || null);
+                      setSelectedLogEntry(event);
                     }}
                   />
                 </div>

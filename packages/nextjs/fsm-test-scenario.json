@@ -1,0 +1,180 @@
+{
+  "version": "3.0",
+  "nodes": [
+    {
+      "nodeId": "DataSource_A",
+      "displayName": "Source A",
+      "position": {
+        "x": 100,
+        "y": 200
+      },
+      "type": "DataSource",
+      "interval": 3,
+      "outputs": [
+        {
+          "name": "output",
+          "destinationNodeId": "FSM_Processor",
+          "destinationInputName": "input",
+          "interface": {
+            "type": "SimpleValue",
+            "requiredFields": ["data.value"]
+          }
+        }
+      ],
+      "generation": {
+        "type": "random",
+        "valueMin": 1,
+        "valueMax": 100
+      }
+    },
+    {
+      "nodeId": "FSM_Processor",
+      "displayName": "FSM Threshold Processor",
+      "position": {
+        "x": 400,
+        "y": 200
+      },
+      "type": "FSMProcessNode",
+      "inputs": [
+        {
+          "name": "input",
+          "interface": {
+            "type": "SimpleValue",
+            "requiredFields": ["data.value"]
+          },
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "outputHigh",
+          "destinationNodeId": "Sink_High",
+          "destinationInputName": "input",
+          "interface": {
+            "type": "ProcessedValue",
+            "requiredFields": ["data.result"]
+          }
+        },
+        {
+          "name": "outputLow",
+          "destinationNodeId": "Sink_Low",
+          "destinationInputName": "input",
+          "interface": {
+            "type": "ProcessedValue",
+            "requiredFields": ["data.result"]
+          }
+        }
+      ],
+      "fsm": {
+        "states": [
+          {
+            "name": "idle",
+            "isInitial": true
+          },
+          {
+            "name": "evaluating",
+            "onEntry": [
+              {
+                "action": "log",
+                "value": "Starting evaluation"
+              }
+            ]
+          },
+          {
+            "name": "emit_high",
+            "onEntry": [
+              {
+                "action": "emit",
+                "target": "outputHigh",
+                "formula": "input.data.value * 2"
+              }
+            ]
+          },
+          {
+            "name": "emit_low",
+            "onEntry": [
+              {
+                "action": "emit",
+                "target": "outputLow",
+                "formula": "input.data.value * 0.5"
+              }
+            ]
+          }
+        ],
+        "transitions": [
+          {
+            "from": "idle",
+            "to": "evaluating",
+            "trigger": "token_received"
+          },
+          {
+            "from": "evaluating",
+            "to": "emit_high",
+            "trigger": "condition",
+            "condition": "input.data.value > 50"
+          },
+          {
+            "from": "evaluating",
+            "to": "emit_low",
+            "trigger": "condition",
+            "condition": "input.data.value <= 50"
+          },
+          {
+            "from": "emit_high",
+            "to": "idle",
+            "trigger": "emission_complete"
+          },
+          {
+            "from": "emit_low",
+            "to": "idle",
+            "trigger": "emission_complete"
+          }
+        ],
+        "variables": {
+          "threshold": 50,
+          "multiplier_high": 2,
+          "multiplier_low": 0.5
+        }
+      },
+      "fsl": "state idle { on token_received -> evaluating }\nstate evaluating { \n  on_entry { log(\"Starting evaluation\") }\n  on input.data.value > 50 -> emit_high\n  on input.data.value <= 50 -> emit_low\n}\nstate emit_high {\n  on_entry { emit(outputHigh, input.data.value * 2) }\n  on emission_complete -> idle\n}\nstate emit_low {\n  on_entry { emit(outputLow, input.data.value * 0.5) }\n  on emission_complete -> idle\n}"
+    },
+    {
+      "nodeId": "Sink_High",
+      "displayName": "High Values Sink (>50)",
+      "position": {
+        "x": 700,
+        "y": 100
+      },
+      "type": "Sink",
+      "inputs": [
+        {
+          "name": "input",
+          "interface": {
+            "type": "Any",
+            "requiredFields": []
+          },
+          "required": true
+        }
+      ]
+    },
+    {
+      "nodeId": "Sink_Low",
+      "displayName": "Low Values Sink (<=50)",
+      "position": {
+        "x": 700,
+        "y": 300
+      },
+      "type": "Sink",
+      "inputs": [
+        {
+          "name": "input",
+          "interface": {
+            "type": "Any",
+            "requiredFields": []
+          },
+          "required": true
+        }
+      ]
+    }
+  ]
+}

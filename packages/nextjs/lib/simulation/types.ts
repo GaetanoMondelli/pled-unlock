@@ -55,6 +55,11 @@ export const HistoryEntrySchema = z.object({
   sourceTokenSummaries: z.array(SourceTokenSummarySchema).optional(),
   details: z.string().optional(),
 
+  // FSM STATE - SINGLE SOURCE OF TRUTH
+  state: z.string(), // Current FSM state when this action occurred
+  bufferSize: z.number().optional(), // Input buffer size at time of action
+  outputBufferSize: z.number().optional(), // Output buffer size at time of action
+
   // Enhanced lineage tracking fields
   operationType: z.enum(["creation", "aggregation", "transformation", "consumption", "transfer"]).optional(),
   aggregationDetails: AggregationDetailsSchema.optional(),
@@ -164,6 +169,53 @@ export const ProcessNodeSchema = BaseNodeSchema.extend({
 });
 export type ProcessNode = z.infer<typeof ProcessNodeSchema>;
 
+// FSM State Actions - cleaner mapping like ProcessNode outputs
+export const FSMStateActionsSchema = z.object({
+  onEntry: z.record(z.string(), z.string()).optional(), // output_name: formula
+  onExit: z.record(z.string(), z.string()).optional(), // output_name: formula
+  logs: z.array(z.string()).optional(), // log messages
+});
+export type FSMStateActions = z.infer<typeof FSMStateActionsSchema>;
+
+// FSM Transition Definition
+export const FSMTransitionSchema = z.object({
+  from: z.string(),
+  to: z.string(),
+  trigger: z.string(), // "token_received", "timer", "condition"
+  condition: z.string().optional(), // formula to evaluate for conditional triggers
+  guard: z.string().optional(), // additional guard condition
+});
+export type FSMTransition = z.infer<typeof FSMTransitionSchema>;
+
+// FSM Output Configuration - dynamically inferred from emit actions
+export const FSMOutputConfigSchema = z.object({
+  name: z.string(), // output name referenced in emit actions
+  interface: InterfaceSchema,
+  destinationNodeId: z.string().optional(), // can be connected later
+  destinationInputName: z.string().optional(),
+});
+export type FSMOutputConfig = z.infer<typeof FSMOutputConfigSchema>;
+
+// FSM Definition - much cleaner structure
+export const FSMDefinitionSchema = z.object({
+  states: z.array(z.string()), // simple state names: ["idle", "processing", "emitting"]
+  initialState: z.string(), // clearly defined initial state
+  transitions: z.array(FSMTransitionSchema),
+  variables: z.record(z.string(), z.any()).optional(), // state variables
+  stateActions: z.record(z.string(), FSMStateActionsSchema).optional(), // state_name: actions
+  outputs: z.array(z.string()).optional(), // output names that can be emitted
+});
+export type FSMDefinition = z.infer<typeof FSMDefinitionSchema>;
+
+// FSMProcessNode Schema - native FSL-based processing node
+export const FSMProcessNodeSchema = BaseNodeSchema.extend({
+  type: z.literal("FSMProcessNode"),
+  inputs: z.array(InputV3Schema),
+  fsm: FSMDefinitionSchema, // Native FSL definition with dynamic outputs
+  fsl: z.string().optional(), // Raw FSL string for display/editing
+});
+export type FSMProcessNode = z.infer<typeof FSMProcessNodeSchema>;
+
 // Sink Schema
 export const SinkNodeSchema = BaseNodeSchema.extend({
   type: z.literal("Sink"),
@@ -172,7 +224,7 @@ export const SinkNodeSchema = BaseNodeSchema.extend({
 export type SinkNode = z.infer<typeof SinkNodeSchema>;
 
 // Union type for all nodes
-export const AnyNodeSchema = z.union([DataSourceNodeSchema, QueueNodeSchema, ProcessNodeSchema, SinkNodeSchema]);
+export const AnyNodeSchema = z.union([DataSourceNodeSchema, QueueNodeSchema, ProcessNodeSchema, FSMProcessNodeSchema, SinkNodeSchema]);
 export type AnyNode = z.infer<typeof AnyNodeSchema>;
 
 // Scenario Schema
@@ -183,12 +235,13 @@ export const ScenarioSchema = z.object({
 export type Scenario = z.infer<typeof ScenarioSchema>;
 
 // State machine state definitions
-export type NodeStateMachineState = 
+export type NodeStateMachineState =
   | "source_idle" | "source_generating" | "source_emitting" | "source_waiting"
   | "queue_idle" | "queue_accumulating" | "queue_processing" | "queue_emitting"
-  | "process_idle" | "process_collecting" | "process_calculating" | "process_emitting"
+  | "process_idle" | "process_collecting" | "process_ready" | "process_evaluating" | "process_outputting"
   | "splitter_idle" | "splitter_evaluating" | "splitter_route_output1" | "splitter_route_output2"
-  | "sink_idle" | "sink_processing";
+  | "sink_idle" | "sink_processing"
+  | string; // Allow custom FSM states for FSMProcessNode
 
 export interface StateMachineInfo {
   currentState: NodeStateMachineState;
@@ -225,13 +278,20 @@ export interface ProcessNodeState extends NodeState {
   lastFiredTime?: number;
 }
 
+export interface FSMProcessNodeState extends NodeState {
+  inputBuffers: Record<string, Token[]>;
+  fsmVariables: Record<string, any>; // FSM state variables
+  currentFSMState: string; // Current state in the FSM definition
+  lastTransitionTime?: number;
+}
+
 export interface SinkState extends NodeState {
   consumedTokenCount: number;
   lastConsumedTime?: number;
   consumedTokens: Token[];
 }
 
-export type AnyNodeState = DataSourceState | QueueState | ProcessNodeState | SinkState;
+export type AnyNodeState = DataSourceState | QueueState | ProcessNodeState | FSMProcessNodeState | SinkState;
 
 // For React Flow
 export interface RFNodeData {

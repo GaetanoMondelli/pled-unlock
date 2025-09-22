@@ -15,8 +15,11 @@ import {
   type AnyNodeState,
   DataSourceNodeSchema,
   type DataSourceState,
+  FSMProcessNodeSchema,
+  type FSMProcessNodeState,
   type HistoryEntry,
   type LineageMetadata,
+  type NodeStateMachineState,
   ProcessNodeSchema,
   type ProcessNodeState,
   QueueNodeSchema,
@@ -25,6 +28,7 @@ import {
   SinkNodeSchema,
   type SinkState,
   type SourceTokenSummary,
+  type StateMachineInfo,
   type Token,
   type TransformationDetails,
 } from "@/lib/simulation/types";
@@ -85,11 +89,15 @@ interface SimulationState {
   _transitionNodeState: (nodeId: string, newState: NodeStateMachineState, timestamp: number, trigger?: string) => void;
   _logNodeActivity: (
     nodeIdForLog: string,
-    logCoreDetails: Omit<HistoryEntry, "timestamp" | "nodeId" | "epochTimestamp" | "sequence">,
+    logCoreDetails: Omit<HistoryEntry, "timestamp" | "nodeId" | "epochTimestamp" | "sequence" | "state" | "bufferSize" | "outputBufferSize">,
     timestamp: number,
   ) => HistoryEntry;
   _createToken: (originNodeId: string, value: any, timestamp: number, sourceTokens?: Token[]) => Token;
+  _tryFireProcessNode: (pnConfig: any, pnState: ProcessNodeState, timestamp: number) => void;
   _restoreScenarioState: (scenario: Scenario) => void;
+  _executeFSMTransition: (fsmConfig: any, fsmState: any, transition: any, newTime: number) => void;
+  _executeFSMAction: (fsmConfig: any, fsmState: any, action: any, newTime: number) => void;
+  _routeFSMToken: (fsmConfig: any, token: Token, outputConfig: any, newTime: number) => void;
 }
 
 export const useSimulationStore = create<SimulationState>((set, get) => ({
@@ -258,7 +266,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
           nodeConfig.outputs.forEach(output => {
             const emissionLog = _logNodeActivity(
               nodeConfig.nodeId,
-              { action: "EMIT_TOKEN", value: token.value, details: `Token ${token.id} to ${output.destinationNodeId}` },
+              { action: "token_emitted", value: token.value, details: `Token ${token.id} to ${output.destinationNodeId}` },
               newTime,
             );
 
@@ -273,7 +281,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
                   const dropLog = _logNodeActivity(
                     destNodeConfig.nodeId,
                     {
-                      action: "DROP_TOKEN",
+                      action: "token_dropped",
                       value: token.value,
                       details: `From ${nodeConfig.displayName}, Token ${token.id} - queue at capacity`,
                     },
@@ -281,34 +289,48 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
                   );
                   token.history.push(dropLog);
                 } else {
+                  // Proper state transition logic for queue when receiving tokens
+                  const currentQueueState = qState.stateMachine?.currentState || 'queue_idle';
+
+                  // Always transition to accumulating when receiving a token
+                  // This is the canonical FSM behavior
                   _transitionNodeState(destNodeConfig.nodeId, 'queue_accumulating', newTime, 'token_received');
+
                   _updateNodeState(destNodeConfig.nodeId, { inputBuffer: [...qState.inputBuffer, token] });
+
+                  // Simplified: Only log state transitions, not individual token operations
                   _logNodeActivity(
                     destNodeConfig.nodeId,
                     {
-                      action: "RECEIVE_TOKEN",
-                      value: token.value,
-                      details: `From ${nodeConfig.displayName}, Token ${token.id}. Buffer size: ${qState.inputBuffer.length + 1}`,
+                      action: "accumulating",
+                      value: qState.inputBuffer.length + 1, // Show buffer size as value
+                      details: `Collecting tokens (buffer size: ${qState.inputBuffer.length + 1})`,
                     },
                     newTime,
                   );
                 }
               } else if (destNodeConfig.type === "ProcessNode") {
-                _transitionNodeState(destNodeConfig.nodeId, 'process_collecting', newTime, 'token_received');
+                _transitionNodeState(destNodeConfig.nodeId, 'process_idle', newTime, 'token_received');
                 const pnState = destNodeState as ProcessNodeState;
                 const bufferForInput = pnState.inputBuffers[nodeConfig.nodeId] || [];
                 _updateNodeState(destNodeConfig.nodeId, {
                   inputBuffers: { ...pnState.inputBuffers, [nodeConfig.nodeId]: [...bufferForInput, token] },
                 });
+
+                // Simplified ProcessNode event - state-based
                 _logNodeActivity(
                   destNodeConfig.nodeId,
                   {
-                    action: "RECEIVE_TOKEN",
-                    value: token.value,
-                    details: `From ${nodeConfig.displayName}, Token ${token.id}. Buffer size: ${bufferForInput.length + 1}`,
+                    action: "token_received",
+                    value: bufferForInput.length + 1,
+                    details: `Received token (buffer size: ${bufferForInput.length + 1})`,
                   },
                   newTime,
                 );
+
+                // Check if ProcessNode can fire now that it received a token
+                const updatedPnState = get().nodeStates[destNodeConfig.nodeId] as ProcessNodeState;
+                _tryFireProcessNode(destNodeConfig, updatedPnState, newTime);
               } else if (destNodeConfig.type === "Sink") {
                 _transitionNodeState(destNodeConfig.nodeId, 'sink_processing', newTime, 'token_received');
                 const sinkState = destNodeState as SinkState;
@@ -318,12 +340,26 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
                   lastConsumedTime: newTime,
                   consumedTokens: updatedConsumedTokens,
                 });
+
+                // Simplified Sink event - state-based (like Queue → Sink)
                 const sinkConsumptionLog = _logNodeActivity(
                   destNodeConfig.nodeId,
-                  { action: "CONSUME_TOKEN", value: token.value, details: `From ${nodeConfig.displayName}, Token ${token.id}` },
+                  {
+                    action: "consuming",
+                    value: token.value,
+                    details: `Token ${token.id} from ${nodeConfig.displayName} output`
+                  },
                   newTime,
                 );
                 token.history.push(sinkConsumptionLog);
+
+                // Add consumed event to log (like Queue → Sink)
+                _logNodeActivity(
+                  destNodeConfig.nodeId,
+                  { action: "token_consumed", value: token.value, details: `Token ${token.id} from ${nodeConfig.displayName} output` },
+                  newTime,
+                );
+
                 _transitionNodeState(destNodeConfig.nodeId, 'sink_idle', newTime, 'consumption_complete');
               }
             }
@@ -335,8 +371,9 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
         }
       }
 
-      // Process ProcessNode nodes
-      if (nodeConfig.type === "ProcessNode") {
+      // ProcessNode firing moved to event-driven logic (when tokens arrive)
+      // Keeping this comment to remember where the polling logic was removed
+      if (false && nodeConfig.type === "ProcessNode") {
         const pnConfig = nodeConfig;
         const pnState = currentNodeState as ProcessNodeState;
         let canFire = true;
@@ -359,40 +396,30 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
           const aliasKey = input.alias || inputSourceNodeId;
           aliasToSourceNodeId[aliasKey] = inputSourceNodeId;
 
-          if (sourceNodeConfig.type === "Queue") {
-            const qState = get().nodeStates[inputSourceNodeId] as QueueState;
-            if (qState.outputBuffer.length > 0) {
-              inputsDataForFormula[aliasKey] = qState.outputBuffer[0];
-            } else {
-              canFire = false;
-              break;
-            }
+          // ProcessNode should always check its own input buffers, regardless of source type
+          if (pnState.inputBuffers[inputSourceNodeId] && pnState.inputBuffers[inputSourceNodeId].length > 0) {
+            inputsDataForFormula[aliasKey] = pnState.inputBuffers[inputSourceNodeId][0];
           } else {
-            if (pnState.inputBuffers[inputSourceNodeId] && pnState.inputBuffers[inputSourceNodeId].length > 0) {
-              inputsDataForFormula[aliasKey] = pnState.inputBuffers[inputSourceNodeId][0];
-            } else {
-              canFire = false;
-              break;
-            }
+            canFire = false;
+            break;
           }
         }
 
         if (canFire) {
-          // Transition to processing state
-          _transitionNodeState(pnConfig.nodeId, 'process_calculating', newTime, 'inputs_ready');
+          // Transition directly to emitting (ProcessNode fires instantly)
+          _transitionNodeState(pnConfig.nodeId, 'process_emitting', newTime, 'fire');
 
           const consumedTokensForThisFiring: Token[] = [];
           const nextPnInputBuffers = JSON.parse(JSON.stringify(pnState.inputBuffers));
 
           Object.entries(inputsDataForFormula).forEach(([inputNodeId, tokenToConsume]) => {
             consumedTokensForThisFiring.push(tokenToConsume);
-            const consumptionLogDetails = `From ${nodesConfig[inputNodeId]?.displayName || inputNodeId}, Token ${tokenToConsume.id}`;
             const consumptionLog = _logNodeActivity(
               pnConfig.nodeId,
               {
-                action: "INPUT_TOKEN_CONSUMED_BY_PROCESSOR",
-                value: tokenToConsume.value,
-                details: consumptionLogDetails,
+                action: "firing",
+                value: consumedTokensForThisFiring.length,
+                details: `Firing with ${consumedTokensForThisFiring.length} inputs`,
               },
               newTime,
             );
@@ -439,7 +466,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
               _logNodeActivity(
                 pnConfig.nodeId,
                 {
-                  action: "FORMULA_ERROR",
+                  action: "error",
                   details: `Output ${index} ('${output.transformation?.formula || ""}'): ${error}. Context: ${JSON.stringify(formulaContext)}`,
                   operationType: "transformation",
                 },
@@ -467,19 +494,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
               // Enhanced source token summaries
               const enhancedSourceTokenSummaries = createEnhancedSourceTokenSummaries(consumedTokensForThisFiring);
 
-              _logNodeActivity(
-                pnConfig.nodeId,
-                {
-                  action: "OUTPUT_GENERATED",
-                  value: newToken.value,
-                  sourceTokenIds: consumedTokensForThisFiring.map(t => t.id),
-                  sourceTokenSummaries: enhancedSourceTokenSummaries,
-                  details: `${transformationDetails.calculation}. Token ${newToken.id} for output ${index} to ${output.destinationNodeId}`,
-                  transformationDetails,
-                  lineageMetadata,
-                },
-                newTime,
-              );
+              // Individual output logging removed - covered by single "firing" event
 
               const destNodeConfig = nodesConfig[output.destinationNodeId];
               if (destNodeConfig) {
@@ -487,7 +502,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
                 const arrivalLogDetails = `Token ${newToken.id} from ${pnConfig.displayName} output ${index}`;
                 const arrivalLog = _logNodeActivity(
                   destNodeConfig.nodeId,
-                  { action: "TOKEN_ARRIVED_AT_NODE", value: newToken.value, details: arrivalLogDetails },
+                  { action: "token_received", value: newToken.value, details: `Received token from ${pnConfig.displayName}` },
                   newTime,
                 );
                 newToken.history.push(arrivalLog);
@@ -498,7 +513,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
                     const dropLog = _logNodeActivity(
                       destNodeConfig.nodeId,
                       {
-                        action: "DROPPED_AT_QUEUE_INPUT_FULL",
+                        action: "token_dropped",
                         value: newToken.value,
                         details: `From ${pnConfig.displayName}, Token ${newToken.id}`,
                       },
@@ -510,9 +525,9 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
                     _logNodeActivity(
                       destNodeConfig.nodeId,
                       {
-                        action: "TOKEN_ADDED_TO_INPUT_BUFFER",
-                        value: newToken.value,
-                        details: `From ${pnConfig.displayName}. New size: ${qState.inputBuffer.length + 1}`,
+                        action: "accumulating",
+                        value: qState.inputBuffer.length + 1,
+                        details: `Collecting tokens (buffer size: ${qState.inputBuffer.length + 1})`,
                       },
                       newTime,
                     );
@@ -526,13 +541,18 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
                   _logNodeActivity(
                     destNodeConfig.nodeId,
                     {
-                      action: "TOKEN_ADDED_TO_INPUT_BUFFER",
-                      value: newToken.value,
-                      details: `From ${pnConfig.displayName} into buffer for ${pnConfig.nodeId}. New size: ${bufferForInput.length + 1}`,
+                      action: "token_received",
+                      value: bufferForInput.length + 1,
+                      details: `Received token (buffer size: ${bufferForInput.length + 1})`,
                     },
                     newTime,
                   );
+
+                  // Check if ProcessNode can fire now that it received a token
+                  const updatedDestPnState = get().nodeStates[destNodeConfig.nodeId] as ProcessNodeState;
+                  get()._tryFireProcessNode(destNodeConfig, updatedDestPnState, newTime);
                 } else if (destNodeConfig.type === "Sink") {
+                  _transitionNodeState(destNodeConfig.nodeId, 'sink_processing', newTime, 'token_received');
                   const sinkState = destNodeState as SinkState;
                   const updatedConsumedTokens = [...(sinkState.consumedTokens || []), newToken].slice(
                     -MAX_SINK_TOKENS_STORED,
@@ -542,34 +562,108 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
                     lastConsumedTime: newTime,
                     consumedTokens: updatedConsumedTokens,
                   });
+
+                  // Consistent logging with token ID
                   const sinkConsumptionLog = _logNodeActivity(
                     destNodeConfig.nodeId,
-                    { action: "CONSUMED_BY_SINK_NODE", value: newToken.value, details: arrivalLogDetails },
+                    { action: "consuming", value: newToken.value, details: `Token ${newToken.id} from ${pnConfig.displayName} output` },
                     newTime,
                   );
                   newToken.history.push(sinkConsumptionLog);
+
+                  // Add consumed event to log
+                  _logNodeActivity(
+                    destNodeConfig.nodeId,
+                    { action: "token_consumed", value: newToken.value, details: `Token ${newToken.id} from ${pnConfig.displayName} output` },
+                    newTime,
+                  );
+
+                  _transitionNodeState(destNodeConfig.nodeId, 'sink_idle', newTime, 'token_consumed');
                 }
               }
             }
           });
 
           // Transition back to idle after all outputs processed
-          _transitionNodeState(pnConfig.nodeId, 'process_idle', newTime, 'outputs_complete');
+          _transitionNodeState(pnConfig.nodeId, 'process_idle', newTime, 'outputs_sent');
         }
       }
     });
 
-    // Process Queue aggregation
+    // Process FSMProcessNode state machines
+    Object.values(nodesConfig).forEach(nodeConfig => {
+      if (nodeConfig.type === "FSMProcessNode") {
+        const fsmConfig = nodeConfig as any; // FSMProcessNode type
+        const fsmState = get().nodeStates[fsmConfig.nodeId] as any; // FSMProcessNodeState
+        const currentState = fsmState.currentFSMState || 'idle';
+
+        // Check for timer-based transitions
+        const timerTransitions = fsmConfig.fsm?.transitions?.filter((t: any) => t.trigger === 'timer') || [];
+        timerTransitions.forEach((transition: any) => {
+          if (transition.from === currentState) {
+            // Simple timer logic - trigger every 5 seconds for demo
+            if (newTime % 5 === 0) {
+              get()._executeFSMTransition(fsmConfig, fsmState, transition, newTime);
+            }
+          }
+        });
+
+        // Check for condition-based transitions
+        const conditionTransitions = fsmConfig.fsm?.transitions?.filter((t: any) => t.trigger === 'condition') || [];
+        conditionTransitions.forEach((transition: any) => {
+          if (transition.from === currentState && transition.condition) {
+            // Evaluate condition with current FSM variables
+            const { value: conditionResult } = evaluateFormula(transition.condition, fsmState.fsmVariables);
+            if (conditionResult) {
+              get()._executeFSMTransition(fsmConfig, fsmState, transition, newTime);
+            }
+          }
+        });
+      }
+    });
+
+    // Process Queue state machines
     Object.values(nodesConfig).forEach(nodeConfig => {
       if (nodeConfig.type === "Queue") {
         const qConfig = nodeConfig;
         const qState = get().nodeStates[qConfig.nodeId] as QueueState;
+        const currentState = qState.stateMachine?.currentState || 'queue_idle';
 
-        if (newTime >= (qState.lastAggregationTime < 0 ? 0 : qState.lastAggregationTime) + qConfig.aggregation.trigger.window) {
-          if (qState.inputBuffer.length > 0) {
-            // Transition to processing state
-            _transitionNodeState(qConfig.nodeId, 'queue_processing', newTime, 'aggregation_window_triggered');
+        // State machine driven logic
+        switch (currentState) {
+          case 'queue_idle':
+            // Check if aggregation window has passed and we have tokens to process
+            if (newTime >= (qState.lastAggregationTime < 0 ? 0 : qState.lastAggregationTime) + qConfig.aggregation.trigger.window) {
+              if (qState.inputBuffer.length > 0) {
+                // Transition to processing state
+                _transitionNodeState(qConfig.nodeId, 'queue_processing', newTime, 'aggregation_window_triggered');
+              } else {
+                // Log empty aggregation window
+                _logNodeActivity(
+                  qConfig.nodeId,
+                  { action: "trigger_met", details: `No tokens in input buffer.` },
+                  newTime,
+                );
+                _updateNodeState(qConfig.nodeId, { lastAggregationTime: newTime });
+              }
+            }
+            break;
 
+          case 'queue_accumulating':
+            // Continue accumulating until window triggers or capacity reached
+            // This state is entered when receiving tokens (handled elsewhere)
+            // Check if we should transition back to idle or to processing
+            if (newTime >= (qState.lastAggregationTime < 0 ? 0 : qState.lastAggregationTime) + qConfig.aggregation.trigger.window) {
+              if (qState.inputBuffer.length > 0) {
+                _transitionNodeState(qConfig.nodeId, 'queue_processing', newTime, 'aggregation_window_triggered');
+              } else {
+                _transitionNodeState(qConfig.nodeId, 'queue_idle', newTime, 'no_tokens_to_process');
+              }
+            }
+            break;
+
+          case 'queue_processing':
+            // Perform aggregation
             const tokensToAggregate = [...qState.inputBuffer];
             let aggregatedValue: any;
             const sourceTokenIdsForLog = tokensToAggregate.map(t => t.id);
@@ -619,34 +713,33 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
               // Enhanced source token summaries
               const enhancedSourceTokenSummaries = createEnhancedSourceTokenSummaries(tokensToAggregate);
 
-              tokensToAggregate.forEach(consumedToken => {
-                const aggConsumptionLogDetails = `Token ${consumedToken.id} from input buffer for aggregation by ${qConfig.displayName}`;
-                const aggConsumptionLog = _logNodeActivity(
-                  qConfig.nodeId,
-                  {
-                    action: "TOKEN_CONSUMED_FOR_AGGREGATION",
-                    value: consumedToken.value,
-                    details: aggConsumptionLogDetails,
-                    operationType: "consumption",
-                  },
-                  newTime,
-                );
-                consumedToken.history.push(aggConsumptionLog);
-              });
-
+              // Simplified: Single processing event for the entire aggregation
+              const consumedValues = tokensToAggregate.map(t => t.value).join(', ');
               _logNodeActivity(
                 qConfig.nodeId,
                 {
-                  action: `AGGREGATED_${qConfig.aggregation.method.toUpperCase()}`,
-                  value: newToken.value,
-                  sourceTokenIds: sourceTokenIdsForLog,
-                  sourceTokenSummaries: enhancedSourceTokenSummaries,
-                  details: `${aggregationDetails.calculation}. Token ${newToken.id} placed in output buffer for ${qConfig.outputs[0]?.destinationNodeId}`,
-                  aggregationDetails,
-                  lineageMetadata,
+                  action: "processing",
+                  value: newToken.value, // Show result value
+                  details: `${qConfig.aggregation.method}([${consumedValues}]) = ${newToken.value}`,
                 },
                 newTime,
               );
+
+              // Add to each consumed token's history
+              tokensToAggregate.forEach(consumedToken => {
+                consumedToken.history.push({
+                  timestamp: newTime,
+                  epochTimestamp: Date.now(),
+                  sequence: 0, // Simplified
+                  nodeId: qConfig.nodeId,
+                  action: "processing",
+                  value: newToken.value,
+                  details: `${qConfig.aggregation.method}([${consumedValues}]) = ${newToken.value}`,
+                  state: 'processing',
+                  bufferSize: 0,
+                  outputBufferSize: 1,
+                });
+              });
 
               // Transition to emitting state
               _transitionNodeState(qConfig.nodeId, 'queue_emitting', newTime, 'aggregation_complete');
@@ -660,21 +753,29 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
               _logNodeActivity(
                 qConfig.nodeId,
                 {
-                  action: "AGGREGATION_EMPTY_VALUE",
+                  action: "error",
                   details: `Input buffer cleared. Contained ${tokensToAggregate.length} tokens.`,
                 },
                 newTime,
               );
               _updateNodeState(qConfig.nodeId, { inputBuffer: [], lastAggregationTime: newTime });
+              _transitionNodeState(qConfig.nodeId, 'queue_idle', newTime, 'no_value_to_aggregate');
             }
-          } else {
-            _logNodeActivity(
-              qConfig.nodeId,
-              { action: "AGGREGATION_WINDOW_PASSED_EMPTY_INPUT", details: `No tokens in input buffer.` },
-              newTime,
-            );
-            _updateNodeState(qConfig.nodeId, { lastAggregationTime: newTime });
-          }
+            break;
+
+          case 'queue_emitting':
+            // Forward tokens from output buffer - this happens immediately after aggregation
+            // This state is also handled in the forwarding section below
+            // Transition back to accumulating if we have room, or idle if we don't
+            if (qState.outputBuffer.length === 0) {
+              _transitionNodeState(qConfig.nodeId, 'queue_idle', newTime, 'output_buffer_empty');
+            }
+            break;
+
+          default:
+            // Unknown state, reset to idle
+            _transitionNodeState(qConfig.nodeId, 'queue_idle', newTime, 'unknown_state_reset');
+            break;
         }
       }
     });
@@ -686,28 +787,39 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
         const qStateSource = get().nodeStates[qConfigSource.nodeId] as QueueState;
 
         if (qStateSource.outputBuffer.length > 0) {
+          // Forward the first token to ALL outputs in one operation
+          const tokenToForward = qStateSource.outputBuffer[0];
+
+          // Transition to emitting state first, THEN log the forwarding event
+          _transitionNodeState(qConfigSource.nodeId, 'queue_emitting', newTime, 'forwarding_token');
+
+          // Create a single forwarding log for all destinations
+          const destinationNames = qConfigSource.outputs.map(output =>
+            nodesConfig[output.destinationNodeId]?.displayName || output.destinationNodeId
+          ).join(', ');
+
+          const forwardActionLog = _logNodeActivity(
+            qConfigSource.nodeId,
+            {
+              action: "emitting",
+              value: tokenToForward.value,
+              details: `Sending to ${destinationNames}`,
+            },
+            newTime,
+          );
+          tokenToForward.history.push(forwardActionLog);
+
           // Process all outputs (v3 supports multiple outputs)
           qConfigSource.outputs.forEach(output => {
             const destNodeConfig = nodesConfig[output.destinationNodeId];
-            if (destNodeConfig && qStateSource.outputBuffer.length > 0) {
-              const tokenToForward = qStateSource.outputBuffer[0];
+            if (destNodeConfig) {
               const transferLogDetails = `Token ${tokenToForward.id} from ${qConfigSource.displayName} output`;
-              const forwardActionLog = _logNodeActivity(
-                qConfigSource.nodeId,
-                {
-                  action: "TOKEN_FORWARDED_FROM_OUTPUT",
-                  value: tokenToForward.value,
-                  details: `To ${destNodeConfig.displayName}`,
-                },
-                newTime,
-              );
-              tokenToForward.history.push(forwardActionLog);
 
               if (destNodeConfig.type === "Sink") {
                 // Add TOKEN_ARRIVED_AT_NODE event for consistency
                 const arrivalLog = _logNodeActivity(
                   destNodeConfig.nodeId,
-                  { action: "TOKEN_ARRIVED_AT_NODE", value: tokenToForward.value, details: transferLogDetails },
+                  { action: "consuming", value: tokenToForward.value, details: `Processing token from ${qConfigSource.displayName}` },
                   newTime,
                 );
                 tokenToForward.history.push(arrivalLog);
@@ -723,7 +835,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
                 });
                 const sinkConsumptionLog = _logNodeActivity(
                   destNodeConfig.nodeId,
-                  { action: "CONSUMED_BY_SINK_NODE", value: tokenToForward.value, details: transferLogDetails },
+                  { action: "token_consumed", value: tokenToForward.value, details: transferLogDetails },
                   newTime,
                 );
                 tokenToForward.history.push(sinkConsumptionLog);
@@ -732,7 +844,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
                 const qStateDest = get().nodeStates[destNodeConfig.nodeId] as QueueState;
                 const arrivalLog = _logNodeActivity(
                   destNodeConfig.nodeId,
-                  { action: "TOKEN_ARRIVED_AT_NODE", value: tokenToForward.value, details: transferLogDetails },
+                  { action: "accumulating", value: qStateDest.inputBuffer.length + 1, details: `Collecting tokens (buffer size: ${qStateDest.inputBuffer.length + 1})` },
                   newTime,
                 );
                 tokenToForward.history.push(arrivalLog);
@@ -741,7 +853,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
                   const dropLog = _logNodeActivity(
                     destNodeConfig.nodeId,
                     {
-                      action: "DROPPED_AT_QUEUE_INPUT_FULL",
+                      action: "token_dropped",
                       value: tokenToForward.value,
                       details: `Token ${tokenToForward.id} from ${qConfigSource.displayName}`,
                     },
@@ -753,20 +865,56 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
                   _logNodeActivity(
                     destNodeConfig.nodeId,
                     {
-                      action: "TOKEN_ADDED_TO_INPUT_BUFFER",
-                      value: tokenToForward.value,
-                      details: `From ${qConfigSource.displayName}. New size: ${qStateDest.inputBuffer.length + 1}`,
+                      action: "accumulating",
+                      value: qStateDest.inputBuffer.length + 1,
+                      details: `Collecting tokens (buffer size: ${qStateDest.inputBuffer.length + 1})`,
                     },
                     newTime,
                   );
                 }
-                _updateNodeState(qConfigSource.nodeId, { outputBuffer: qStateSource.outputBuffer.slice(1) });
+              } else if (destNodeConfig.type === "ProcessNode") {
+                // Handle ProcessNode forwarding - THIS WAS MISSING!
+                _transitionNodeState(destNodeConfig.nodeId, 'process_idle', newTime, 'token_received');
+                const pnState = get().nodeStates[destNodeConfig.nodeId] as ProcessNodeState;
+                const bufferForInput = pnState.inputBuffers[qConfigSource.nodeId] || [];
+                _updateNodeState(destNodeConfig.nodeId, {
+                  inputBuffers: { ...pnState.inputBuffers, [qConfigSource.nodeId]: [...bufferForInput, tokenToForward] },
+                });
 
-                // Transition back to idle after forwarding
-                _transitionNodeState(qConfigSource.nodeId, 'queue_idle', newTime, 'forwarding_complete');
+                _logNodeActivity(
+                  destNodeConfig.nodeId,
+                  {
+                    action: "token_received",
+                    value: bufferForInput.length + 1,
+                    details: `Received token from ${qConfigSource.displayName} (buffer size: ${bufferForInput.length + 1})`,
+                  },
+                  newTime,
+                );
+                tokenToForward.history.push({
+                  timestamp: newTime,
+                  epochTimestamp: Date.now(),
+                  sequence: 0,
+                  nodeId: destNodeConfig.nodeId,
+                  action: "token_received",
+                  value: bufferForInput.length + 1,
+                  details: `Received token from ${qConfigSource.displayName} (buffer size: ${bufferForInput.length + 1})`,
+                  state: 'process_idle',
+                  bufferSize: bufferForInput.length + 1,
+                  outputBufferSize: 0,
+                });
+
+                // Check if ProcessNode can fire now that it received a token
+                const updatedPnState = get().nodeStates[destNodeConfig.nodeId] as ProcessNodeState;
+                get()._tryFireProcessNode(destNodeConfig, updatedPnState, newTime);
               }
             }
           });
+
+          // Remove the forwarded token from output buffer (once, after all destinations processed)
+          _updateNodeState(qConfigSource.nodeId, { outputBuffer: qStateSource.outputBuffer.slice(1) });
+
+          // Transition back to idle after forwarding (once, after all destinations processed)
+          _transitionNodeState(qConfigSource.nodeId, 'queue_idle', newTime, 'forwarding_complete');
         }
       }
     });
@@ -904,6 +1052,14 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
     // Determine operation type from action
     const operationType = determineOperationType(logCoreDetails.action);
 
+    // GET CURRENT FSM STATE - SINGLE SOURCE OF TRUTH
+    const currentState = get().nodeStates[nodeIdForLog];
+    const currentFSMState = currentState?.stateMachine?.currentState || 'unknown';
+
+    // Get buffer sizes for context
+    const bufferSize = (currentState as any)?.inputBuffer?.length || 0;
+    const outputBufferSize = (currentState as any)?.outputBuffer?.length || 0;
+
     const newEntry: HistoryEntry = {
       timestamp: timestamp,
       epochTimestamp: Date.now(),
@@ -914,6 +1070,12 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       sourceTokenIds: logCoreDetails.sourceTokenIds,
       sourceTokenSummaries: logCoreDetails.sourceTokenSummaries,
       details: logCoreDetails.details,
+
+      // FSM STATE - AUTHORITATIVE
+      state: currentFSMState,
+      bufferSize: bufferSize,
+      outputBufferSize: outputBufferSize,
+
       operationType,
       // Enhanced fields will be added by specific operations
       aggregationDetails: (logCoreDetails as any).aggregationDetails,
@@ -962,20 +1124,370 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
     // Create lineage metadata for this token creation
     const lineageMetadata = createLineageMetadata("creation", sourceTokens, newToken.id);
 
-    const createLog = get()._logNodeActivity(
-      originNodeId,
-      {
-        action: "CREATED",
-        value: newToken.value,
-        sourceTokenIds,
-        sourceTokenSummaries,
-        details: `Token ${newToken.id}`,
-        lineageMetadata,
-      },
-      timestamp,
-    );
-    newToken.history.push(createLog);
+    // Removed redundant data_generated event - business logic events are sufficient
     return newToken;
+  },
+
+  _tryFireProcessNode: (pnConfig, pnState, newTime) => {
+    const { nodesConfig, _logNodeActivity, _createToken, _updateNodeState, _transitionNodeState } = get();
+
+    // Check if ProcessNode can fire
+    let canFire = true;
+    const inputsDataForFormula: Record<string, Token> = {};
+    const aliasToSourceNodeId: Record<string, string> = {};
+
+    for (const input of pnConfig.inputs) {
+      const inputSourceNodeId = input.nodeId;
+      if (!inputSourceNodeId) {
+        canFire = false;
+        break;
+      }
+
+      const sourceNodeConfig = nodesConfig[inputSourceNodeId];
+      if (!sourceNodeConfig) {
+        canFire = false;
+        break;
+      }
+
+      const aliasKey = input.alias || inputSourceNodeId;
+      aliasToSourceNodeId[aliasKey] = inputSourceNodeId;
+
+      // Check if we have tokens in input buffer for this input
+      if (pnState.inputBuffers[inputSourceNodeId] && pnState.inputBuffers[inputSourceNodeId].length > 0) {
+        inputsDataForFormula[aliasKey] = pnState.inputBuffers[inputSourceNodeId][0];
+      } else {
+        canFire = false;
+        break;
+      }
+    }
+
+    if (!canFire) {
+      return; // Can't fire yet, need more inputs
+    }
+
+    // ProcessNode can fire!
+    _transitionNodeState(pnConfig.nodeId, 'process_emitting', newTime, 'fire');
+
+    const consumedTokensForThisFiring: Token[] = [];
+    const nextPnInputBuffers = JSON.parse(JSON.stringify(pnState.inputBuffers));
+
+    // Consume input tokens
+    Object.entries(inputsDataForFormula).forEach(([inputNodeId, tokenToConsume]) => {
+      consumedTokensForThisFiring.push(tokenToConsume);
+
+      // Remove token from input buffer
+      const buffer = (nextPnInputBuffers[inputNodeId] as Token[]) || [];
+      buffer.shift();
+      nextPnInputBuffers[inputNodeId] = buffer;
+    });
+
+    // Log firing event
+    _logNodeActivity(
+      pnConfig.nodeId,
+      {
+        action: "firing",
+        value: consumedTokensForThisFiring.length,
+        details: `Firing with ${consumedTokensForThisFiring.length} inputs`,
+      },
+      newTime,
+    );
+
+    _updateNodeState(pnConfig.nodeId, { inputBuffers: nextPnInputBuffers, lastFiredTime: newTime });
+
+    // Build formula context
+    const formulaContext: Record<string, any> = { inputs: {} };
+    Object.entries(inputsDataForFormula).forEach(([aliasKey, token]) => {
+      formulaContext.inputs[aliasKey] = { value: token.value };
+      const sourceNodeId = aliasToSourceNodeId[aliasKey];
+      if (sourceNodeId) {
+        formulaContext[aliasKey] = {
+          data: {
+            value: token.value,
+            aggregatedValue: token.value,
+            transformedValue: token.value
+          }
+        };
+        formulaContext[aliasKey + 'Value'] = token.value;
+      }
+    });
+
+    // Generate outputs (simplified - no individual emitting events)
+    pnConfig.outputs.forEach((output: any) => {
+      const { formula } = output.transformation || { formula: "inputs.a" };
+      const result = evaluateFormula(formula, formulaContext);
+      const outputValue = typeof result === 'object' && result !== null && 'value' in result ? result.value : result;
+
+      const newToken = _createToken(pnConfig.nodeId, outputValue, newTime);
+
+      // Forward token to destination (reuse existing forwarding logic)
+      const destNodeConfig = nodesConfig[output.destinationNodeId];
+      if (destNodeConfig) {
+        const destNodeState = get().nodeStates[destNodeConfig.nodeId];
+
+        if (destNodeConfig.type === "Queue") {
+          const qState = destNodeState as QueueState;
+          _transitionNodeState(destNodeConfig.nodeId, 'queue_accumulating', newTime, 'token_received');
+          _updateNodeState(destNodeConfig.nodeId, { inputBuffer: [...qState.inputBuffer, newToken] });
+
+          _logNodeActivity(
+            destNodeConfig.nodeId,
+            {
+              action: "accumulating",
+              value: qState.inputBuffer.length + 1,
+              details: `Received token from ${pnConfig.displayName} (buffer size: ${qState.inputBuffer.length + 1})`,
+            },
+            newTime,
+          );
+        } else if (destNodeConfig.type === "ProcessNode") {
+          const destPnState = destNodeState as ProcessNodeState;
+          const bufferForInput = destPnState.inputBuffers[pnConfig.nodeId] || [];
+          _updateNodeState(destNodeConfig.nodeId, {
+            inputBuffers: { ...destPnState.inputBuffers, [pnConfig.nodeId]: [...bufferForInput, newToken] },
+          });
+
+          _logNodeActivity(
+            destNodeConfig.nodeId,
+            {
+              action: "token_received",
+              value: bufferForInput.length + 1,
+              details: `Received token from ${pnConfig.displayName} (buffer size: ${bufferForInput.length + 1})`,
+            },
+            newTime,
+          );
+
+          // Recursively try to fire the destination ProcessNode
+          const updatedDestPnState = get().nodeStates[destNodeConfig.nodeId] as ProcessNodeState;
+          get()._tryFireProcessNode(destNodeConfig, updatedDestPnState, newTime);
+        } else if (destNodeConfig.type === "Sink") {
+          const sinkState = destNodeState as SinkState;
+          _transitionNodeState(destNodeConfig.nodeId, 'sink_processing', newTime, 'token_received');
+          const updatedConsumedTokens = [...(sinkState.consumedTokens || []), newToken].slice(-MAX_SINK_TOKENS_STORED);
+          _updateNodeState(destNodeConfig.nodeId, {
+            consumedTokenCount: (sinkState.consumedTokenCount || 0) + 1,
+            lastConsumedTime: newTime,
+            consumedTokens: updatedConsumedTokens,
+          });
+
+          // Consistent logging with token ID
+          _logNodeActivity(
+            destNodeConfig.nodeId,
+            {
+              action: "consuming",
+              value: newToken.value,
+              details: `Token ${newToken.id} from ${pnConfig.displayName} output`
+            },
+            newTime,
+          );
+
+          // Add consumed event to log
+          _logNodeActivity(
+            destNodeConfig.nodeId,
+            { action: "token_consumed", value: newToken.value, details: `Token ${newToken.id} from ${pnConfig.displayName} output` },
+            newTime,
+          );
+
+          _transitionNodeState(destNodeConfig.nodeId, 'sink_idle', newTime, 'token_consumed');
+        }
+      }
+    });
+
+    // Transition back to idle
+    _transitionNodeState(pnConfig.nodeId, 'process_idle', newTime, 'outputs_sent');
+  },
+
+  // FSM-specific functions
+  _executeFSMTransition: (fsmConfig: any, fsmState: any, transition: any, newTime: number) => {
+    const { _logNodeActivity, _updateNodeState, _transitionNodeState } = get();
+
+    // Log transition
+    _logNodeActivity(
+      fsmConfig.nodeId,
+      {
+        action: "fsm_transition",
+        details: `${transition.from} → ${transition.to} (${transition.trigger})`,
+      },
+      newTime,
+    );
+
+    // Execute onExit actions for current state
+    const currentStateObj = fsmConfig.fsm?.states?.find((s: any) => s.name === fsmState.currentFSMState);
+    if (currentStateObj?.onExit) {
+      currentStateObj.onExit.forEach((action: any) => {
+        get()._executeFSMAction(fsmConfig, fsmState, action, newTime);
+      });
+    }
+
+    // Update FSM state
+    _updateNodeState(fsmConfig.nodeId, {
+      currentFSMState: transition.to,
+      lastTransitionTime: newTime,
+    });
+
+    // Update state machine tracking
+    _transitionNodeState(fsmConfig.nodeId, transition.to, newTime, transition.trigger);
+
+    // Execute onEntry actions for new state
+    const newStateObj = fsmConfig.fsm?.states?.find((s: any) => s.name === transition.to);
+    if (newStateObj?.onEntry) {
+      newStateObj.onEntry.forEach((action: any) => {
+        get()._executeFSMAction(fsmConfig, fsmState, action, newTime);
+      });
+    }
+  },
+
+  _executeFSMAction: (fsmConfig: any, fsmState: any, action: any, newTime: number) => {
+    const { _logNodeActivity, _updateNodeState, _createToken, nodesConfig } = get();
+
+    switch (action.action) {
+      case 'emit':
+        if (action.target && action.formula) {
+          // Evaluate formula to get output value
+          const formulaContext = {
+            ...fsmState.fsmVariables,
+            ...Object.fromEntries(
+              Object.entries(fsmState.inputBuffers || {}).map(([key, tokens]: [string, any]) =>
+                [key, tokens[0]?.value] // Use first token value
+              )
+            )
+          };
+
+          const { value: outputValue, error } = evaluateFormula(action.formula, formulaContext);
+          if (!error) {
+            // Create token and emit it
+            const token = _createToken(fsmConfig.nodeId, outputValue, newTime);
+
+            // Find the output configuration
+            const outputConfig = fsmConfig.outputs?.find((out: any) => out.name === action.target);
+            if (outputConfig) {
+              get()._routeFSMToken(fsmConfig, outputConfig, token, newTime);
+            }
+          } else {
+            _logNodeActivity(fsmConfig.nodeId, {
+              action: "error",
+              details: `FSM emit action formula error: ${error}`,
+            }, newTime);
+          }
+        } else if (action.target && action.value !== undefined) {
+          // Direct value emission
+          const token = _createToken(fsmConfig.nodeId, action.value, newTime);
+          const outputConfig = fsmConfig.outputs?.find((out: any) => out.name === action.target);
+          if (outputConfig) {
+            get()._routeFSMToken(fsmConfig, outputConfig, token, newTime);
+          }
+        }
+        break;
+
+      case 'log':
+        _logNodeActivity(fsmConfig.nodeId, {
+          action: "fsm_log",
+          details: action.value || action.formula || "FSM log action",
+        }, newTime);
+        break;
+
+      case 'set_variable':
+        if (action.target) {
+          let newValue = action.value;
+          if (action.formula) {
+            const { value, error } = evaluateFormula(action.formula, fsmState.fsmVariables);
+            if (!error) newValue = value;
+          }
+
+          _updateNodeState(fsmConfig.nodeId, {
+            fsmVariables: {
+              ...fsmState.fsmVariables,
+              [action.target]: newValue
+            }
+          });
+        }
+        break;
+
+      case 'increment':
+        if (action.target) {
+          const currentValue = fsmState.fsmVariables[action.target] || 0;
+          _updateNodeState(fsmConfig.nodeId, {
+            fsmVariables: {
+              ...fsmState.fsmVariables,
+              [action.target]: currentValue + (action.value || 1)
+            }
+          });
+        }
+        break;
+
+      case 'decrement':
+        if (action.target) {
+          const currentValue = fsmState.fsmVariables[action.target] || 0;
+          _updateNodeState(fsmConfig.nodeId, {
+            fsmVariables: {
+              ...fsmState.fsmVariables,
+              [action.target]: currentValue - (action.value || 1)
+            }
+          });
+        }
+        break;
+    }
+  },
+
+  _routeFSMToken: (fsmConfig: any, outputConfig: any, token: any, newTime: number) => {
+    const { _logNodeActivity, _updateNodeState, nodesConfig } = get();
+
+    // Log emission
+    _logNodeActivity(fsmConfig.nodeId, {
+      action: "token_emitted",
+      value: token.value,
+      details: `Token ${token.id} via FSM action to ${outputConfig.destinationNodeId}`,
+    }, newTime);
+
+    // Route token to destination
+    const destNodeConfig = nodesConfig[outputConfig.destinationNodeId];
+    if (destNodeConfig) {
+      const destNodeState = get().nodeStates[destNodeConfig.nodeId];
+
+      // Handle different destination types
+      if (destNodeConfig.type === "FSMProcessNode") {
+        // FSM → FSM: trigger token_received transition
+        const destFsmState = destNodeState as any;
+        const tokenReceivedTransitions = destNodeConfig.fsm?.transitions?.filter((t: any) =>
+          t.trigger === 'token_received' && t.from === destFsmState.currentFSMState
+        ) || [];
+
+        // Add token to input buffer
+        const inputBuffers = destFsmState.inputBuffers || {};
+        const bufferKey = outputConfig.destinationInputName || 'default';
+        inputBuffers[bufferKey] = [...(inputBuffers[bufferKey] || []), token];
+        _updateNodeState(destNodeConfig.nodeId, { inputBuffers });
+
+        // Trigger transitions
+        tokenReceivedTransitions.forEach((transition: any) => {
+          get()._executeFSMTransition(destNodeConfig, destFsmState, transition, newTime);
+        });
+
+      } else if (destNodeConfig.type === "Sink") {
+        // FSM → Sink: use existing Sink logic
+        get()._transitionNodeState(destNodeConfig.nodeId, 'sink_processing', newTime, 'token_received');
+        const sinkState = destNodeState as any;
+        const updatedConsumedTokens = [...(sinkState.consumedTokens || []), token].slice(-50);
+        _updateNodeState(destNodeConfig.nodeId, {
+          consumedTokenCount: (sinkState.consumedTokenCount || 0) + 1,
+          lastConsumedTime: newTime,
+          consumedTokens: updatedConsumedTokens,
+        });
+
+        _logNodeActivity(destNodeConfig.nodeId, {
+          action: "consuming",
+          value: token.value,
+          details: `Token ${token.id} from FSM ${fsmConfig.displayName}`,
+        }, newTime);
+
+        _logNodeActivity(destNodeConfig.nodeId, {
+          action: "token_consumed",
+          value: token.value,
+          details: `Token ${token.id} from FSM ${fsmConfig.displayName}`,
+        }, newTime);
+
+        get()._transitionNodeState(destNodeConfig.nodeId, 'sink_idle', newTime, 'token_consumed');
+      }
+      // Add more destination types as needed (Queue, ProcessNode, etc.)
+    }
   },
 
   _restoreScenarioState: (scenario) => {
@@ -1015,14 +1527,29 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
             break;
           case "ProcessNode":
             const inputBuffers: Record<string, Token[]> = {};
-            initialNodeStates[node.nodeId] = { 
-              inputBuffers, 
+            initialNodeStates[node.nodeId] = {
+              inputBuffers,
               lastFiredTime: -1,
               stateMachine: {
                 currentState: "process_idle",
                 transitionHistory: []
               }
             } as ProcessNodeState;
+            break;
+          case "FSMProcessNode":
+            const fsmNode = node as any; // FSMProcessNode type
+            const fsmInputBuffers: Record<string, Token[]> = {};
+            const initialState = fsmNode.fsm?.states?.find((s: any) => s.isInitial)?.name || fsmNode.fsm?.states?.[0]?.name || "idle";
+            initialNodeStates[node.nodeId] = {
+              inputBuffers: fsmInputBuffers,
+              fsmVariables: { ...fsmNode.fsm?.variables } || {},
+              currentFSMState: initialState,
+              lastTransitionTime: -1,
+              stateMachine: {
+                currentState: initialState,
+                transitionHistory: []
+              }
+            } as any; // FSMProcessNodeState;
             break;
           case "Sink":
             initialNodeStates[node.nodeId] = {

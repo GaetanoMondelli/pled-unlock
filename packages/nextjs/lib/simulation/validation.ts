@@ -22,7 +22,7 @@ export function validateScenario(data: any): { scenario: Scenario | null; errors
         }
         // Validate outputs
         node.outputs.forEach(output => {
-          if (!nodeIds.has(output.destinationNodeId)) {
+          if (output.destinationNodeId && !nodeIds.has(output.destinationNodeId)) {
             errors.push(`DataSource "${node.nodeId}": output destinationNodeId "${output.destinationNodeId}" does not exist.`);
           }
         });
@@ -31,7 +31,7 @@ export function validateScenario(data: any): { scenario: Scenario | null; errors
       case "Queue":
         // Validate outputs
         node.outputs.forEach(output => {
-          if (!nodeIds.has(output.destinationNodeId)) {
+          if (output.destinationNodeId && !nodeIds.has(output.destinationNodeId)) {
             errors.push(`Queue "${node.nodeId}": output destinationNodeId "${output.destinationNodeId}" does not exist.`);
           }
         });
@@ -46,7 +46,7 @@ export function validateScenario(data: any): { scenario: Scenario | null; errors
         });
         // Validate outputs
         node.outputs.forEach(output => {
-          if (!nodeIds.has(output.destinationNodeId)) {
+          if (output.destinationNodeId && !nodeIds.has(output.destinationNodeId)) {
             errors.push(`ProcessNode "${node.nodeId}": output destinationNodeId "${output.destinationNodeId}" does not exist.`);
           }
         });
