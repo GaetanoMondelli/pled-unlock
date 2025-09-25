@@ -175,13 +175,37 @@ function Landing() {
                   </div>
                 </div>
                 
-                {/* Simulator screenshot */}
+                {/* Simulator media: video with image fallback */}
                 <div className="bg-white dark:bg-gray-900 rounded-lg overflow-hidden shadow-lg">
-                  <img 
-                    src="/simulator.png" 
-                    alt="Pled Template Editor showing AI-powered workflow simulation with queue processing, data sources, and AI assistant"
+                  <video
                     className="w-full h-auto"
-                  />
+                    poster="/simulator.png"
+                    autoPlay
+                    muted
+                    playsInline
+                    loop
+                    controls
+                    preload="metadata"
+                    onError={(e) => {
+                      const container = (e.currentTarget.parentElement as HTMLElement);
+                      if (!container) return;
+                      // Replace video with image fallback on error
+                      const img = document.createElement('img');
+                      img.src = '/simulator.png';
+                      img.alt = 'Pled Template Editor showing AI-powered workflow simulation with queue processing, data sources, and AI assistant';
+                      img.className = 'w-full h-auto';
+                      container.innerHTML = '';
+                      container.appendChild(img);
+                    }}
+                  >
+                    <source src="/example.mp4#t=0.1" type="video/mp4" />
+                    {/* Fallback content for very old browsers */}
+                    <img 
+                      src="/simulator.png" 
+                      alt="Pled Template Editor showing AI-powered workflow simulation with queue processing, data sources, and AI assistant"
+                      className="w-full h-auto"
+                    />
+                  </video>
                 </div>
               </div>
             </BorderBeam>

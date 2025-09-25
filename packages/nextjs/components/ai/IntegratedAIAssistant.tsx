@@ -26,12 +26,122 @@ import {
 } from "lucide-react";
 import { cn } from "~~/lib/utils";
 
+// --- Simple auto-layout helpers (non-overlapping placement) ---
+const NODE_WIDTH = 200;
+const NODE_HEIGHT = 150;
+const GAP_X = 220;
+const GAP_Y = 170;
+const MARGIN = 50;
+const CANVAS_WIDTH = 1200;
+const CANVAS_HEIGHT = 800;
+
+type ScenarioNode = {
+  nodeId: string;
+  displayName?: string;
+  type?: string;
+  position?: { x: number; y: number };
+};
+
+function rectsOverlap(ax: number, ay: number, bx: number, by: number) {
+  return (
+    Math.abs(ax - bx) < NODE_WIDTH &&
+    Math.abs(ay - by) < NODE_HEIGHT
+  );
+}
+
+function isOccupied(nodes: ScenarioNode[], x: number, y: number): boolean {
+  return nodes.some(n => n.position && rectsOverlap(n.position.x, n.position.y, x, y));
+}
+
+function clampToCanvas(x: number, y: number): { x: number; y: number } {
+  return {
+    x: Math.min(Math.max(x, MARGIN), CANVAS_WIDTH - NODE_WIDTH - MARGIN),
+    y: Math.min(Math.max(y, MARGIN), CANVAS_HEIGHT - NODE_HEIGHT - MARGIN),
+  };
+}
+
+function findFreeSlotNear(nodes: ScenarioNode[], baseX: number, baseY: number): { x: number; y: number } {
+  // Spiral search around base (left/right/up/down rows)
+  const candidates: Array<{ x: number; y: number }> = [];
+  const layers = 6; // up to ~6 layers around
+  for (let d = 0; d <= layers; d++) {
+    for (let dy = -d; dy <= d; dy++) {
+      const y = baseY + dy * GAP_Y;
+      const x1 = baseX - d * GAP_X;
+      const x2 = baseX + d * GAP_X;
+      candidates.push({ x: x1, y });
+      candidates.push({ x: x2, y });
+    }
+  }
+  for (const c of candidates) {
+    const cc = clampToCanvas(c.x, c.y);
+    if (!isOccupied(nodes, cc.x, cc.y)) return cc;
+  }
+  // Fallback: scan grid from top-left
+  for (let gy = MARGIN; gy < CANVAS_HEIGHT - NODE_HEIGHT - MARGIN; gy += GAP_Y) {
+    for (let gx = MARGIN; gx < CANVAS_WIDTH - NODE_WIDTH - MARGIN; gx += GAP_X) {
+      const cc = clampToCanvas(gx, gy);
+      if (!isOccupied(nodes, cc.x, cc.y)) return cc;
+    }
+  }
+  return clampToCanvas(baseX, baseY);
+}
+
+function getBestPositionForNewNode(scenario: any, targetNodeId?: string): { x: number; y: number } {
+  const nodes: ScenarioNode[] = Array.isArray(scenario?.nodes) ? scenario.nodes : [];
+  if (targetNodeId) {
+    const target = nodes.find(n => n.nodeId === targetNodeId);
+    if (target?.position) {
+      // Prefer left of target; stack vertically if needed
+      const baseX = target.position.x - GAP_X;
+      const baseY = target.position.y;
+      return findFreeSlotNear(nodes, baseX, baseY);
+    }
+  }
+  // Otherwise place in first free grid slot
+  return findFreeSlotNear(nodes, MARGIN, MARGIN);
+}
+
+function fixCollisionsInPlace(scenario: any) {
+  const nodes: ScenarioNode[] = Array.isArray(scenario?.nodes) ? scenario.nodes : [];
+  // Sort by x then y so we stabilize left-to-right placement
+  nodes.sort((a, b) => (a.position?.x ?? 0) - (b.position?.x ?? 0) || (a.position?.y ?? 0) - (b.position?.y ?? 0));
+  const placed: Array<{ x: number; y: number }> = [];
+  nodes.forEach((n) => {
+    if (!n.position) n.position = { x: MARGIN, y: MARGIN };
+    let { x, y } = n.position;
+    let attempts = 0;
+    // First, try vertical nudges
+    while (placed.some(p => rectsOverlap(p.x, p.y, x, y)) && attempts < 8) {
+      y += GAP_Y;
+      attempts++;
+    }
+    // If still colliding, shift to the right and reset vertical position near current row band
+    let columnShifts = 0;
+    while (placed.some(p => rectsOverlap(p.x, p.y, x, y)) && columnShifts < 6) {
+      x += GAP_X;
+      // Snap y to nearest grid band
+      y = Math.round(y / GAP_Y) * GAP_Y;
+      attempts = 0;
+      while (placed.some(p => rectsOverlap(p.x, p.y, x, y)) && attempts < 8) {
+        y += GAP_Y;
+        attempts++;
+      }
+      columnShifts++;
+    }
+    const clamped = clampToCanvas(x, y);
+    n.position.x = clamped.x;
+    n.position.y = clamped.y;
+    placed.push({ x: n.position.x, y: n.position.y });
+  });
+}
+
 interface ChatMessage {
   id: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: Date;
-  type?: 'command' | 'context' | 'analysis' | 'suggestion';
+  type?: 'command' | 'context' | 'analysis' | 'suggestion' | 'system';
   metadata?: {
     command?: string;
     context?: string[];
@@ -445,7 +555,7 @@ export default function IntegratedAIAssistant({ className, isEditMode = false, s
         body: JSON.stringify({
           messages: [...messages, userMessage],
           scenarioContext: {
-            scenario: scenarioContent ? JSON.parse(scenarioContent) : null,
+            scenario: scenario || (scenarioContent ? JSON.parse(scenarioContent) : null),
             currentTime: currentTime || 0,
             errors: errorMessages || [],
             isRunning: isRunning || false
@@ -469,32 +579,33 @@ export default function IntegratedAIAssistant({ className, isEditMode = false, s
             const patches = JSON.parse(patchMatch[1]);
             const scenario = JSON.parse(scenarioContent);
             
-            // Apply each patch operation
+            // Apply minimal JSON Patch ops: add/replace (sufficient for assistant output)
             patches.forEach((patch: any) => {
-              if (patch.op === 'replace' && patch.path && patch.value !== undefined) {
-                const pathParts = patch.path.split('/').filter((p: string) => p);
-                let current = scenario;
-                
-                // Navigate to the parent object
-                for (let i = 0; i < pathParts.length - 1; i++) {
-                  const part = pathParts[i];
-                  if (Array.isArray(current) && !isNaN(parseInt(part))) {
-                    current = current[parseInt(part)];
-                  } else {
-                    current = current[part];
-                  }
-                }
-                
-                // Apply the change
-                const finalKey = pathParts[pathParts.length - 1];
-                if (Array.isArray(current) && !isNaN(parseInt(finalKey))) {
-                  current[parseInt(finalKey)] = patch.value;
-                } else {
-                  current[finalKey] = patch.value;
-                }
+              if (!patch || !patch.op || !patch.path) return;
+              const parts = patch.path.split('/').filter((p: string) => p);
+              let parent = scenario as any;
+              for (let i = 0; i < parts.length - 1; i++) {
+                const key = parts[i];
+                if (Array.isArray(parent) && !isNaN(parseInt(key))) parent = parent[parseInt(key)];
+                else parent = parent[key];
+              }
+              const finalKey = parts[parts.length - 1];
+              if (patch.op === 'replace') {
+                if (Array.isArray(parent) && !isNaN(parseInt(finalKey))) parent[parseInt(finalKey)] = patch.value;
+                else parent[finalKey] = patch.value;
+              } else if (patch.op === 'add') {
+                if (Array.isArray(parent) && finalKey === '-') parent.push(patch.value);
+                else if (Array.isArray(parent) && !isNaN(parseInt(finalKey))) parent.splice(parseInt(finalKey), 0, patch.value);
+                else parent[finalKey] = patch.value;
               }
             });
             
+            // Ensure Protocol V3 version field is present
+            if (!scenario.version || scenario.version !== '3.0') {
+              (scenario as any).version = '3.0';
+            }
+            // Fix collisions introduced by patches
+            fixCollisionsInPlace(scenario);
             const updatedScenario = JSON.stringify(scenario, null, 2);
             onScenarioUpdate(updatedScenario);
             
@@ -587,6 +698,17 @@ export default function IntegratedAIAssistant({ className, isEditMode = false, s
               console.log(`DEBUG: No target node found for: "${targetName}"`);
               console.log('Available nodes:', scenario.nodes.map(n => `${n.nodeId} (${n.displayName})`));
             }
+
+            // Safety: ensure destination is a Queue in V3 schema
+            const resolved = scenario.nodes.find((n: any) => n.nodeId === destination);
+            if (!resolved || resolved.type !== 'Queue') {
+              const firstQueue = scenario.nodes.find((n: any) => n.type === 'Queue');
+              if (firstQueue) {
+                destination = firstQueue.nodeId;
+                destinationDisplayName = firstQueue.displayName || firstQueue.nodeId;
+                console.log(`DEBUG: Destination was not a Queue; falling back to ${destination} (${destinationDisplayName})`);
+              }
+            }
           } catch (e) {
             // Fallback to default
           }
@@ -604,41 +726,42 @@ export default function IntegratedAIAssistant({ className, isEditMode = false, s
               displayName = nameMatch[1].trim();
             }
             
-            // Smart positioning to keep nodes within visible canvas
-            const canvasWidth = 1200; // Approximate canvas width
-            const canvasHeight = 800;  // Approximate canvas height
-            const nodeWidth = 200;     // Approximate node width
-            const nodeHeight = 150;    // Approximate node height
-            const margin = 50;         // Margin from edges
+            // Compute best non-overlapping position near destination node
+            const { x: finalX, y: finalY } = getBestPositionForNewNode(scenario, destination);
             
-            // Calculate grid-based positioning
-            const maxNodesPerRow = Math.floor((canvasWidth - 2 * margin) / (nodeWidth + 20));
-            const currentNodeIndex = scenario.nodes.length;
-            const row = Math.floor(currentNodeIndex / maxNodesPerRow);
-            const col = currentNodeIndex % maxNodesPerRow;
-            
-            const x = margin + col * (nodeWidth + 20);
-            const y = margin + row * (nodeHeight + 20);
-            
-            // Ensure we don't exceed canvas bounds
-            const finalX = Math.min(x, canvasWidth - nodeWidth - margin);
-            const finalY = Math.min(y, canvasHeight - nodeHeight - margin);
-            
+            // Build DataSource node using V3 schema (outputs + generation)
             const newNode = {
               nodeId: newNodeId,
-              type: "DataSource",
+              type: "DataSource" as const,
               displayName: displayName,
               position: {
                 x: finalX,
-                y: finalY
+                y: finalY,
               },
               interval: interval,
-              valueMin: minVal,
-              valueMax: maxVal,
-              destinationNodeId: destination
+              outputs: [
+                {
+                  name: "output",
+                  destinationNodeId: destination,
+                  destinationInputName: "input",
+                  interface: {
+                    type: "SimpleValue",
+                    requiredFields: ["data.value"],
+                  },
+                },
+              ],
+              generation: {
+                type: "random",
+                valueMin: minVal,
+                valueMax: maxVal,
+              },
             };
             
             scenario.nodes.push(newNode);
+            // Ensure Protocol V3 version field is present
+            if (!scenario.version || scenario.version !== '3.0') {
+              (scenario as any).version = '3.0';
+            }
             const updatedScenario = JSON.stringify(scenario, null, 2);
             onScenarioUpdate(updatedScenario);
             

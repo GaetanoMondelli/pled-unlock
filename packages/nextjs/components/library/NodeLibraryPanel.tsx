@@ -52,9 +52,15 @@ const NODE_TEMPLATES: NodeTemplate[] = [
       type: "DataSource",
       displayName: "New Source",
       interval: 3,
-      valueMin: 1,
-      valueMax: 10,
-      destinationNodeId: ""
+      outputs: [
+        {
+          name: "output",
+          destinationNodeId: "",
+          destinationInputName: "input",
+          interface: { type: "SimpleValue", requiredFields: ["data.value"] },
+        },
+      ],
+      generation: { type: "random", valueMin: 1, valueMax: 10 },
     }
   },
   {
@@ -67,10 +73,27 @@ const NODE_TEMPLATES: NodeTemplate[] = [
     defaultConfig: {
       type: "Queue",
       displayName: "New Queue",
-      timeWindow: 10,
-      aggregationMethod: "sum",
+      inputs: [
+        {
+          name: "input",
+          interface: { type: "SimpleValue", requiredFields: ["data.value"] },
+          required: true,
+        },
+      ],
+      outputs: [
+        {
+          name: "output",
+          destinationNodeId: "",
+          destinationInputName: "input",
+          interface: { type: "AggregationResult", requiredFields: ["data.aggregatedValue"] },
+        },
+      ],
+      aggregation: {
+        method: "sum",
+        formula: "sum(input.data.value)",
+        trigger: { type: "time", window: 10 },
+      },
       capacity: 10,
-      destinationNodeId: ""
     }
   },
   {
@@ -83,13 +106,25 @@ const NODE_TEMPLATES: NodeTemplate[] = [
     defaultConfig: {
       type: "ProcessNode",
       displayName: "New Processor",
-      inputNodeIds: [""],
+      inputs: [
+        {
+          name: "inputA",
+          interface: { type: "Any", requiredFields: ["metadata.timestamp"] },
+          required: true,
+        },
+      ],
       outputs: [
         {
-          formula: "1",
-          destinationNodeId: ""
-        }
-      ]
+          name: "output",
+          destinationNodeId: "",
+          destinationInputName: "input",
+          interface: { type: "TransformationResult", requiredFields: ["data.transformedValue"] },
+          transformation: {
+            formula: "inputA.data.value",
+            fieldMapping: { "data.transformedValue": "inputA.data.value" },
+          },
+        },
+      ],
     }
   },
   {
@@ -155,7 +190,14 @@ const NODE_TEMPLATES: NodeTemplate[] = [
     color: "bg-slate-100 text-slate-700 border-slate-200",
     defaultConfig: {
       type: "Sink",
-      displayName: "New Sink"
+      displayName: "New Sink",
+      inputs: [
+        {
+          name: "input",
+          interface: { type: "Any", requiredFields: ["metadata.timestamp"] },
+          required: true,
+        },
+      ],
     }
   }
 ];

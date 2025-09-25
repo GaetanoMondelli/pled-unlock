@@ -229,7 +229,8 @@ export type AnyNode = z.infer<typeof AnyNodeSchema>;
 
 // Scenario Schema
 export const ScenarioSchema = z.object({
-  version: z.string(),
+  // Protocol V3 only; default to "3.0" if missing
+  version: z.literal("3.0").default("3.0"),
   nodes: z.array(AnyNodeSchema),
 });
 export type Scenario = z.infer<typeof ScenarioSchema>;

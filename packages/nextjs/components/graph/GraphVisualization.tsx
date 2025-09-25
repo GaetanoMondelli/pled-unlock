@@ -400,6 +400,7 @@ const GraphVisualization: React.FC = () => {
         // Add to scenario
         const updatedScenario = {
           ...scenario,
+          version: '3.0',
           nodes: [...scenario.nodes, newNode],
         };
         
