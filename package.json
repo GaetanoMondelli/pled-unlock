@@ -34,7 +34,7 @@
     "postinstall": "husky install",
     "lint": "yarn next:lint && yarn hardhat:lint",
     "build": "yarn next:check-types && yarn next:lint && yarn next:build",
-  "vercel:check": "yarn next:build",
+    "vercel:check": "yarn next:build",
     "next:build": "yarn workspace @se-2/nextjs build",
     "next:check-types": "yarn workspace @se-2/nextjs check-types",
     "next:format": "yarn workspace @se-2/nextjs format",

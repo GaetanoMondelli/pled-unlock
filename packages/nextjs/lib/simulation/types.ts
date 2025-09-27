@@ -223,8 +223,31 @@ export const SinkNodeSchema = BaseNodeSchema.extend({
 });
 export type SinkNode = z.infer<typeof SinkNodeSchema>;
 
+// Module Node Schema - contains a sub-graph that can be collapsed/expanded
+export const ModuleNodeSchema = BaseNodeSchema.extend({
+  type: z.literal("Module"),
+  // Interface definition - external inputs and outputs for the module
+  inputs: z.array(InputV3Schema),
+  outputs: z.array(OutputV3Schema),
+  // The internal sub-graph - full scenario definition
+  subGraph: z.object({
+    nodes: z.array(z.lazy(() => AnyNodeSchema)), // Recursive reference to allow nested modules
+    // Optional metadata
+    version: z.string().default("3.0"),
+  }),
+  // UI state for collapse/expand
+  isExpanded: z.boolean().default(false),
+  // Optional module metadata
+  moduleDescription: z.string().optional(),
+  moduleVersion: z.string().default("1.0"),
+  // Module library info (for reusable modules)
+  isLibraryModule: z.boolean().default(false),
+  libraryCategory: z.string().optional(),
+});
+export type ModuleNode = z.infer<typeof ModuleNodeSchema>;
+
 // Union type for all nodes
-export const AnyNodeSchema = z.union([DataSourceNodeSchema, QueueNodeSchema, ProcessNodeSchema, FSMProcessNodeSchema, SinkNodeSchema]);
+export const AnyNodeSchema = z.union([DataSourceNodeSchema, QueueNodeSchema, ProcessNodeSchema, FSMProcessNodeSchema, SinkNodeSchema, ModuleNodeSchema]);
 export type AnyNode = z.infer<typeof AnyNodeSchema>;
 
 // Scenario Schema
@@ -292,7 +315,22 @@ export interface SinkState extends NodeState {
   consumedTokens: Token[];
 }
 
-export type AnyNodeState = DataSourceState | QueueState | ProcessNodeState | FSMProcessNodeState | SinkState;
+export interface ModuleState extends NodeState {
+  // Input/output buffers for the module's interface
+  inputBuffers: Record<string, Token[]>; // Tokens waiting at module inputs
+  outputBuffers: Record<string, Token[]>; // Tokens ready to be sent from module outputs
+  // Internal simulation state for the sub-graph
+  subGraphStates: Record<string, AnyNodeState>; // Node states within the module
+  // UI state
+  isExpanded: boolean;
+  // Execution state
+  lastProcessedTime?: number;
+  processedTokenCount: number;
+  // Performance tracking
+  internalEventCounter: number;
+}
+
+export type AnyNodeState = DataSourceState | QueueState | ProcessNodeState | FSMProcessNodeState | SinkState | ModuleState;
 
 // For React Flow
 export interface RFNodeData {

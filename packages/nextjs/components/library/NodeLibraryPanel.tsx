@@ -26,12 +26,12 @@ import {
 } from "@/components/ui/dialog";
 
 interface NodeTemplate {
-  type: "DataSource" | "Queue" | "ProcessNode" | "FSMProcessNode" | "Sink";
+  type: "DataSource" | "Queue" | "ProcessNode" | "FSMProcessNode" | "Sink" | "Module";
   displayName: string;
   description: string;
   icon: React.ReactNode;
   defaultConfig: any;
-  category: "input" | "processing" | "output";
+  category: "input" | "processing" | "output" | "grouping";
   color: string;
 }
 
@@ -199,6 +199,41 @@ const NODE_TEMPLATES: NodeTemplate[] = [
         },
       ],
     }
+  },
+  {
+    type: "Module",
+    displayName: "Module",
+    description: "Container for grouping nodes into reusable sub-graphs with collapse/expand",
+    icon: <Layers className="h-4 w-4" />,
+    category: "grouping",
+    color: "bg-purple-100 text-purple-700 border-purple-200",
+    defaultConfig: {
+      type: "Module",
+      displayName: "New Module",
+      inputs: [
+        {
+          name: "input",
+          interface: { type: "Any", requiredFields: [] },
+          required: false,
+        },
+      ],
+      outputs: [
+        {
+          name: "output",
+          destinationNodeId: "",
+          destinationInputName: "input",
+          interface: { type: "Any", requiredFields: [] },
+        },
+      ],
+      subGraph: {
+        nodes: [],
+        version: "3.0",
+      },
+      isExpanded: false,
+      moduleDescription: "A reusable module containing sub-components",
+      moduleVersion: "1.0",
+      isLibraryModule: false,
+    }
   }
 ];
 
@@ -256,7 +291,7 @@ const NodeTemplateCard: React.FC<{
 };
 
 const CategorySection: React.FC<{
-  category: "input" | "processing" | "output";
+  category: "input" | "processing" | "output" | "grouping";
   templates: NodeTemplate[];
   onNodeDragStart: (template: NodeTemplate) => void;
   onShowDetails: (template: NodeTemplate) => void;
@@ -264,7 +299,8 @@ const CategorySection: React.FC<{
   const categoryInfo = {
     input: { label: "Input Nodes", icon: <Database className="h-4 w-4" />, color: "text-emerald-600" },
     processing: { label: "Processing Nodes", icon: <Cpu className="h-4 w-4" />, color: "text-blue-600" },
-    output: { label: "Output Nodes", icon: <Target className="h-4 w-4" />, color: "text-slate-600" }
+    output: { label: "Output Nodes", icon: <Target className="h-4 w-4" />, color: "text-slate-600" },
+    grouping: { label: "Grouping Nodes", icon: <Layers className="h-4 w-4" />, color: "text-purple-600" }
   }[category];
 
   const categoryTemplates = templates.filter(t => t.category === category);
@@ -348,9 +384,15 @@ export default function NodeLibraryPanel({ className, onNodeDrop }: NodeLibraryP
             onNodeDragStart={handleNodeDragStart}
             onShowDetails={handleShowDetails}
           />
-          <CategorySection 
-            category="output" 
-            templates={NODE_TEMPLATES} 
+          <CategorySection
+            category="output"
+            templates={NODE_TEMPLATES}
+            onNodeDragStart={handleNodeDragStart}
+            onShowDetails={handleShowDetails}
+          />
+          <CategorySection
+            category="grouping"
+            templates={NODE_TEMPLATES}
             onNodeDragStart={handleNodeDragStart}
             onShowDetails={handleShowDetails}
           />

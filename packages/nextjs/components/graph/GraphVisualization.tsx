@@ -6,6 +6,7 @@ import ProcessNodeDisplay from "./nodes/ProcessNodeDisplay";
 import QueueNodeDisplay from "./nodes/QueueNodeDisplay";
 import SinkNodeDisplay from "./nodes/SinkNodeDisplay";
 import FSMProcessNodeDisplay from "./nodes/FSMProcessNodeDisplay";
+import ModuleNodeDisplay from "./nodes/ModuleNodeDisplay";
 import { type AnyNode, type RFEdgeData, type RFNodeData } from "@/lib/simulation/types";
 import { useSimulationStore } from "@/stores/simulationStore";
 import { cn } from "@/lib/utils";
@@ -32,6 +33,7 @@ const nodeTypes = {
   ProcessNode: ProcessNodeDisplay,
   FSMProcessNode: FSMProcessNodeDisplay,
   Sink: SinkNodeDisplay,
+  Module: ModuleNodeDisplay,
 };
 
 const edgeTypes = {
@@ -294,6 +296,19 @@ const GraphVisualization: React.FC = () => {
             case "Sink":
               const sState = nodeState as any;
               details = `Consumed: ${sState.consumedTokenCount || 0} tokens`;
+              break;
+            case "Module":
+              const mState = nodeState as any;
+              const moduleInputs = Object.values(mState.inputBuffers || {}).reduce(
+                (sum: number, buffer: any) => sum + (buffer?.length || 0),
+                0,
+              );
+              const moduleOutputs = Object.values(mState.outputBuffers || {}).reduce(
+                (sum: number, buffer: any) => sum + (buffer?.length || 0),
+                0,
+              );
+              const subNodeCount = Object.keys(mState.subGraphStates || {}).length;
+              details = `I/O: ${moduleInputs}/${moduleOutputs}, Sub-nodes: ${subNodeCount}`;
               break;
           }
         }

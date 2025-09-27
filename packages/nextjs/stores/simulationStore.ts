@@ -33,6 +33,8 @@ import {
   type TransformationDetails,
 } from "@/lib/simulation/types";
 import { validateScenario } from "@/lib/simulation/validation";
+import { templateService } from "@/lib/template-service";
+import type { TemplateDocument, ExecutionDocument } from "@/lib/firestore-types";
 import { z } from "zod";
 import { create } from "zustand";
 
@@ -60,7 +62,12 @@ interface SimulationState {
   selectedToken: Token | null;
   isGlobalLedgerOpen: boolean;
   errorMessages: string[];
-  
+
+  // Template and execution management
+  currentTemplate: TemplateDocument | null;
+  currentExecution: ExecutionDocument | null;
+  availableTemplates: TemplateDocument[];
+
   // Undo/Redo system
   undoHistory: ScenarioSnapshot[];
   redoHistory: ScenarioSnapshot[];
@@ -84,6 +91,17 @@ interface SimulationState {
   canRedo: () => boolean;
   saveSnapshot: (description: string) => void;
 
+  // Template and execution actions
+  loadTemplates: () => Promise<void>;
+  loadTemplate: (templateId: string) => Promise<void>;
+  createNewTemplate: (name: string, description?: string, fromDefault?: boolean) => Promise<string>;
+  saveCurrentAsTemplate: (name: string, description?: string) => Promise<string>;
+  updateCurrentTemplate: () => Promise<void>;
+  deleteTemplate: (templateId: string) => Promise<void>;
+  saveExecution: (name: string, description?: string) => Promise<string>;
+  loadExecution: (executionId: string) => Promise<void>;
+  createNewExecution: (name: string, description?: string) => Promise<string>;
+
   // Helper functions
   _updateNodeState: (nodeId: string, partialState: Partial<AnyNodeState>) => void;
   _transitionNodeState: (nodeId: string, newState: NodeStateMachineState, timestamp: number, trigger?: string) => void;
@@ -98,6 +116,7 @@ interface SimulationState {
   _executeFSMTransition: (fsmConfig: any, fsmState: any, transition: any, newTime: number) => void;
   _executeFSMAction: (fsmConfig: any, fsmState: any, action: any, newTime: number) => void;
   _routeFSMToken: (fsmConfig: any, token: Token, outputConfig: any, newTime: number) => void;
+  _restoreExecutionState: (execution: ExecutionDocument) => void;
 }
 
 export const useSimulationStore = create<SimulationState>((set, get) => ({
@@ -115,6 +134,13 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
   selectedToken: null,
   isGlobalLedgerOpen: false,
   errorMessages: [],
+
+  // Template and execution state
+  currentTemplate: null,
+  currentExecution: null,
+  availableTemplates: [],
+
+  // Undo/Redo state
   undoHistory: [],
   redoHistory: [],
 
@@ -195,6 +221,22 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
               transitionHistory: []
             }
           } as SinkState;
+          break;
+        case "Module":
+          const moduleNode = node as any; // ModuleNode type
+          initialNodeStates[node.nodeId] = {
+            inputBuffers: {},
+            outputBuffers: {},
+            subGraphStates: {},
+            isExpanded: moduleNode.isExpanded || false,
+            lastProcessedTime: -1,
+            processedTokenCount: 0,
+            internalEventCounter: 0,
+            stateMachine: {
+              currentState: "module_idle",
+              transitionHistory: []
+            }
+          } as any; // ModuleState
           break;
       }
     });
@@ -1004,6 +1046,277 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
   canUndo: () => get().undoHistory.length > 0,
   canRedo: () => get().redoHistory.length > 0,
 
+  // Template and execution actions
+  loadTemplates: async () => {
+    try {
+      const templates = await templateService.getTemplates();
+      set({ availableTemplates: templates });
+
+      // Show info if template system is not available
+      if (templates.length === 0) {
+        console.info('Template management is not available. This may be due to Firebase configuration.');
+      }
+    } catch (error) {
+      console.error('Failed to load templates:', error);
+
+      // Handle Firebase configuration issues gracefully
+      if (error instanceof Error && (
+        error.message.includes('Firebase') ||
+        error.message.includes('service account') ||
+        error.message.includes('FIREBASE_SERVICE_ACCOUNT')
+      )) {
+        console.warn('Template management unavailable: Firebase not configured');
+        set({ availableTemplates: [] });
+      } else {
+        set(state => ({
+          errorMessages: [...state.errorMessages, `Failed to load templates: ${error instanceof Error ? error.message : 'Unknown error'}`],
+        }));
+      }
+    }
+  },
+
+  loadTemplate: async (templateId: string) => {
+    try {
+      const template = await templateService.getTemplate(templateId);
+      set({ currentTemplate: template });
+
+      // Load the scenario from the template
+      await get().loadScenario(template.scenario);
+
+      // If template has saved execution state, restore it
+      if (template.executionState) {
+        console.log(`Restoring saved execution state for template "${template.name}"`);
+        set({
+          // Restore simulation state
+          nodeStates: template.executionState.nodeStates,
+          currentTime: template.executionState.currentTime,
+          eventCounter: template.executionState.eventCounter,
+          // Restore activity logs and ledger data
+          nodeActivityLogs: template.executionState.nodeActivityLogs,
+          globalActivityLog: template.executionState.globalActivityLog,
+          // Restore simulation settings
+          simulationSpeed: template.executionState.simulationSpeed,
+          // Clear any error messages since we successfully loaded
+          errorMessages: [],
+        });
+        console.log(`Restored state: time=${template.executionState.currentTime}, events=${template.executionState.eventCounter}, logs=${template.executionState.globalActivityLog.length} entries`);
+      }
+    } catch (error) {
+      console.error('Failed to load template:', error);
+      set(state => ({
+        errorMessages: [...state.errorMessages, `Failed to load template: ${error instanceof Error ? error.message : 'Unknown error'}`],
+      }));
+    }
+  },
+
+  createNewTemplate: async (name: string, description?: string, fromDefault = true) => {
+    try {
+      const template = await templateService.createTemplate({
+        name,
+        description,
+        fromDefault,
+      });
+
+      // Update available templates
+      set(state => ({
+        availableTemplates: [...state.availableTemplates, template],
+        currentTemplate: template,
+      }));
+
+      return template.id;
+    } catch (error) {
+      console.error('Failed to create template:', error);
+      set(state => ({
+        errorMessages: [...state.errorMessages, `Failed to create template: ${error instanceof Error ? error.message : 'Unknown error'}`],
+      }));
+      throw error;
+    }
+  },
+
+  saveCurrentAsTemplate: async (name: string, description?: string) => {
+    try {
+      const state = get();
+      if (!state.scenario) {
+        throw new Error('No scenario loaded to save as template');
+      }
+
+      const template = await templateService.createTemplate({
+        name,
+        description,
+        scenario: state.scenario,
+      });
+
+      // Update available templates
+      set(prevState => ({
+        availableTemplates: [...prevState.availableTemplates, template],
+        currentTemplate: template,
+      }));
+
+      return template.id;
+    } catch (error) {
+      console.error('Failed to save current as template:', error);
+      set(state => ({
+        errorMessages: [...state.errorMessages, `Failed to save template: ${error instanceof Error ? error.message : 'Unknown error'}`],
+      }));
+      throw error;
+    }
+  },
+  updateCurrentTemplate: async () => {
+    try {
+      const state = get();
+      if (!state.currentTemplate) {
+        throw new Error('No template is currently loaded to update');
+      }
+      if (!state.scenario) {
+        throw new Error('No scenario loaded to save');
+      }
+
+      // Capture complete simulation state for saving
+      const completeState = {
+        scenario: state.scenario,
+        // Simulation execution state
+        nodeStates: state.nodeStates,
+        currentTime: state.currentTime,
+        eventCounter: state.eventCounter,
+        // Activity logs and ledger data
+        nodeActivityLogs: state.nodeActivityLogs,
+        globalActivityLog: state.globalActivityLog,
+        // Simulation settings
+        simulationSpeed: state.simulationSpeed,
+        // Save timestamp
+        lastSavedAt: Date.now(),
+      };
+
+      const updatedTemplate = await templateService.updateTemplate(state.currentTemplate.id, {
+        scenario: state.scenario,
+        // Add execution state to template
+        executionState: completeState,
+        description: `${state.currentTemplate.description || ''} (Updated: ${new Date().toLocaleString()})`.trim(),
+      });
+
+      // Update the current template and available templates list
+      set(prevState => ({
+        currentTemplate: updatedTemplate,
+        availableTemplates: prevState.availableTemplates.map(t =>
+          t.id === updatedTemplate.id ? updatedTemplate : t
+        ),
+      }));
+    } catch (error) {
+      console.error('Failed to update template:', error);
+      set(state => ({
+        errorMessages: [...state.errorMessages, `Failed to update template: ${error instanceof Error ? error.message : 'Unknown error'}`],
+      }));
+      throw error;
+    }
+  },
+  deleteTemplate: async (templateId: string) => {
+    try {
+      await templateService.deleteTemplate(templateId);
+
+      // Remove from available templates and clear current template if it was deleted
+      set(prevState => ({
+        availableTemplates: prevState.availableTemplates.filter(t => t.id !== templateId),
+        currentTemplate: prevState.currentTemplate?.id === templateId ? null : prevState.currentTemplate,
+      }));
+    } catch (error) {
+      console.error('Failed to delete template:', error);
+      set(state => ({
+        errorMessages: [...state.errorMessages, `Failed to delete template: ${error instanceof Error ? error.message : 'Unknown error'}`],
+      }));
+      throw error;
+    }
+  },
+
+  saveExecution: async (name: string, description?: string) => {
+    try {
+      const state = get();
+
+      if (!state.scenario) {
+        throw new Error('No scenario loaded to save execution');
+      }
+
+      if (!state.currentTemplate) {
+        throw new Error('No template associated with current execution');
+      }
+
+      const execution = await templateService.saveExecution({
+        templateId: state.currentTemplate.id,
+        name,
+        description,
+        scenario: state.scenario,
+        nodeStates: state.nodeStates,
+        currentTime: state.currentTime,
+        eventCounter: state.eventCounter,
+        globalActivityLog: state.globalActivityLog,
+        nodeActivityLogs: state.nodeActivityLogs,
+        isCompleted: false,
+      });
+
+      set({ currentExecution: execution });
+
+      return execution.id;
+    } catch (error) {
+      console.error('Failed to save execution:', error);
+      set(state => ({
+        errorMessages: [...state.errorMessages, `Failed to save execution: ${error instanceof Error ? error.message : 'Unknown error'}`],
+      }));
+      throw error;
+    }
+  },
+
+  loadExecution: async (executionId: string) => {
+    try {
+      const execution = await templateService.getExecution(executionId);
+      set({ currentExecution: execution });
+
+      // Restore the complete simulation state
+      const state = get();
+      state._restoreExecutionState(execution);
+    } catch (error) {
+      console.error('Failed to load execution:', error);
+      set(state => ({
+        errorMessages: [...state.errorMessages, `Failed to load execution: ${error instanceof Error ? error.message : 'Unknown error'}`],
+      }));
+    }
+  },
+
+  createNewExecution: async (name: string, description?: string) => {
+    try {
+      const state = get();
+
+      if (!state.scenario) {
+        throw new Error('No scenario loaded to create execution');
+      }
+
+      if (!state.currentTemplate) {
+        throw new Error('No template associated with current scenario');
+      }
+
+      const execution = await templateService.saveExecution({
+        templateId: state.currentTemplate.id,
+        name,
+        description,
+        scenario: state.scenario,
+        nodeStates: state.nodeStates,
+        currentTime: state.currentTime,
+        eventCounter: state.eventCounter,
+        globalActivityLog: state.globalActivityLog,
+        nodeActivityLogs: state.nodeActivityLogs,
+        isCompleted: false,
+      });
+
+      set({ currentExecution: execution });
+
+      return execution.id;
+    } catch (error) {
+      console.error('Failed to create execution:', error);
+      set(state => ({
+        errorMessages: [...state.errorMessages, `Failed to create execution: ${error instanceof Error ? error.message : 'Unknown error'}`],
+      }));
+      throw error;
+    }
+  },
+
   _updateNodeState: (nodeId, partialState) => {
     set(state => ({
       nodeStates: {
@@ -1562,6 +1875,22 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
               }
             } as SinkState;
             break;
+          case "Module":
+            const moduleNode2 = node as any; // ModuleNode type
+            initialNodeStates[node.nodeId] = {
+              inputBuffers: {},
+              outputBuffers: {},
+              subGraphStates: {},
+              isExpanded: moduleNode2.isExpanded || false,
+              lastProcessedTime: -1,
+              processedTokenCount: 0,
+              internalEventCounter: 0,
+              stateMachine: {
+                currentState: "module_idle",
+                transitionHistory: []
+              }
+            } as any; // ModuleState
+            break;
         }
       });
 
@@ -1582,5 +1911,26 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       
     } else {
     }
+  },
+
+  _restoreExecutionState: (execution: ExecutionDocument) => {
+    // Restore complete execution state for perfect reconstruction
+    set({
+      scenario: execution.scenario,
+      nodeStates: execution.nodeStates,
+      currentTime: execution.currentTime,
+      eventCounter: execution.eventCounter,
+      globalActivityLog: execution.globalActivityLog,
+      nodeActivityLogs: execution.nodeActivityLogs,
+      currentExecution: execution,
+    });
+
+    // Rebuild nodesConfig from scenario
+    const nodesConfig: Record<string, AnyNode> = {};
+    execution.scenario.nodes.forEach(node => {
+      nodesConfig[node.nodeId] = node;
+    });
+
+    set(state => ({ ...state, nodesConfig }));
   },
 }));

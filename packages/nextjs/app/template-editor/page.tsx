@@ -1,10 +1,13 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import GraphVisualization from "@/components/graph/GraphVisualization";
 import GlobalLedgerModal from "@/components/modals/GlobalLedgerModal";
 import NodeInspectorModal from "@/components/modals/NodeInspectorModal";
 import TokenInspectorModal from "@/components/modals/TokenInspectorModal";
+import TemplateManagerModal from "@/components/modals/TemplateManagerModal";
+import ExecutionManagerModal from "@/components/modals/ExecutionManagerModal";
 import IntegratedAIAssistant from "@/components/ai/IntegratedAIAssistant";
 import NodeLibraryPanel from "@/components/library/NodeLibraryPanel";
 import StateInspectorPanel from "@/components/ui/state-inspector-panel";
@@ -23,10 +26,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useSimulationStore } from "@/stores/simulationStore";
-import { AlertCircle, BookOpen, Edit, Pause, Play, RefreshCw, StepForward, Brain, Eye, EyeOff, Activity, Library, Undo2, Redo2 } from "lucide-react";
+import { AlertCircle, BookOpen, Edit, Pause, Play, RefreshCw, StepForward, Brain, Eye, EyeOff, Activity, Library, Undo2, Redo2, FileText, Archive } from "lucide-react";
 import { cn } from "~~/lib/utils";
 
 export default function TemplateEditorPage() {
+  const router = useRouter();
   const loadScenario = useSimulationStore(state => state.loadScenario);
   const play = useSimulationStore(state => state.play);
   const pause = useSimulationStore(state => state.pause);
@@ -43,6 +47,10 @@ export default function TemplateEditorPage() {
   const redo = useSimulationStore(state => state.redo);
   const canUndo = useSimulationStore(state => state.canUndo);
   const canRedo = useSimulationStore(state => state.canRedo);
+  const currentTemplate = useSimulationStore(state => state.currentTemplate);
+  const currentExecution = useSimulationStore(state => state.currentExecution);
+  const loadTemplates = useSimulationStore(state => state.loadTemplates);
+  const updateCurrentTemplate = useSimulationStore(state => state.updateCurrentTemplate);
 
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
@@ -55,23 +63,48 @@ export default function TemplateEditorPage() {
   const [isResizing, setIsResizing] = useState(false);
   const [isStateInspectorOpen, setIsStateInspectorOpen] = useState(false);
   const [sidePanelMode, setSidePanelMode] = useState<'ai' | 'library'>('ai');
+  const [isTemplateManagerOpen, setIsTemplateManagerOpen] = useState(false);
+  const [isExecutionManagerOpen, setIsExecutionManagerOpen] = useState(false);
+  const [isLibraryPanelOpen, setIsLibraryPanelOpen] = useState(false);
   const lastErrorCountRef = useRef(0);
 
   const fetchDefaultScenarioContent = useCallback(async () => {
     try {
-      const response = await fetch("/scenario.json");
+      console.log("Fetching scenario.json...");
+
+      // Add timeout to prevent hanging
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+      const response = await fetch("/scenario.json", {
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
       const data = await response.json();
+      console.log("Successfully fetched scenario.json");
       return data;
     } catch (err) {
       console.error("Error fetching default scenario content:", err);
-      toast({
-        variant: "destructive",
-        title: "Fetch Error",
-        description: `Could not fetch default scenario.json: ${err instanceof Error ? err.message : String(err)}`,
-      });
+
+      if (err instanceof Error && err.name === 'AbortError') {
+        toast({
+          variant: "destructive",
+          title: "Timeout Error",
+          description: "Loading scenario.json timed out. Please refresh the page.",
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Fetch Error",
+          description: `Could not fetch default scenario.json: ${err instanceof Error ? err.message : String(err)}`,
+        });
+      }
+
       setDefaultScenarioContent("");
       return null;
     }
@@ -79,22 +112,156 @@ export default function TemplateEditorPage() {
 
   const initialLoadScenario = useCallback(async () => {
     setIsLoading(true);
-    const defaultData = await fetchDefaultScenarioContent();
-    if (defaultData) {
-      setDefaultScenarioContent(JSON.stringify(defaultData, null, 2));
-      await loadScenario(defaultData);
+    try {
+      console.log("Starting initial scenario load...");
+      const defaultData = await fetchDefaultScenarioContent();
+      if (defaultData) {
+        console.log("Fetched scenario data, setting content...");
+        setDefaultScenarioContent(JSON.stringify(defaultData, null, 2));
+        console.log("Loading scenario into store...");
+        await loadScenario(defaultData);
+        console.log("Scenario loaded successfully");
+      } else {
+        console.warn("No default scenario data found, creating minimal scenario");
+        // Create a minimal fallback scenario
+        const fallbackScenario = {
+          version: "3.0",
+          nodes: [
+            {
+              nodeId: "source1",
+              type: "DataSource",
+              displayName: "Token Source",
+              position: { x: 100, y: 100 },
+              interval: 5,
+              generation: { type: "random", valueMin: 1, valueMax: 10 },
+              outputs: [{ destinationNodeId: "sink1" }],
+            },
+            {
+              nodeId: "sink1",
+              type: "Sink",
+              displayName: "Token Sink",
+              position: { x: 400, y: 100 },
+              inputs: [{ nodeId: "source1" }],
+            },
+          ],
+        };
+        setDefaultScenarioContent(JSON.stringify(fallbackScenario, null, 2));
+        await loadScenario(fallbackScenario);
+        console.log("Fallback scenario loaded");
+      }
+    } catch (error) {
+      console.error("Error in initial scenario load:", error);
+      // Use toast directly without dependency
     }
+    console.log("Setting loading to false");
     setIsLoading(false);
-  }, [fetchDefaultScenarioContent, loadScenario]);
+  }, [fetchDefaultScenarioContent, loadScenario]); // Removed toast dependency
 
   useEffect(() => {
-    initialLoadScenario();
-  }, [initialLoadScenario]);
+    // Run scenario loading only once on mount
+    const loadOnce = async () => {
+      setIsLoading(true);
+      try {
+        console.log("Starting initial template and scenario load...");
+
+        // First, load available templates
+        await loadTemplates();
+
+        // Then try to load a default template
+        const templates = useSimulationStore.getState().availableTemplates;
+        if (templates.length > 0) {
+          // Find the default template, or use the first one
+          const defaultTemplate = templates.find(t => t.isDefault) || templates[0];
+          const loadTemplate = useSimulationStore.getState().loadTemplate;
+          await loadTemplate(defaultTemplate.id);
+          console.log(`Default template "${defaultTemplate.name}" loaded successfully`);
+        } else {
+          // Fallback to loading scenario.json directly
+          console.log("No templates found, loading scenario.json...");
+          const response = await fetch("/scenario.json");
+          if (response.ok) {
+            const defaultData = await response.json();
+            setDefaultScenarioContent(JSON.stringify(defaultData, null, 2));
+            await loadScenario(defaultData);
+            console.log("Scenario loaded successfully");
+          } else {
+            console.warn("Using fallback scenario");
+            const fallbackScenario = {
+              version: "3.0",
+              nodes: [
+                {
+                  nodeId: "source1",
+                  type: "DataSource",
+                  displayName: "Token Source",
+                  position: { x: 100, y: 100 },
+                  interval: 5,
+                  generation: { type: "random", valueMin: 1, valueMax: 10 },
+                  outputs: [{ destinationNodeId: "sink1" }],
+                },
+                {
+                  nodeId: "sink1",
+                  type: "Sink",
+                  displayName: "Token Sink",
+                  position: { x: 400, y: 100 },
+                  inputs: [{ nodeId: "source1" }],
+                },
+              ],
+            };
+            setDefaultScenarioContent(JSON.stringify(fallbackScenario, null, 2));
+            await loadScenario(fallbackScenario);
+          }
+        }
+      } catch (error) {
+        console.error("Error loading scenario:", error);
+      }
+      setIsLoading(false);
+    };
+
+    loadOnce();
+  }, []); // Empty dependency - run only once
+
 
   useEffect(() => {
     // Ensure page starts at top on reload
     window.scrollTo(0, 0);
   }, []);
+
+  // Navigate to template slug URL when template is loaded
+  useEffect(() => {
+    if (currentTemplate && window.location.pathname === '/template-editor') {
+      const templateSlug = currentTemplate.name
+        .toLowerCase()
+        .replace(/[^\w ]+/g, '')
+        .replace(/ +/g, '-');
+      router.push(`/template-editor/${templateSlug}`);
+    }
+  }, [currentTemplate, router]);
+
+  // Handler for saving current template
+  const handleSaveTemplate = useCallback(async () => {
+    if (!currentTemplate) {
+      toast({
+        variant: "destructive",
+        title: "No template loaded",
+        description: "Please load a template before trying to save changes.",
+      });
+      return;
+    }
+
+    try {
+      await updateCurrentTemplate();
+      toast({
+        title: "Template saved",
+        description: `Changes to "${currentTemplate.name}" have been saved successfully.`,
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Save failed",
+        description: `Failed to save template: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      });
+    }
+  }, [currentTemplate, updateCurrentTemplate, toast]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     setIsResizing(true);
@@ -213,141 +380,216 @@ export default function TemplateEditorPage() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-slate-50 overflow-hidden">
-      <header className="px-6 py-3 bg-white border-b border-slate-200 shadow-sm flex-shrink-0">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center space-x-4">
-            <h1 className="text-xl font-bold text-slate-800">Template Editor</h1>
-            
-            {/* Mode Toggle */}
-            <div className="flex items-center bg-slate-100 rounded-lg p-1">
-              <button
-                onClick={() => setIsEditMode(false)}
-                className={cn(
-                  "px-3 py-1.5 text-sm font-medium rounded-md transition-all",
-                  !isEditMode 
-                    ? "bg-white text-slate-800 shadow-sm" 
-                    : "text-slate-600 hover:text-slate-800"
-                )}
-              >
-                <div className="flex items-center space-x-2">
-                  <Play className="h-4 w-4" />
-                  <span>Simulation</span>
-                </div>
-              </button>
-              <button
-                onClick={() => setIsEditMode(true)}
-                className={cn(
-                  "px-3 py-1.5 text-sm font-medium rounded-md transition-all",
-                  isEditMode 
-                    ? "bg-white text-slate-800 shadow-sm" 
-                    : "text-slate-600 hover:text-slate-800"
-                )}
-              >
-                <div className="flex items-center space-x-2">
-                  <Edit className="h-4 w-4" />
-                  <span>Edit</span>
-                </div>
-              </button>
-            </div>
+    <div className="flex flex-col h-screen bg-gray-50 overflow-hidden">
+      {/* Professional B2B Toolbar */}
+      <header className="bg-white border-b border-gray-300 flex-shrink-0">
+        {/* Menu Bar Style Toolbar */}
+        <div className="h-12 px-4 flex items-center justify-between bg-gray-50 border-b border-gray-200">
+          <div className="flex items-center space-x-6">
+            <h1 className="text-sm font-medium text-gray-700 select-none">Template Editor</h1>
 
-            {/* Status Badge */}
-            {!isEditMode && (
-              <div className="flex items-center space-x-1 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-full">
-                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
-                <span className="text-sm font-medium text-emerald-700">Live Simulation</span>
-              </div>
-            )}
-
-            {isEditMode && (
-              <div className="flex items-center space-x-1 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-full">
-                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                <span className="text-sm font-medium text-blue-700">JSON Editor</span>
-              </div>
-            )}
-          </div>
-          
-          <div className="flex items-center space-x-3">
-            {/* Simulation Mode Controls */}
-            {!isEditMode && (
-              <>
-                <div className="flex items-center space-x-2 text-sm text-slate-600 bg-slate-100 px-3 py-1.5 rounded-lg">
-                  <span className="font-mono">Time: {currentTime}s</span>
-                </div>
-                
-                <div className="flex items-center space-x-2">
-                  <Button variant="outline" size="sm" onClick={handlePlayPause} 
-                    className={cn(
-                      "font-medium transition-all",
-                      isRunning 
-                        ? "bg-red-500 hover:bg-red-600 text-white border-red-500" 
-                        : "bg-emerald-500 hover:bg-emerald-600 text-white border-emerald-500"
-                    )}>
-                    {isRunning ? (
+            {/* Menu Items */}
+            <div className="flex items-center">
+              {/* File Menu */}
+              <div className="relative group">
+                <button className="px-3 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded transition-colors">
+                  File
+                </button>
+                <div className="absolute top-full left-0 mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                  <div className="py-1">
+                    <button
+                      onClick={() => setIsTemplateManagerOpen(true)}
+                      className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                    >
+                      <FileText className="w-4 h-4 mr-2" />
+                      Templates...
+                    </button>
+                    <button
+                      onClick={() => setIsExecutionManagerOpen(true)}
+                      className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                    >
+                      <Archive className="w-4 h-4 mr-2" />
+                      Executions...
+                    </button>
+                    {currentTemplate && (
                       <>
-                        <Pause className="mr-2 h-4 w-4" /> Pause
-                      </>
-                    ) : (
-                      <>
-                        <Play className="mr-2 h-4 w-4" /> Play
+                        <div className="border-t border-gray-200 my-1"></div>
+                        <button
+                          onClick={handleSaveTemplate}
+                          className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                        >
+                          <FileText className="w-4 h-4 mr-2" />
+                          Save Template
+                        </button>
                       </>
                     )}
-                  </Button>
-                  
-                  <Button variant="outline" size="sm" onClick={handleStepForward} disabled={isRunning}
-                    className="border-slate-300 hover:bg-slate-50">
-                    <StepForward className="mr-2 h-4 w-4" /> Step
-                  </Button>
-                  
-                  <Button variant="outline" size="sm" onClick={undo} disabled={!canUndo() || isRunning}
-                    className="border-slate-300 hover:bg-slate-50" title="Undo (Ctrl/Cmd+Z)">
-                    <Undo2 className="h-4 w-4" />
-                  </Button>
-                  
-                  <Button variant="outline" size="sm" onClick={redo} disabled={!canRedo() || isRunning}
-                    className="border-slate-300 hover:bg-slate-50" title="Redo (Ctrl/Cmd+Y)">
-                    <Redo2 className="h-4 w-4" />
-                  </Button>
+                  </div>
                 </div>
-                
-                <div className="h-6 w-px bg-slate-300"></div>
-                
-                <div className="flex items-center space-x-2">
-                  <Button variant="outline" size="sm" onClick={toggleGlobalLedger}
-                    className="border-slate-300 hover:bg-slate-50">
-                    <BookOpen className="mr-2 h-4 w-4" /> Ledger
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={handleReloadDefaultScenario}
-                    className="border-slate-300 hover:bg-slate-50">
-                    <RefreshCw className="mr-2 h-4 w-4" /> Reload
-                  </Button>
-                  <Button 
-                    variant={isStateInspectorOpen ? "default" : "outline"} 
-                    size="sm" 
-                    onClick={() => setIsStateInspectorOpen(!isStateInspectorOpen)}
-                    className="border-slate-300 hover:bg-slate-50"
-                  >
-                    <Activity className="mr-2 h-4 w-4" /> States
-                  </Button>
-                </div>
-              </>
-            )}
-
-            {/* Edit Mode Controls */}
-            {isEditMode && (
-              <div className="flex items-center space-x-2">
-                <Button variant="outline" size="sm" onClick={handleOpenScenarioEditor}
-                  className="border-blue-300 text-blue-700 hover:bg-blue-50">
-                  <Edit className="mr-2 h-4 w-4" /> Open JSON Editor
-                </Button>
-                <Button variant="outline" size="sm" onClick={handleReloadDefaultScenario}
-                  className="border-slate-300 hover:bg-slate-50">
-                  <RefreshCw className="mr-2 h-4 w-4" /> Reset
-                </Button>
               </div>
+
+              {/* Edit Menu */}
+              <div className="relative group">
+                <button className="px-3 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded transition-colors">
+                  Edit
+                </button>
+                <div className="absolute top-full left-0 mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                  <div className="py-1">
+                    <button
+                      onClick={undo}
+                      disabled={!canUndo() || isRunning}
+                      className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <span className="flex items-center">
+                        <Undo2 className="w-4 h-4 mr-2" />
+                        Undo
+                      </span>
+                      <span className="text-xs text-gray-400">Ctrl+Z</span>
+                    </button>
+                    <button
+                      onClick={redo}
+                      disabled={!canRedo() || isRunning}
+                      className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <span className="flex items-center">
+                        <Redo2 className="w-4 h-4 mr-2" />
+                        Redo
+                      </span>
+                      <span className="text-xs text-gray-400">Ctrl+Y</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* View Menu */}
+              <div className="relative group">
+                <button className="px-3 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded transition-colors">
+                  View
+                </button>
+                <div className="absolute top-full left-0 mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                  <div className="py-1">
+                    <button
+                      onClick={toggleGlobalLedger}
+                      className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                    >
+                      <BookOpen className="w-4 h-4 mr-2" />
+                      Activity Ledger
+                    </button>
+                    <button
+                      onClick={() => setIsStateInspectorOpen(!isStateInspectorOpen)}
+                      className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                    >
+                      <Eye className="w-4 h-4 mr-2" />
+                      State Inspector
+                    </button>
+                    <button
+                      onClick={() => setSidePanelMode('library')}
+                      className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                    >
+                      <Library className="w-4 h-4 mr-2" />
+                      Node Library
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Mode Toggle */}
+              <div className="flex items-center ml-4 bg-white border border-gray-300 rounded">
+                <button
+                  onClick={() => setIsEditMode(false)}
+                  className={cn(
+                    "px-3 py-1 text-xs font-medium transition-colors border-r border-gray-300",
+                    !isEditMode
+                      ? "bg-blue-50 text-blue-700"
+                      : "text-gray-600 hover:bg-gray-50"
+                  )}
+                >
+                  Simulation
+                </button>
+                <button
+                  onClick={() => setIsEditMode(true)}
+                  className={cn(
+                    "px-3 py-1 text-xs font-medium transition-colors",
+                    isEditMode
+                      ? "bg-blue-50 text-blue-700"
+                      : "text-gray-600 hover:bg-gray-50"
+                  )}
+                >
+                  Edit
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Right side info */}
+          <div className="flex items-center space-x-4 text-sm text-gray-600">
+            {currentTemplate && (
+              <span className="flex items-center">
+                <FileText className="w-4 h-4 mr-1" />
+                {currentTemplate.name}
+                {currentTemplate.executionState && (
+                  <span className="ml-2 text-xs text-blue-600">● Saved</span>
+                )}
+              </span>
+            )}
+            {!isEditMode && (
+              <span className="font-mono text-xs">
+                Time: {currentTime}s
+              </span>
             )}
           </div>
         </div>
+
+        {/* Simulation Controls Toolbar */}
+        {!isEditMode && (
+          <div className="h-10 px-4 flex items-center justify-between bg-white border-b border-gray-200">
+            <div className="flex items-center space-x-1">
+              {/* Play/Pause Button */}
+              <button
+                onClick={handlePlayPause}
+                className={cn(
+                  "px-4 py-1.5 text-xs font-medium rounded transition-colors flex items-center",
+                  isRunning
+                    ? "bg-red-100 text-red-700 hover:bg-red-200"
+                    : "bg-green-100 text-green-700 hover:bg-green-200"
+                )}
+              >
+                {isRunning ? (
+                  <>
+                    <Pause className="w-3 h-3 mr-1" /> Pause
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-3 h-3 mr-1" /> Play
+                  </>
+                )}
+              </button>
+
+              {/* Step Button */}
+              <button
+                onClick={handleStepForward}
+                disabled={isRunning}
+                className="px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 rounded transition-colors flex items-center disabled:opacity-50"
+              >
+                <StepForward className="w-3 h-3 mr-1" /> Step
+              </button>
+
+              <div className="w-px h-4 bg-gray-300 mx-2"></div>
+
+              {/* Reload Button */}
+              <button
+                onClick={handleReloadDefaultScenario}
+                className="px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 rounded transition-colors flex items-center"
+              >
+                <RefreshCw className="w-3 h-3 mr-1" /> Reload
+              </button>
+            </div>
+
+            <div className="flex items-center space-x-2 text-xs text-gray-500">
+              {!isEditMode && <span className="animate-pulse text-green-600">● Live</span>}
+              {isEditMode && <span className="text-blue-600">● Edit Mode</span>}
+            </div>
+          </div>
+        )}
       </header>
 
       <main className="flex-1 flex overflow-hidden min-h-0" style={{ height: 'calc(100vh - 80px)' }}>
@@ -531,6 +773,14 @@ export default function TemplateEditorPage() {
       <NodeInspectorModal />
       <TokenInspectorModal />
       <GlobalLedgerModal />
+      <TemplateManagerModal
+        isOpen={isTemplateManagerOpen}
+        onClose={() => setIsTemplateManagerOpen(false)}
+      />
+      <ExecutionManagerModal
+        isOpen={isExecutionManagerOpen}
+        onClose={() => setIsExecutionManagerOpen(false)}
+      />
     </div>
   );
 }
