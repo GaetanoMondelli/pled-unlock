@@ -15,12 +15,27 @@ export default function TemplateSlugPage({ params }: TemplatePageProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const loadTemplate = useSimulationStore(state => state.loadTemplate);
+  const currentTemplate = useSimulationStore(state => state.currentTemplate);
 
   useEffect(() => {
     const loadTemplateBySlug = async () => {
       try {
         setIsLoading(true);
         setError(null);
+
+        // Check if the current template already matches the slug
+        if (currentTemplate) {
+          const currentSlug = currentTemplate.name
+            .toLowerCase()
+            .replace(/[^\w ]+/g, '')
+            .replace(/ +/g, '-');
+
+          if (currentSlug === params.slug) {
+            // Template is already loaded and matches the slug
+            setIsLoading(false);
+            return;
+          }
+        }
 
         // Get templates and find by slug
         const templates = await templateService.getTemplates();
@@ -35,8 +50,10 @@ export default function TemplateSlugPage({ params }: TemplatePageProps) {
           return;
         }
 
-        // Load the template
-        await loadTemplate(template.id);
+        // Only load if it's different from current template
+        if (!currentTemplate || currentTemplate.id !== template.id) {
+          await loadTemplate(template.id);
+        }
         setIsLoading(false);
       } catch (error) {
         console.error('Error loading template by slug:', error);
@@ -46,7 +63,7 @@ export default function TemplateSlugPage({ params }: TemplatePageProps) {
     };
 
     loadTemplateBySlug();
-  }, [params.slug, loadTemplate, router]);
+  }, [params.slug, loadTemplate, router, currentTemplate]);
 
   if (isLoading) {
     return (

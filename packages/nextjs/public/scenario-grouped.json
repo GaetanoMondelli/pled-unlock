@@ -1,0 +1,318 @@
+{
+  "version": "3.0",
+  "groups": {
+    "tags": [
+      {
+        "name": "data-sources",
+        "color": "#22c55e",
+        "description": "Nodes that generate or provide data"
+      },
+      {
+        "name": "processing",
+        "color": "#3b82f6",
+        "description": "Nodes that process and transform data"
+      },
+      {
+        "name": "storage",
+        "color": "#f97316",
+        "description": "Nodes that store or buffer data"
+      },
+      {
+        "name": "outputs",
+        "color": "#8b5cf6",
+        "description": "Final output and consumption nodes"
+      }
+    ],
+    "visualMode": "all",
+    "activeFilters": []
+  },
+  "nodes": [
+    {
+      "nodeId": "DataSource_A",
+      "displayName": "Source A",
+      "position": {
+        "x": 100,
+        "y": 100
+      },
+      "type": "DataSource",
+      "tags": ["data-sources"],
+      "interval": 3,
+      "outputs": [
+        {
+          "name": "output",
+          "destinationNodeId": "Queue_B",
+          "destinationInputName": "input",
+          "interface": {
+            "type": "SimpleValue",
+            "requiredFields": ["data.value"]
+          }
+        }
+      ],
+      "generation": {
+        "type": "random",
+        "valueMin": 1,
+        "valueMax": 10
+      }
+    },
+    {
+      "nodeId": "DataSource_X",
+      "displayName": "Source X",
+      "position": {
+        "x": 100,
+        "y": 350
+      },
+      "type": "DataSource",
+      "tags": ["data-sources"],
+      "interval": 5,
+      "outputs": [
+        {
+          "name": "output",
+          "destinationNodeId": "Queue_B",
+          "destinationInputName": "input",
+          "interface": {
+            "type": "SimpleValue",
+            "requiredFields": ["data.value"]
+          }
+        }
+      ],
+      "generation": {
+        "type": "random",
+        "valueMin": 1,
+        "valueMax": 10
+      }
+    },
+    {
+      "nodeId": "Queue_B",
+      "displayName": "Queue B",
+      "position": {
+        "x": 350,
+        "y": 225
+      },
+      "type": "Queue",
+      "tags": ["storage", "processing"],
+      "inputs": [
+        {
+          "name": "input",
+          "interface": {
+            "type": "SimpleValue",
+            "requiredFields": ["data.value"]
+          },
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "destinationNodeId": "ProcessNode_C",
+          "destinationInputName": "inputA",
+          "interface": {
+            "type": "AggregatedValue",
+            "requiredFields": ["data.sum", "data.count"]
+          }
+        }
+      ],
+      "aggregation": {
+        "method": "sum",
+        "formula": "sum(input.data.value)",
+        "trigger": {
+          "type": "interval",
+          "intervalTime": 2
+        }
+      }
+    },
+    {
+      "nodeId": "DataSource_Y",
+      "displayName": "Source Y",
+      "position": {
+        "x": 100,
+        "y": 500
+      },
+      "type": "DataSource",
+      "tags": ["data-sources"],
+      "interval": 4,
+      "outputs": [
+        {
+          "name": "output",
+          "destinationNodeId": "ProcessNode_C",
+          "destinationInputName": "inputB",
+          "interface": {
+            "type": "SimpleValue",
+            "requiredFields": ["data.value"]
+          }
+        }
+      ],
+      "generation": {
+        "type": "sequential",
+        "startValue": 1,
+        "increment": 2
+      }
+    },
+    {
+      "nodeId": "ProcessNode_C",
+      "displayName": "Processor C",
+      "position": {
+        "x": 600,
+        "y": 300
+      },
+      "type": "ProcessNode",
+      "tags": ["processing"],
+      "inputs": [
+        {
+          "name": "inputA",
+          "interface": {
+            "type": "AggregatedValue",
+            "requiredFields": ["data.sum", "data.count"]
+          },
+          "required": true
+        },
+        {
+          "name": "inputB",
+          "interface": {
+            "type": "SimpleValue",
+            "requiredFields": ["data.value"]
+          },
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "success",
+          "destinationNodeId": "Sink_D",
+          "destinationInputName": "input",
+          "interface": {
+            "type": "ProcessedValue",
+            "requiredFields": ["data.result"]
+          }
+        },
+        {
+          "name": "failure",
+          "destinationNodeId": "Sink_E",
+          "destinationInputName": "input",
+          "interface": {
+            "type": "ErrorValue",
+            "requiredFields": ["data.error"]
+          }
+        }
+      ],
+      "formula": "inputA.data.sum + inputB.data.value"
+    },
+    {
+      "nodeId": "Sink_D",
+      "displayName": "Success Sink",
+      "position": {
+        "x": 850,
+        "y": 250
+      },
+      "type": "Sink",
+      "tags": ["outputs"],
+      "inputs": [
+        {
+          "name": "input",
+          "interface": {
+            "type": "ProcessedValue",
+            "requiredFields": ["data.result"]
+          },
+          "required": true
+        }
+      ]
+    },
+    {
+      "nodeId": "Sink_E",
+      "displayName": "Error Sink",
+      "position": {
+        "x": 850,
+        "y": 350
+      },
+      "type": "Sink",
+      "tags": ["outputs"],
+      "inputs": [
+        {
+          "name": "input",
+          "interface": {
+            "type": "ErrorValue",
+            "requiredFields": ["data.error"]
+          },
+          "required": true
+        }
+      ]
+    },
+    {
+      "nodeId": "DataSource_Z",
+      "displayName": "Source Z (External)",
+      "position": {
+        "x": 100,
+        "y": 650
+      },
+      "type": "DataSource",
+      "tags": ["data-sources"],
+      "interval": 7,
+      "outputs": [
+        {
+          "name": "output",
+          "destinationNodeId": "ProcessNode_F",
+          "destinationInputName": "input",
+          "interface": {
+            "type": "SimpleValue",
+            "requiredFields": ["data.value"]
+          }
+        }
+      ],
+      "generation": {
+        "type": "constant",
+        "value": 42
+      }
+    },
+    {
+      "nodeId": "ProcessNode_F",
+      "displayName": "External Processor",
+      "position": {
+        "x": 350,
+        "y": 650
+      },
+      "type": "ProcessNode",
+      "tags": ["processing"],
+      "inputs": [
+        {
+          "name": "input",
+          "interface": {
+            "type": "SimpleValue",
+            "requiredFields": ["data.value"]
+          },
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "destinationNodeId": "Sink_G",
+          "destinationInputName": "input",
+          "interface": {
+            "type": "ProcessedValue",
+            "requiredFields": ["data.result"]
+          }
+        }
+      ],
+      "formula": "input.data.value * 2"
+    },
+    {
+      "nodeId": "Sink_G",
+      "displayName": "External Sink",
+      "position": {
+        "x": 600,
+        "y": 650
+      },
+      "type": "Sink",
+      "tags": ["outputs"],
+      "inputs": [
+        {
+          "name": "input",
+          "interface": {
+            "type": "ProcessedValue",
+            "requiredFields": ["data.result"]
+          },
+          "required": true
+        }
+      ]
+    }
+  ]
+}

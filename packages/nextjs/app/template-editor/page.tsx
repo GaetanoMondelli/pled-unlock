@@ -10,6 +10,7 @@ import TemplateManagerModal from "@/components/modals/TemplateManagerModal";
 import ExecutionManagerModal from "@/components/modals/ExecutionManagerModal";
 import IntegratedAIAssistant from "@/components/ai/IntegratedAIAssistant";
 import NodeLibraryPanel from "@/components/library/NodeLibraryPanel";
+import GroupManagementPanel from "@/components/graph/GroupManagementPanel";
 import StateInspectorPanel from "@/components/ui/state-inspector-panel";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,7 +27,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useSimulationStore } from "@/stores/simulationStore";
-import { AlertCircle, BookOpen, Edit, Pause, Play, RefreshCw, StepForward, Brain, Eye, EyeOff, Activity, Library, Undo2, Redo2, FileText, Archive } from "lucide-react";
+import { AlertCircle, BookOpen, Edit, Pause, Play, RefreshCw, StepForward, Brain, Eye, EyeOff, Activity, Library, Undo2, Redo2, FileText, Archive, ScrollText, Group } from "lucide-react";
 import { cn } from "~~/lib/utils";
 
 export default function TemplateEditorPage() {
@@ -51,6 +52,7 @@ export default function TemplateEditorPage() {
   const currentExecution = useSimulationStore(state => state.currentExecution);
   const loadTemplates = useSimulationStore(state => state.loadTemplates);
   const updateCurrentTemplate = useSimulationStore(state => state.updateCurrentTemplate);
+  const globalActivityLog = useSimulationStore(state => state.globalActivityLog);
 
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
@@ -62,7 +64,7 @@ export default function TemplateEditorPage() {
   const [isAIPanelVisible, setIsAIPanelVisible] = useState(true);
   const [isResizing, setIsResizing] = useState(false);
   const [isStateInspectorOpen, setIsStateInspectorOpen] = useState(false);
-  const [sidePanelMode, setSidePanelMode] = useState<'ai' | 'library'>('ai');
+  const [sidePanelMode, setSidePanelMode] = useState<'ai' | 'library' | 'groups'>('ai');
   const [isTemplateManagerOpen, setIsTemplateManagerOpen] = useState(false);
   const [isExecutionManagerOpen, setIsExecutionManagerOpen] = useState(false);
   const [isLibraryPanelOpen, setIsLibraryPanelOpen] = useState(false);
@@ -158,61 +160,22 @@ export default function TemplateEditorPage() {
   }, [fetchDefaultScenarioContent, loadScenario]); // Removed toast dependency
 
   useEffect(() => {
-    // Run scenario loading only once on mount
+    // Load available templates and check if we need to force template creation
     const loadOnce = async () => {
       setIsLoading(true);
       try {
-        console.log("Starting initial template and scenario load...");
-
-        // First, load available templates
+        console.log("Loading available templates...");
         await loadTemplates();
 
-        // Then try to load a default template
         const templates = useSimulationStore.getState().availableTemplates;
-        if (templates.length > 0) {
-          // Find the default template, or use the first one
-          const defaultTemplate = templates.find(t => t.isDefault) || templates[0];
-          const loadTemplate = useSimulationStore.getState().loadTemplate;
-          await loadTemplate(defaultTemplate.id);
-          console.log(`Default template "${defaultTemplate.name}" loaded successfully`);
-        } else {
-          // Fallback to loading scenario.json directly
-          console.log("No templates found, loading scenario.json...");
-          const response = await fetch("/scenario.json");
-          if (response.ok) {
-            const defaultData = await response.json();
-            setDefaultScenarioContent(JSON.stringify(defaultData, null, 2));
-            await loadScenario(defaultData);
-            console.log("Scenario loaded successfully");
-          } else {
-            console.warn("Using fallback scenario");
-            const fallbackScenario = {
-              version: "3.0",
-              nodes: [
-                {
-                  nodeId: "source1",
-                  type: "DataSource",
-                  displayName: "Token Source",
-                  position: { x: 100, y: 100 },
-                  interval: 5,
-                  generation: { type: "random", valueMin: 1, valueMax: 10 },
-                  outputs: [{ destinationNodeId: "sink1" }],
-                },
-                {
-                  nodeId: "sink1",
-                  type: "Sink",
-                  displayName: "Token Sink",
-                  position: { x: 400, y: 100 },
-                  inputs: [{ nodeId: "source1" }],
-                },
-              ],
-            };
-            setDefaultScenarioContent(JSON.stringify(fallbackScenario, null, 2));
-            await loadScenario(fallbackScenario);
-          }
+        if (templates.length === 0) {
+          console.log("No templates found, opening template manager...");
+          setIsTemplateManagerOpen(true);
         }
+        // Don't auto-load any template - let user choose
       } catch (error) {
-        console.error("Error loading scenario:", error);
+        console.error("Error loading templates:", error);
+        // If template loading fails, still allow user to work
       }
       setIsLoading(false);
     };
@@ -228,12 +191,17 @@ export default function TemplateEditorPage() {
 
   // Navigate to template slug URL when template is loaded
   useEffect(() => {
-    if (currentTemplate && window.location.pathname === '/template-editor') {
+    if (currentTemplate) {
       const templateSlug = currentTemplate.name
         .toLowerCase()
         .replace(/[^\w ]+/g, '')
         .replace(/ +/g, '-');
-      router.push(`/template-editor/${templateSlug}`);
+      const expectedPath = `/template-editor/${templateSlug}`;
+
+      // Only navigate if we're not already on the correct template path
+      if (window.location.pathname !== expectedPath) {
+        router.push(expectedPath);
+      }
     }
   }, [currentTemplate, router]);
 
@@ -488,6 +456,13 @@ export default function TemplateEditorPage() {
                       <Library className="w-4 h-4 mr-2" />
                       Node Library
                     </button>
+                    <button
+                      onClick={() => setSidePanelMode('groups')}
+                      className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                    >
+                      <Group className="w-4 h-4 mr-2" />
+                      Groups & Tags
+                    </button>
                   </div>
                 </div>
               </div>
@@ -617,36 +592,8 @@ export default function TemplateEditorPage() {
             </div>
           )}
 
-          {/* Side Panel Toggle Buttons */}
-          <div className="absolute top-4 right-4 z-10 flex gap-1">
-            {isAIPanelVisible && (
-              <div className="flex bg-white border border-slate-200 rounded-lg shadow-sm">
-                <button
-                  onClick={() => setSidePanelMode('ai')}
-                  className={cn(
-                    "px-2 py-1 text-xs font-medium rounded-l-lg transition-all flex items-center gap-1",
-                    sidePanelMode === 'ai'
-                      ? "bg-slate-600 text-white" 
-                      : "text-slate-600 hover:text-slate-800 hover:bg-slate-50"
-                  )}
-                >
-                  <Brain className="h-3 w-3" />
-                  AI
-                </button>
-                <button
-                  onClick={() => setSidePanelMode('library')}
-                  className={cn(
-                    "px-2 py-1 text-xs font-medium rounded-r-lg transition-all flex items-center gap-1",
-                    sidePanelMode === 'library'
-                      ? "bg-indigo-600 text-white" 
-                      : "text-slate-600 hover:text-slate-800 hover:bg-slate-50"
-                  )}
-                >
-                  <Library className="h-3 w-3" />
-                  Library
-                </button>
-              </div>
-            )}
+          {/* Panel Visibility Toggle Button */}
+          <div className="absolute top-4 right-4 z-10">
             <button
               onClick={() => setIsAIPanelVisible(!isAIPanelVisible)}
               className="w-8 h-8 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-lg flex items-center justify-center transition-colors"
@@ -674,56 +621,109 @@ export default function TemplateEditorPage() {
           </div>
         )}
 
-        {/* Side Panel (AI Assistant or Node Library) */}
+        {/* Side Panel (AI Assistant, Node Library, or Ledger) */}
         {isAIPanelVisible && (
-          <div 
+          <div
             className="border-l border-slate-200 bg-white flex flex-col min-h-0"
-            style={{ 
+            style={{
               width: `${aiPanelWidth}px`,
               minWidth: `${aiPanelWidth}px`,
               maxWidth: `${aiPanelWidth}px`
             }}
           >
-            {sidePanelMode === 'ai' ? (
-              <>
-                <div className="px-3 py-1.5 border-b border-slate-200 bg-slate-50 flex-shrink-0">
-                  <div className="flex items-center justify-center">
-                    <div className="w-8 h-8 bg-gradient-to-br from-slate-600 to-slate-800 rounded-full flex items-center justify-center shadow-sm">
-                      <Brain className="h-4 w-4 text-white" />
+            {/* Panel Header with Toggle Buttons */}
+            <div className="border-b border-slate-200 bg-slate-50 flex-shrink-0">
+              <div className="flex items-center justify-center p-2">
+                <div className="flex bg-white border border-slate-200 rounded-lg shadow-sm">
+                  <button
+                    onClick={() => setSidePanelMode('ai')}
+                    className={cn(
+                      "px-3 py-1.5 text-xs font-medium rounded-l-lg transition-all flex items-center gap-2",
+                      sidePanelMode === 'ai'
+                        ? "bg-slate-600 text-white"
+                        : "text-slate-600 hover:text-slate-800 hover:bg-slate-50"
+                    )}
+                  >
+                    <Brain className="h-3 w-3" />
+                    AI
+                  </button>
+                  <button
+                    onClick={() => setSidePanelMode('library')}
+                    className={cn(
+                      "px-3 py-1.5 text-xs font-medium transition-all flex items-center gap-2 border-l border-slate-200",
+                      sidePanelMode === 'library'
+                        ? "bg-indigo-600 text-white"
+                        : "text-slate-600 hover:text-slate-800 hover:bg-slate-50"
+                    )}
+                  >
+                    <Library className="h-3 w-3" />
+                    Library
+                  </button>
+                  <button
+                    onClick={() => setSidePanelMode('groups')}
+                    className={cn(
+                      "px-3 py-1.5 text-xs font-medium rounded-r-lg transition-all flex items-center gap-2 border-l border-slate-200",
+                      sidePanelMode === 'groups'
+                        ? "bg-emerald-600 text-white"
+                        : "text-slate-600 hover:text-slate-800 hover:bg-slate-50"
+                    )}
+                  >
+                    <Group className="h-3 w-3" />
+                    Groups
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Panel Content */}
+            <div className="flex-1 min-h-0 flex flex-col">
+              {sidePanelMode === 'ai' && (
+                <IntegratedAIAssistant
+                  className="flex-1 min-h-0"
+                  isEditMode={isEditMode}
+                  scenarioContent={scenario ? JSON.stringify(scenario, null, 2) : defaultScenarioContent}
+                  onScenarioUpdate={(newScenario) => {
+                    try {
+                      const parsedScenario = JSON.parse(newScenario);
+                      loadScenario(parsedScenario);
+                      toast({ title: "Success", description: "Scenario updated automatically by AI" });
+                    } catch (error) {
+                      toast({
+                        variant: "destructive",
+                        title: "JSON Error",
+                        description: "AI generated invalid JSON"
+                      });
+                    }
+                  }}
+                />
+              )}
+
+              {sidePanelMode === 'library' && (
+                <NodeLibraryPanel
+                  className="flex-1"
+                  onNodeDrop={(nodeType, position) => {
+                    // TODO: Implement node drop functionality
+                    console.log('Node drop:', nodeType, position);
+                  }}
+                />
+              )}
+
+              {sidePanelMode === 'groups' && (
+                <div className="flex-1 min-h-0 flex flex-col">
+                  <div className="px-3 py-2 border-b border-slate-200 bg-white flex-shrink-0">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-medium text-slate-800 flex items-center gap-2">
+                        <Group className="h-4 w-4" />
+                        Groups & Tags
+                      </h3>
                     </div>
                   </div>
+                  <div className="flex-1 min-h-0 overflow-hidden">
+                    <GroupManagementPanel className="h-full p-3" />
+                  </div>
                 </div>
-                
-                <div className="flex-1 min-h-0 flex flex-col">
-                  <IntegratedAIAssistant 
-                    className="flex-1 min-h-0" 
-                    isEditMode={isEditMode}
-                    scenarioContent={scenario ? JSON.stringify(scenario, null, 2) : defaultScenarioContent}
-                    onScenarioUpdate={(newScenario) => {
-                      try {
-                        const parsedScenario = JSON.parse(newScenario);
-                        loadScenario(parsedScenario);
-                        toast({ title: "Success", description: "Scenario updated automatically by AI" });
-                      } catch (error) {
-                        toast({ 
-                          variant: "destructive", 
-                          title: "JSON Error", 
-                          description: "AI generated invalid JSON" 
-                        });
-                      }
-                    }}
-                  />
-                </div>
-              </>
-            ) : (
-              <NodeLibraryPanel 
-                className="flex-1"
-                onNodeDrop={(nodeType, position) => {
-                  // TODO: Implement node drop functionality
-                  console.log('Node drop:', nodeType, position);
-                }}
-              />
-            )}
+              )}
+            </div>
           </div>
         )}
       </main>

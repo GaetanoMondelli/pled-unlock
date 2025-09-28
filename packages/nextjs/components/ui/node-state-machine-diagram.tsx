@@ -22,6 +22,7 @@ import type { AnyNode, NodeStateMachineState, StateMachineInfo } from "@/lib/sim
 interface StateNodeData {
   label: string;
   isActive: boolean;
+  isSelected: boolean;
   stateType: "initial" | "intermediate" | "final" | "error";
   variables?: {
     buffer_size?: number;
@@ -50,6 +51,7 @@ interface NodeStateMachineDiagramProps {
 // Node component for state machine states WITH VARIABLES
 const StateNode: React.FC<{ data: StateNodeData; selected?: boolean }> = ({ data, selected }) => {
   const getStateColor = () => {
+    if (data.isSelected) return "border-blue-600 bg-blue-100 text-blue-800";
     if (data.isActive) return "border-green-600 bg-green-100 text-green-800";
     if (data.stateType === "initial") return "border-teal-500 bg-teal-50 text-teal-800";
     if (data.stateType === "final") return "border-indigo-500 bg-indigo-50 text-indigo-800";
@@ -95,8 +97,11 @@ const StateNode: React.FC<{ data: StateNodeData; selected?: boolean }> = ({ data
             )}
           </div>
         )}
-        {data.isActive && (
+        {data.isActive && !data.isSelected && (
           <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-pulse" />
+        )}
+        {data.isSelected && (
+          <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full" />
         )}
       </div>
       {/* Source (outgoing) */}
@@ -168,7 +173,7 @@ export const NodeStateMachineDiagram: React.FC<NodeStateMachineDiagramProps> = (
         case 'FSMProcessNode':
           // For FSM nodes, get states from the FSM definition
           const fsmNode = nodeConfig as any;
-          return fsmNode.fsm?.states?.map((s: any) => s.name) || ['idle'];
+          return fsmNode.fsm?.states || ['idle'];
         case 'Sink':
           return ['sink_idle', 'sink_processing'];
         default:
@@ -243,6 +248,7 @@ export const NodeStateMachineDiagram: React.FC<NodeStateMachineDiagramProps> = (
       data: {
         label: state.label,
         isActive: currentState === state.id,
+        isSelected: overrideActiveState === state.id,
         stateType: state.type,
         variables: variables && currentState === state.id ? {
           buffer_size: variables.buffer_size,

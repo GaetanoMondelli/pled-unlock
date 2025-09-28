@@ -1,11 +1,13 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { Handle, Position, useReactFlow } from "reactflow";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Settings, Activity, Variable, Trash2 } from "lucide-react";
+import { Settings, Activity, Variable, Trash2, ChevronDown, ChevronUp, Edit3 } from "lucide-react";
 import type { RFNodeData } from "@/lib/simulation/types";
+import FSMConfigurationModal from "./FSMConfigurationModal";
 
 interface FSMProcessNodeDisplayProps {
   data: RFNodeData;
@@ -17,6 +19,8 @@ const FSMProcessNodeDisplay: React.FC<FSMProcessNodeDisplayProps> = ({ data, sel
   const config = data.config;
   const fsmState = data.config.type === "FSMProcessNode" ? (data as any).nodeState : null;
   const { deleteElements } = useReactFlow();
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
 
   // Get FSM definition first
   const fsmDefinition = config.fsm;
@@ -79,26 +83,77 @@ const FSMProcessNodeDisplay: React.FC<FSMProcessNodeDisplayProps> = ({ data, sel
               FSM Processor
             </div>
           </div>
-          {data.isActive && (
-            <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse flex-shrink-0" />
-          )}
+          <div className="flex items-center gap-1">
+            {data.isActive && (
+              <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse flex-shrink-0" />
+            )}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsConfigModalOpen(true);
+              }}
+              className="p-1 text-orange-600 hover:text-orange-800 hover:bg-orange-200 rounded transition-colors"
+              title="Configure FSM"
+            >
+              <Edit3 className="h-3 w-3" />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsExpanded(!isExpanded);
+              }}
+              className="p-1 text-orange-600 hover:text-orange-800 hover:bg-orange-200 rounded transition-colors"
+              title={isExpanded ? "Collapse" : "Expand"}
+            >
+              {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Current FSM State */}
+      {/* FSM States */}
       <div className="px-3 py-2 border-b border-slate-100">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Activity className="h-3 w-3 text-slate-500" />
-            <span className="text-xs text-slate-600 font-medium">State:</span>
+        <div className="flex items-center gap-2 mb-2">
+          <Activity className="h-3 w-3 text-slate-500" />
+          <span className="text-xs text-slate-600 font-medium">
+            States ({totalStates})
+          </span>
+          {!isExpanded && (
+            <span className="text-xs text-slate-400">- Current: {currentFSMState}</span>
+          )}
+        </div>
+
+        {isExpanded ? (
+          <div className="flex flex-wrap gap-1">
+            {fsmDefinition?.states?.map((state: string) => (
+              <Badge
+                key={state}
+                variant="outline"
+                className={cn(
+                  "text-xs font-mono px-2 py-1 transition-all",
+                  state === currentFSMState
+                    ? "bg-orange-100 text-orange-800 border-orange-300 ring-1 ring-orange-400"
+                    : state === fsmDefinition?.initialState
+                    ? "bg-green-50 text-green-700 border-green-200"
+                    : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+                )}
+              >
+                {state === currentFSMState && "● "}
+                {state}
+                {state === fsmDefinition?.initialState && " (initial)"}
+              </Badge>
+            )) || (
+              <span className="text-xs text-slate-400 italic">No states defined</span>
+            )}
           </div>
+        ) : (
           <Badge
             variant="outline"
             className={cn("text-xs font-mono", getStateColor(currentFSMState))}
           >
-            {currentFSMState}
+            ● {currentFSMState}
           </Badge>
-        </div>
+        )}
       </div>
 
       {/* FSM Variables (if any) */}
@@ -122,6 +177,19 @@ const FSMProcessNodeDisplay: React.FC<FSMProcessNodeDisplayProps> = ({ data, sel
                 +{Object.keys(fsmVariables).length - 3} more...
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* FSL Definition (when expanded) */}
+      {isExpanded && config.fsl && (
+        <div className="px-3 py-2 border-b border-slate-100">
+          <div className="flex items-center gap-2 mb-2">
+            <Settings className="h-3 w-3 text-slate-500" />
+            <span className="text-xs text-slate-600 font-medium">FSL Definition</span>
+          </div>
+          <div className="bg-slate-50 rounded p-2 text-xs font-mono text-slate-700 max-h-32 overflow-y-auto">
+            <pre className="whitespace-pre-wrap">{config.fsl}</pre>
           </div>
         </div>
       )}
@@ -167,6 +235,14 @@ const FSMProcessNodeDisplay: React.FC<FSMProcessNodeDisplayProps> = ({ data, sel
         className="!bg-orange-500 !border-orange-600 !w-3 !h-3 !border-2"
       />
       </div>
+
+      {/* FSM Configuration Modal */}
+      <FSMConfigurationModal
+        isOpen={isConfigModalOpen}
+        onClose={() => setIsConfigModalOpen(false)}
+        nodeId={id}
+        currentConfig={config}
+      />
     </div>
   );
 };

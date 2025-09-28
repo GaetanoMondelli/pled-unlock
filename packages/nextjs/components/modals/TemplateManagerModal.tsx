@@ -28,7 +28,9 @@ import {
   User,
   CheckCircle2,
   AlertCircle,
-  Loader2
+  Loader2,
+  Code,
+  Eye
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
@@ -44,6 +46,7 @@ const TemplateManagerModal: React.FC<TemplateManagerModalProps> = ({ isOpen, onC
   const [newTemplateName, setNewTemplateName] = useState("");
   const [newTemplateDescription, setNewTemplateDescription] = useState("");
   const [createFromDefault, setCreateFromDefault] = useState(true);
+  const [viewingTemplate, setViewingTemplate] = useState<TemplateDocument | null>(null);
 
   // Store hooks
   const loadTemplates = useSimulationStore(state => state.loadTemplates);
@@ -158,8 +161,15 @@ const TemplateManagerModal: React.FC<TemplateManagerModalProps> = ({ isOpen, onC
     });
   };
 
+  const handleClose = () => {
+    // Only allow closing if there are templates available
+    if (availableTemplates.length > 0) {
+      onClose();
+    }
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center">
@@ -167,7 +177,10 @@ const TemplateManagerModal: React.FC<TemplateManagerModalProps> = ({ isOpen, onC
             Template Manager
           </DialogTitle>
           <DialogDescription>
-            Create, manage, and load simulation templates. Templates store node configurations and can be reused across different executions.
+            {availableTemplates.length === 0
+              ? "You need to create at least one template to start working. Templates store your node configurations and allow you to save and reuse your work."
+              : "Create, manage, and load simulation templates. Templates store node configurations and can be reused across different executions."
+            }
           </DialogDescription>
         </DialogHeader>
 
@@ -267,94 +280,116 @@ const TemplateManagerModal: React.FC<TemplateManagerModalProps> = ({ isOpen, onC
               </div>
 
               <ScrollArea className="flex-1">
-                <div className="p-4 space-y-3">
-                  {availableTemplates.length === 0 ? (
-                    <div className="text-center py-8">
-                      <FileText className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                      <p className="text-gray-600 mb-2">No templates found</p>
-                      <p className="text-sm text-gray-500 mb-4">
-                        Create your first template to get started.
-                      </p>
-                      <Button onClick={() => setIsCreating(true)}>
-                        <Plus className="mr-2 h-4 w-4" />
-                        Create Template
-                      </Button>
+                {availableTemplates.length === 0 && !isCreating ? (
+                  <div className="text-center py-8">
+                    <FileText className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                    <p className="text-gray-600 mb-2">No templates found</p>
+                    <p className="text-sm text-gray-500 mb-4">
+                      You must create at least one template to start working.
+                    </p>
+                    <Button onClick={() => setIsCreating(true)} size="lg">
+                      <Plus className="mr-2 h-4 w-4" />
+                      Create Your First Template
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="divide-y">
+                    {/* Header */}
+                    <div className="px-4 py-2 bg-gray-50 text-xs font-medium text-gray-500 uppercase tracking-wide">
+                      <div className="grid grid-cols-12 gap-2 items-center">
+                        <div className="col-span-5">Name</div>
+                        <div className="col-span-3">Created</div>
+                        <div className="col-span-1">Version</div>
+                        <div className="col-span-3 text-center">Actions</div>
+                      </div>
                     </div>
-                  ) : (
-                    availableTemplates.map((template) => (
+
+                    {/* Template rows */}
+                    {availableTemplates.map((template) => (
                       <div
                         key={template.id}
-                        className={`p-4 border rounded-lg hover:bg-gray-50 transition-colors ${
-                          currentTemplate?.id === template.id ? "border-primary bg-primary/5" : "border-gray-200"
+                        className={`px-4 py-2 hover:bg-gray-50 transition-colors ${
+                          currentTemplate?.id === template.id ? "bg-blue-50" : ""
                         }`}
                       >
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center space-x-2 mb-2">
-                              <h4 className="font-semibold text-gray-900">{template.name}</h4>
-                              {template.isDefault && (
-                                <Badge variant="secondary" className="text-xs">
-                                  <Star className="h-3 w-3 mr-1" />
-                                  Default
-                                </Badge>
-                              )}
-                              {currentTemplate?.id === template.id && (
-                                <Badge className="text-xs">
-                                  <CheckCircle2 className="h-3 w-3 mr-1" />
-                                  Current
-                                </Badge>
-                              )}
-                            </div>
-
-                            {template.description && (
-                              <p className="text-sm text-gray-600 mb-3">{template.description}</p>
-                            )}
-
-                            <div className="flex items-center space-x-4 text-xs text-gray-500">
-                              <div className="flex items-center">
-                                <Calendar className="h-3 w-3 mr-1" />
-                                Created {formatDate(template.createdAt)}
+                        <div className="grid grid-cols-12 gap-2 items-center text-sm">
+                          {/* Name column */}
+                          <div className="col-span-5 flex items-center space-x-2">
+                            <FileText className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center space-x-2">
+                                <span className="font-medium text-gray-900 truncate">
+                                  {template.name}
+                                </span>
+                                {currentTemplate?.id === template.id && (
+                                  <CheckCircle2 className="h-3 w-3 text-green-500 flex-shrink-0" title="Currently loaded" />
+                                )}
                               </div>
-                              <div className="flex items-center">
-                                <FileText className="h-3 w-3 mr-1" />
-                                v{template.version}
-                              </div>
+                              {template.description && (
+                                <div className="text-xs text-gray-500 truncate" title={template.description}>
+                                  {template.description}
+                                </div>
+                              )}
                             </div>
                           </div>
 
-                          <div className="flex items-center space-x-2 ml-4">
+                          {/* Created column */}
+                          <div className="col-span-3 text-xs text-gray-500">
+                            {new Date(template.createdAt).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric'
+                            })}
+                          </div>
+
+                          {/* Version column */}
+                          <div className="col-span-1 text-xs text-gray-500 font-mono">
+                            v{template.version}
+                          </div>
+
+                          {/* Actions column */}
+                          <div className="col-span-3 flex items-center justify-center space-x-1">
                             <Button
-                              variant="outline"
+                              variant="ghost"
                               size="sm"
                               onClick={() => handleLoadTemplate(template.id)}
                               disabled={isLoading || currentTemplate?.id === template.id}
+                              className="h-7 px-2 text-xs"
+                              title={currentTemplate?.id === template.id ? "Currently loaded" : "Load template"}
                             >
-                              {isLoading ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
+                              {isLoading && currentTemplate?.id !== template.id ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : currentTemplate?.id === template.id ? (
+                                <CheckCircle2 className="h-3 w-3 text-green-500" />
                               ) : (
-                                <>
-                                  <Download className="h-4 w-4 mr-1" />
-                                  Load
-                                </>
+                                <Download className="h-3 w-3" />
                               )}
                             </Button>
-                            {!template.isDefault && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleDeleteTemplate(template.id, template.name)}
-                                disabled={isLoading}
-                                className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-300"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setViewingTemplate(template)}
+                              className="h-7 px-2 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                              title="View JSON"
+                            >
+                              <Code className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteTemplate(template.id, template.name)}
+                              disabled={isLoading}
+                              className="h-7 px-2 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                              title="Delete template"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
                           </div>
                         </div>
                       </div>
-                    ))
-                  )}
-                </div>
+                    ))}
+                  </div>
+                )}
               </ScrollArea>
             </div>
           )}
@@ -366,6 +401,69 @@ const TemplateManagerModal: React.FC<TemplateManagerModalProps> = ({ isOpen, onC
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      {/* JSON Viewer Modal */}
+      {viewingTemplate && (
+        <Dialog open={!!viewingTemplate} onOpenChange={() => setViewingTemplate(null)}>
+          <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col">
+            <DialogHeader>
+              <DialogTitle className="flex items-center">
+                <Code className="h-5 w-5 mr-2" />
+                Template JSON: {viewingTemplate.name}
+              </DialogTitle>
+              <DialogDescription>
+                Raw JSON representation of the template. You can copy this to backup or share the template.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="flex-1 min-h-0 overflow-hidden">
+              <ScrollArea className="h-96 w-full">
+                <pre className="text-xs font-mono bg-gray-50 p-4 rounded border whitespace-pre-wrap">
+                  {JSON.stringify(viewingTemplate, null, 2)}
+                </pre>
+              </ScrollArea>
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  navigator.clipboard.writeText(JSON.stringify(viewingTemplate, null, 2));
+                  toast({
+                    title: "Copied to clipboard",
+                    description: "Template JSON has been copied to your clipboard.",
+                  });
+                }}
+              >
+                Copy JSON
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const blob = new Blob([JSON.stringify(viewingTemplate, null, 2)], { type: 'application/json' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `${viewingTemplate.name.replace(/[^\w-]/g, '_')}.json`;
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  URL.revokeObjectURL(url);
+                  toast({
+                    title: "Downloaded",
+                    description: "Template JSON has been downloaded.",
+                  });
+                }}
+              >
+                Download JSON
+              </Button>
+              <Button onClick={() => setViewingTemplate(null)}>
+                Close
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </Dialog>
   );
 };

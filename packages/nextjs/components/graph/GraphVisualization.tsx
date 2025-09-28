@@ -7,6 +7,7 @@ import QueueNodeDisplay from "./nodes/QueueNodeDisplay";
 import SinkNodeDisplay from "./nodes/SinkNodeDisplay";
 import FSMProcessNodeDisplay from "./nodes/FSMProcessNodeDisplay";
 import ModuleNodeDisplay from "./nodes/ModuleNodeDisplay";
+import GroupNodeDisplay from "./nodes/GroupNodeDisplay";
 import { type AnyNode, type RFEdgeData, type RFNodeData } from "@/lib/simulation/types";
 import { useSimulationStore } from "@/stores/simulationStore";
 import { cn } from "@/lib/utils";
@@ -34,6 +35,7 @@ const nodeTypes = {
   FSMProcessNode: FSMProcessNodeDisplay,
   Sink: SinkNodeDisplay,
   Module: ModuleNodeDisplay,
+  Group: GroupNodeDisplay,
 };
 
 const edgeTypes = {
@@ -59,6 +61,40 @@ const GraphVisualization: React.FC = () => {
   const [activeNodes, setActiveNodes] = useState<Set<string>>(new Set());
   const [animatedEdges, setAnimatedEdges] = useState<Set<string>>(new Set());
   const [isDragOver, setIsDragOver] = useState(false);
+
+  // Filter nodes based on grouping configuration
+  const filteredNodes = useMemo(() => {
+    if (!scenario) return [];
+    
+    const visualMode = scenario.groups?.visualMode || "all";
+    const activeFilters = scenario.groups?.activeFilters || [];
+    
+    if (visualMode === "filtered" && activeFilters.length > 0) {
+      // Show only nodes that have at least one of the active tags
+      return scenario.nodes.filter(node => {
+        if (node.type === "Group") return true; // Always show groups
+        if (!node.tags || node.tags.length === 0) return false;
+        return node.tags.some(tag => activeFilters.includes(tag));
+      });
+    }
+    
+    if (visualMode === "grouped") {
+      // Show groups and ungrouped nodes
+      const groupedNodeIds = new Set<string>();
+      scenario.nodes.forEach(node => {
+        if (node.type === "Group") {
+          node.containedNodes?.forEach(nodeId => groupedNodeIds.add(nodeId));
+        }
+      });
+      
+      return scenario.nodes.filter(node => 
+        node.type === "Group" || !groupedNodeIds.has(node.nodeId)
+      );
+    }
+    
+    // Default: show all nodes
+    return scenario.nodes;
+  }, [scenario]);
 
   const onNodesChange: OnNodesChange = useCallback((changes) => {
     // Handle node deletions by updating the scenario
@@ -163,24 +199,31 @@ const GraphVisualization: React.FC = () => {
   // Initialize nodes and edges when scenario loads
   useEffect(() => {
     if (!scenario) return;
-    const initialNodes: Node<RFNodeData>[] = scenario.nodes.map((node: AnyNode) => {
+    const initialNodes: Node<RFNodeData>[] = filteredNodes.map((node: AnyNode) => {
       const position = {
         x: node.position?.x ?? 0,
         y: node.position?.y ?? 0,
       };
+
+      const baseData: RFNodeData = {
+        label: node.displayName,
+        type: node.type,
+        config: node,
+        isActive: false,
+        details: "",
+      };
+
+      // Add specific data for Group nodes
+      if (node.type === "Group") {
+        baseData.nodeCount = node.containedNodes?.length || 0;
+      }
 
       return {
         id: node.nodeId,
         type: node.type,
         position,
         deletable: true,
-        data: {
-          label: node.displayName,
-          type: node.type,
-          config: node,
-          isActive: false,
-          details: "",
-        },
+        data: baseData,
         sourcePosition: Position.Right,
         targetPosition: Position.Left,
       };
@@ -188,11 +231,54 @@ const GraphVisualization: React.FC = () => {
     setRfNodes(initialNodes);
 
     const initialEdges: Edge<RFEdgeData>[] = [];
-    scenario.nodes.forEach(node => {
-      // All nodes now use outputs array in v3
-      if (node.outputs) {
+    
+    // Create edges based on visible nodes only
+    const visibleNodeIds = new Set(filteredNodes.map(node => node.nodeId));
+    
+    filteredNodes.forEach(node => {
+      if (node.type === "Group") {
+        // Handle group node edges differently
+        // Groups show aggregated inputs/outputs from contained nodes
+        // This is a simplified version - you may want more sophisticated edge handling
+        if (node.inputs) {
+          node.inputs.forEach((input, index) => {
+            if (input.nodeId && visibleNodeIds.has(input.nodeId)) {
+              initialEdges.push({
+                id: `e-${input.nodeId}-group-${node.nodeId}`,
+                source: input.nodeId,
+                target: node.nodeId,
+                targetHandle: `input-${input.name}`,
+                type: "default",
+                deletable: true,
+                markerEnd: { type: MarkerType.ArrowClosed, color: "hsl(var(--foreground))" },
+                data: { animated: false },
+              });
+            }
+          });
+        }
+        
+        if (node.outputs) {
+          node.outputs.forEach((output, index) => {
+            if (output.destinationNodeId && visibleNodeIds.has(output.destinationNodeId)) {
+              initialEdges.push({
+                id: `e-${node.nodeId}-${output.name}-${output.destinationNodeId}`,
+                source: node.nodeId,
+                sourceHandle: `output-${output.name}`,
+                target: output.destinationNodeId,
+                type: "default",
+                deletable: true,
+                markerEnd: { type: MarkerType.ArrowClosed, color: "hsl(var(--foreground))" },
+                data: { animated: false },
+              });
+            }
+          });
+        }
+      } else if (node.outputs) {
+        // Handle regular node edges
         node.outputs.forEach((output, index) => {
-          if (output.destinationNodeId && output.destinationNodeId.trim() !== "") {
+          if (output.destinationNodeId && 
+              output.destinationNodeId.trim() !== "" && 
+              visibleNodeIds.has(output.destinationNodeId)) {
             const sourceHandle = node.type === "ProcessNode" ? `output-${output.name}` : undefined;
             initialEdges.push({
               id: `e-${node.nodeId}-${output.name}-${output.destinationNodeId}`,
@@ -209,7 +295,7 @@ const GraphVisualization: React.FC = () => {
       }
     });
     setRfEdges(initialEdges);
-  }, [scenario]);
+  }, [scenario, filteredNodes]);
 
   // Update visual states based on recent activity
   useEffect(() => {
@@ -378,6 +464,26 @@ const GraphVisualization: React.FC = () => {
     [setSelectedNodeId],
   );
 
+  const onNodeDoubleClick = useCallback(
+    (event: React.MouseEvent, node: Node<RFNodeData>) => {
+      // Handle group expand/collapse on double-click
+      if (node.data.config.type === "Group" && scenario) {
+        saveSnapshot(`Toggle group collapse: ${node.id}`);
+        
+        const updatedNodes = scenario.nodes.map(n => {
+          if (n.nodeId === node.id && n.type === "Group") {
+            return { ...n, isCollapsed: !n.isCollapsed };
+          }
+          return n;
+        });
+        
+        const updatedScenario = { ...scenario, nodes: updatedNodes };
+        loadScenario(updatedScenario);
+      }
+    },
+    [scenario, loadScenario, saveSnapshot],
+  );
+
   const onDrop = useCallback(
     (event: React.DragEvent) => {
       event.preventDefault();
@@ -469,6 +575,7 @@ const GraphVisualization: React.FC = () => {
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         onNodeClick={onNodeClick}
+        onNodeDoubleClick={onNodeDoubleClick}
         fitView
         deleteKeyCode={["Backspace", "Delete"]}
         multiSelectionKeyCode={["Meta", "Ctrl"]}

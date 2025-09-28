@@ -198,9 +198,12 @@ const ExecutionManagerModal: React.FC<ExecutionManagerModalProps> = ({ isOpen, o
           <DialogTitle className="flex items-center">
             <Archive className="h-5 w-5 mr-2" />
             Execution Manager
+            <Badge variant="outline" className="ml-3 text-xs font-normal">
+              {currentTemplate.name}
+            </Badge>
           </DialogTitle>
           <DialogDescription>
-            Save and load execution states for template "{currentTemplate.name}". Executions preserve the complete simulation state including node states, logs, and timing.
+            Save and load execution states for this template. Executions preserve the complete simulation state including node states, logs, and timing. Each execution is tied to this specific template.
           </DialogDescription>
         </DialogHeader>
 
@@ -277,7 +280,7 @@ const ExecutionManagerModal: React.FC<ExecutionManagerModalProps> = ({ isOpen, o
             <div className="flex flex-col h-full">
               <div className="flex items-center justify-between p-4 border-b">
                 <h3 className="text-lg font-semibold">
-                  Saved Executions ({availableExecutions.length})
+                  Executions for "{currentTemplate.name}" ({availableExecutions.length})
                 </h3>
                 <Button onClick={() => setShowSaveForm(true)} disabled={!scenario}>
                   <Plus className="mr-2 h-4 w-4" />

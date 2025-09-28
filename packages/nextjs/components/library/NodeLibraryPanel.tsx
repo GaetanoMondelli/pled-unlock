@@ -145,40 +145,40 @@ const NODE_TEMPLATES: NodeTemplate[] = [
         }
       ],
       fsm: {
-        states: ["idle", "processing", "emitting"],
-        initialState: "idle",
+        states: ["off", "on"],
+        initialState: "off",
         transitions: [
           {
-            from: "idle",
-            to: "processing",
-            trigger: "token_received"
-          },
-          {
-            from: "processing",
-            to: "emitting",
-            trigger: "condition",
+            from: "off",
+            to: "on",
+            trigger: "token_received",
             condition: "input.data.value > 0"
           },
           {
-            from: "emitting",
-            to: "idle",
-            trigger: "emission_complete"
+            from: "on",
+            to: "off",
+            trigger: "token_received",
+            condition: "input.data.value <= 0"
           }
         ],
         variables: {},
         stateActions: {
-          "processing": {
-            logs: ["Processing started"]
-          },
-          "emitting": {
+          "on": {
             onEntry: {
-              "output": "input.data.value"
-            }
+              "output": "1"
+            },
+            logs: ["Toggle switched ON"]
+          },
+          "off": {
+            onEntry: {
+              "output": "0"
+            },
+            logs: ["Toggle switched OFF"]
           }
         },
         outputs: ["output"]
       },
-      fsl: "state idle { on token_received -> processing }\nstate processing { \n  on_entry { log(\"Processing started\") }\n  on input.data.value > 0 -> emitting\n}\nstate emitting {\n  on_entry { emit(output, input.data.value) }\n  on emission_complete -> idle\n}"
+      fsl: "state off {\n  on_entry { emit(output, 0); log(\"Toggle switched OFF\") }\n  on input.data.value > 0 -> on\n}\nstate on {\n  on_entry { emit(output, 1); log(\"Toggle switched ON\") }\n  on input.data.value <= 0 -> off\n}"
     }
   },
   {

@@ -968,7 +968,35 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
   toggleGlobalLedger: () => set(state => ({ isGlobalLedgerOpen: !state.isGlobalLedgerOpen })),
 
   updateNodeConfigInStore: (nodeId, newConfigData) => {
-    // Simplified implementation for now
+    const currentState = get();
+    if (!currentState.scenario?.nodes) return false;
+
+    // Find the node and update its configuration
+    const nodeIndex = currentState.scenario.nodes.findIndex(node => node.nodeId === nodeId);
+    if (nodeIndex === -1) return false;
+
+    // Save snapshot for undo functionality
+    currentState.saveSnapshot(`Update ${currentState.scenario.nodes[nodeIndex].displayName || nodeId} configuration`);
+
+    // Update the node configuration
+    set(state => {
+      if (!state.scenario?.nodes) return state;
+
+      const updatedNodes = [...state.scenario.nodes];
+      updatedNodes[nodeIndex] = {
+        ...updatedNodes[nodeIndex],
+        ...newConfigData
+      };
+
+      return {
+        ...state,
+        scenario: {
+          ...state.scenario,
+          nodes: updatedNodes
+        }
+      };
+    });
+
     return true;
   },
 

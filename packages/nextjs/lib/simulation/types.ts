@@ -87,6 +87,9 @@ const BaseNodeSchema = z.object({
   nodeId: z.string(),
   displayName: z.string(),
   position: PositionSchema,
+  tags: z.array(z.string()).optional(),
+  groupId: z.string().optional(),
+  isCollapsed: z.boolean().optional(),
 });
 
 // V3 Schema Components
@@ -246,8 +249,29 @@ export const ModuleNodeSchema = BaseNodeSchema.extend({
 });
 export type ModuleNode = z.infer<typeof ModuleNodeSchema>;
 
+// Group Node Schema for managing visual complexity
+export const GroupNodeSchema = BaseNodeSchema.extend({
+  type: z.literal("Group"),
+  groupName: z.string(),
+  groupColor: z.string().default("#6366f1"), // Default indigo color
+  groupDescription: z.string().optional(),
+  containedNodes: z.array(z.string()), // Array of nodeIds within this group
+  isCollapsed: z.boolean().default(false),
+  // Group inputs/outputs are computed from contained nodes
+  inputs: z.array(InputV3Schema).optional(),
+  outputs: z.array(OutputV3Schema).optional(),
+  // Visual bounds for positioning
+  bounds: z.object({
+    x: z.number(),
+    y: z.number(),
+    width: z.number(),
+    height: z.number(),
+  }).optional(),
+});
+export type GroupNode = z.infer<typeof GroupNodeSchema>;
+
 // Union type for all nodes
-export const AnyNodeSchema = z.union([DataSourceNodeSchema, QueueNodeSchema, ProcessNodeSchema, FSMProcessNodeSchema, SinkNodeSchema, ModuleNodeSchema]);
+export const AnyNodeSchema = z.union([DataSourceNodeSchema, QueueNodeSchema, ProcessNodeSchema, FSMProcessNodeSchema, SinkNodeSchema, ModuleNodeSchema, GroupNodeSchema]);
 export type AnyNode = z.infer<typeof AnyNodeSchema>;
 
 // Scenario Schema
@@ -255,6 +279,16 @@ export const ScenarioSchema = z.object({
   // Protocol V3 only; default to "3.0" if missing
   version: z.literal("3.0").default("3.0"),
   nodes: z.array(AnyNodeSchema),
+  // Group configuration for managing visual complexity
+  groups: z.object({
+    tags: z.array(z.object({
+      name: z.string(),
+      color: z.string(),
+      description: z.string().optional(),
+    })).optional(),
+    visualMode: z.enum(["all", "grouped", "filtered"]).default("all"),
+    activeFilters: z.array(z.string()).optional(), // Active tag filters
+  }).optional(),
 });
 export type Scenario = z.infer<typeof ScenarioSchema>;
 
@@ -346,6 +380,9 @@ export interface RFNodeData {
     stateDisplayName?: string;
     transitionCount?: number;
   };
+  // Group-specific data
+  nodeCount?: number;
+  nodeState?: any; // For FSM nodes
 }
 
 export interface RFEdgeData {
