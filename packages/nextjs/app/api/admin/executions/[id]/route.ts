@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { firestoreService } from "@/lib/firestore-service";
+import { dataService } from "@/lib/platform/dataService";
 
 export const dynamic = "force-dynamic";
 
@@ -8,7 +8,7 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const execution = await firestoreService.getExecution(params.id);
+    const execution = await dataService.getExecution(params.id);
 
     if (!execution) {
       return NextResponse.json({ error: "Execution not found" }, { status: 404 });
@@ -54,9 +54,9 @@ export async function PUT(
     if (nodeActivityLogs) updates.nodeActivityLogs = nodeActivityLogs;
     if (isCompleted !== undefined) updates.isCompleted = isCompleted;
 
-    await firestoreService.updateExecution(params.id, updates);
+  await dataService.updateExecution(params.id, updates);
 
-    const execution = await firestoreService.getExecution(params.id);
+  const execution = await dataService.getExecution(params.id);
 
     return NextResponse.json({
       success: true,
@@ -80,7 +80,7 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    await firestoreService.deleteExecution(params.id);
+    await dataService.deleteExecution(params.id);
 
     return NextResponse.json({
       success: true,

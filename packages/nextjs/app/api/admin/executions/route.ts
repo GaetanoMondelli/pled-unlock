@@ -1,17 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { firestoreService } from "@/lib/firestore-service";
+import { dataService } from "@/lib/platform/dataService";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   try {
-    console.log("GET /api/admin/executions - Execution management temporarily disabled");
+    const { searchParams } = new URL(request.url);
+    const templateId = searchParams.get('templateId') || undefined;
+    console.log("GET /api/admin/executions - listing", templateId ? `for template ${templateId}` : 'all');
 
-    // Return empty executions for now due to Firebase Datastore/Firestore mode conflict
+    const executions = await dataService.listExecutions(templateId || undefined);
+
     return NextResponse.json({
-      executions: [],
-      count: 0,
-      warning: "Execution management temporarily disabled due to Firebase configuration",
+      executions,
+      count: executions.length,
     });
   } catch (error) {
     console.error("Error in executions route:", error);
@@ -28,48 +30,45 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { templateId, name, description } = body;
+    const { templateId, name, description, scenario, nodeStates, currentTime, eventCounter, globalActivityLog, nodeActivityLogs, isCompleted } = body;
 
-    console.log("POST /api/admin/executions - Execution saving temporarily disabled");
+    console.log("POST /api/admin/executions - creating execution for template", templateId);
 
-    if (!templateId || !name) {
+    if (!templateId || !name || !scenario) {
       return NextResponse.json(
-        { error: "Template ID and execution name are required" },
+        { error: "templateId, name and scenario are required" },
         { status: 400 }
       );
     }
 
-    // Return a mock success response for now due to Firebase Datastore/Firestore mode conflict
-    const mockExecution = {
-      id: `mock-execution-${Date.now()}`,
+    const executionId = await dataService.createExecution({
       templateId,
       name,
-      description: description || "Mock execution (Firebase disabled)",
-      scenario: { version: "3.0", nodes: [] },
-      nodeStates: {},
-      currentTime: 0,
-      eventCounter: 0,
-      globalActivityLog: [],
-      nodeActivityLogs: {},
-      startedAt: Date.now(),
-      lastSavedAt: Date.now(),
-      isCompleted: false,
-    };
+      description,
+      scenario,
+      nodeStates: nodeStates ?? {},
+      currentTime: currentTime ?? 0,
+      eventCounter: eventCounter ?? 0,
+      globalActivityLog: globalActivityLog ?? [],
+      nodeActivityLogs: nodeActivityLogs ?? {},
+      isCompleted: !!isCompleted,
+    });
+
+    const execution = await dataService.getExecution(executionId);
 
     return NextResponse.json({
       success: true,
-      execution: mockExecution,
-      message: `Execution "${name}" saved successfully (mock - Firebase disabled)`,
-      warning: "Execution management temporarily disabled due to Firebase configuration",
+      execution,
+      message: `Execution "${name}" saved successfully`,
     });
   } catch (error) {
     console.error("Error in execution saving route:", error);
     return NextResponse.json(
       {
-        error: "Execution saving temporarily disabled",
-        details: "Firebase configuration issue - using mock response",
+        error: "Failed to save execution",
+        details: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 200 }, // Return 200 to prevent UI errors
+      { status: 500 },
     );
   }
 }

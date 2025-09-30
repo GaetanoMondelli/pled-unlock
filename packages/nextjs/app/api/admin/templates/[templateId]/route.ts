@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { fileTemplateService } from "@/lib/file-template-service";
+import { dataService } from "@/lib/platform/dataService";
 
 export const dynamic = "force-dynamic";
 
@@ -8,7 +8,7 @@ export async function GET(request: NextRequest, { params }: { params: { template
     const { templateId } = params;
     console.log(`GET /api/admin/templates/${templateId} - Loading template`);
 
-    const template = await fileTemplateService.getTemplate(templateId);
+    const template = await dataService.getTemplate(templateId);
 
     if (!template) {
       return NextResponse.json(
@@ -36,8 +36,8 @@ export async function PUT(request: NextRequest, { params }: { params: { template
     const body = await request.json();
     console.log(`PUT /api/admin/templates/${templateId} - Updating template`);
 
-    await fileTemplateService.updateTemplate(templateId, body);
-    const template = await fileTemplateService.getTemplate(templateId);
+    await dataService.updateTemplate(templateId, body);
+    const template = await dataService.getTemplate(templateId);
 
     if (!template) {
       return NextResponse.json(
@@ -68,7 +68,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { templ
     const { templateId } = params;
     console.log(`DELETE /api/admin/templates/${templateId} - Deleting template`);
 
-    await fileTemplateService.deleteTemplate(templateId);
+    await dataService.deleteTemplate(templateId);
 
     return NextResponse.json({
       success: true,

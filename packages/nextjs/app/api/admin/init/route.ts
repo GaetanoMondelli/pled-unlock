@@ -1,11 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
-import { firestoreService } from "@/lib/firestore-service";
+import { dataService } from "@/lib/platform/dataService";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
   try {
-    await firestoreService.initializeDefaultTemplate();
+    // Ensure at least one default template exists
+    const templates = await dataService.listTemplates();
+    const hasDefault = templates.some(t => t.isDefault);
+    if (!hasDefault) {
+      // Create a minimal default template if none is present
+      const defaultId = await dataService.createTemplate({
+        name: 'Default Template',
+        description: 'Default simulation template',
+        scenario: { version: '3.0', nodes: [] } as any,
+        version: '3.0',
+        isDefault: true,
+      } as any);
+      console.log('Created default template with id', defaultId);
+    }
 
     return NextResponse.json({
       success: true,

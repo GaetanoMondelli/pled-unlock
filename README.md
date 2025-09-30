@@ -136,4 +136,53 @@ Coordination doesn’t always start with signed contracts, whether under Common 
 
 
 
+## Documentation and Roadmap
+
+New architecture and product docs (API + backend + SDK + blockchain roadmap):
+
+- docs/PRODUCT_VISION.md — Product vision for PLED as FSM + tokenization protocol
+- docs/PRD_TEMPLATE_EDITOR_BACKEND.md — PRD for backend/API powering the template editor and executions
+- docs/API_ARCHITECTURE.md — Service design, data model, and endpoints (MVP → future)
+- docs/SDK_DESIGN.md — TypeScript SDK surface and developer experience
+- docs/BLOCKCHAIN_ROADMAP.md — Commitments, tokenization, and ZK path
+- docs/OPEN_QUESTIONS.md — Open decisions and alignment checklist
+
+These complement the existing Next.js simulation and will guide the transition to a full multi-tenant service.
+
+
+## Adapter-based storage/auth abstraction (template-editor wired)
+
+We introduced a provider-agnostic platform layer to decouple product code from specific storage/auth backends. This makes it easy to swap Firebase, Postgres, or other providers by implementing small adapters ("drivers") while keeping the rest of the app unchanged.
+
+- Contracts (ports): `packages/nextjs/lib/platform/ports.ts` define `AuthProvider`, `DocumentStore`, and `BlobStore` interfaces.
+- Current adapters: Firestore-backed `DocumentStore` and NextAuth-backed `AuthProvider`.
+- Repositories: `TemplatesRepository` and `ExecutionsRepository` encapsulate collection paths and timestamp policies.
+- Facade: `dataService` exposes CRUD for templates and executions.
+
+Template-editor API routes now use the new `dataService`:
+
+- `GET/POST /api/admin/templates` → `packages/nextjs/app/api/admin/templates/route.ts`
+- `GET/PUT/DELETE /api/admin/templates/[templateId]` → `packages/nextjs/app/api/admin/templates/[templateId]/route.ts`
+
+This means storage can be swapped by changing only the platform adapter wiring in:
+
+- `packages/nextjs/lib/platform/index.ts` (factory that composes adapters)
+- `packages/nextjs/lib/platform/adapters/**/*` (implementations)
+
+Next steps we plan:
+
+- Migrate remaining routes/endpoints to use `dataService` (executions list/save/update).
+- Add env-based switching (e.g., `DATA_BACKEND=postgres`) and a `BlobStore` adapter for binary assets.
+- Gradually remove direct references to Firebase files after migration is complete.
+
+
+
+
+
+
+
+
+
+
+
 

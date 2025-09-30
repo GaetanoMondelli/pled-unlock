@@ -1,13 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
-import { fileTemplateService } from "@/lib/file-template-service";
+import { dataService } from "@/lib/platform/dataService";
+
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^\w ]+/g, "")
+    .replace(/ +/g, "-")
+    .trim();
+}
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    console.log("GET /api/admin/templates - Loading templates from file system");
+    console.log("GET /api/admin/templates - Loading templates from dataService (adapter-backed)");
 
-    const templates = await fileTemplateService.getTemplates();
+    const templates = await dataService.listTemplates();
 
     return NextResponse.json({
       templates,
@@ -39,15 +47,26 @@ export async function POST(request: NextRequest) {
     let templateId: string;
 
     if (fromDefault) {
-      // Create from default template
-      templateId = await fileTemplateService.createTemplateFromDefault(name, description);
+      // Create from default template (look for isDefault=true)
+      const templates = await dataService.listTemplates();
+      const defaultTemplate = templates.find(t => t.isDefault);
+      if (!defaultTemplate) {
+        return NextResponse.json({ error: "No default template found" }, { status: 400 });
+      }
+      templateId = await dataService.createTemplate({
+        name,
+        description,
+        scenario: defaultTemplate.scenario,
+        version: defaultTemplate.version,
+        isDefault: false,
+      });
     } else {
       // Create from provided scenario
       if (!scenario) {
         return NextResponse.json({ error: "Scenario is required when not creating from default" }, { status: 400 });
       }
 
-      templateId = await fileTemplateService.createTemplate({
+      templateId = await dataService.createTemplate({
         name,
         description,
         scenario,
@@ -55,13 +74,13 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const template = await fileTemplateService.getTemplate(templateId);
+    const template = await dataService.getTemplate(templateId);
 
     return NextResponse.json({
       success: true,
       template,
       templateId,
-      slug: fileTemplateService.getTemplateSlug(name),
+      slug: slugify(name),
       message: `Template "${name}" created successfully`,
     });
   } catch (error) {
