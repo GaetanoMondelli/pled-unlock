@@ -1,0 +1,588 @@
+openapi: 3.1.0
+info:
+  title: PLED API
+  version: 0.1.0
+  summary: Workflow FSM + Tokenization protocol API
+  description: |
+    The PLED API turns real-world procedures into composable finite state machines (FSMs) backed by an append-only ledger.
+    
+    What makes it different:
+    - Evidence-first: ingest raw events, derive messages with rules (deterministic or AI-assisted), and compute state.
+    - Governed automation: actions are executed under FSM guardrails with full audit trails and idempotency.
+    - Verifiability-ready: state and ledger can be committed to blockchains; sinks can mint tokens (Phase 2).
+
+    Core resources:
+    - Templates: reusable FSM models and components.
+    - Executions: running instances of templates.
+    - Events → Messages: evidence-to-signal pipeline.
+    - Ledger: append-only activity of transitions, actions, and token movements.
+    - Snapshots & Replay: time-travel and deterministic recomputation.
+servers:
+  - url: https://api.pled.dev
+    description: Production
+  - url: https://api.staging.pled.dev
+    description: Staging
+  - url: http://localhost:4000
+    description: Local development
+tags:
+  - name: Templates
+    description: Define and manage FSM templates
+  - name: Executions
+    description: Create and observe running instances
+  - name: Events
+    description: Ingest evidence and list derived messages
+  - name: Rules
+    description: Manage and test event-to-message rules
+  - name: Actions
+    description: Trigger and inspect actions
+  - name: Tokens
+    description: Token accounting and minting (Phase 2)
+  - name: Streaming
+    description: Real-time ledger/state updates via SSE
+security:
+  - bearerAuth: []
+  - ApiKeyAuth: []
+paths:
+  /v1/templates:
+    get:
+      tags: [Templates]
+      summary: List templates
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Template'
+    post:
+      tags: [Templates]
+      summary: Create template
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TemplateCreate'
+            examples:
+              basic:
+                value:
+                  name: "Hydro Power Tokenization"
+                  description: "IoT → Queue → Token Creator → Certificate"
+                  model: { /* compiled FSM JSON */ }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Template'
+
+  /v1/templates/{templateId}:
+    parameters:
+      - $ref: '#/components/parameters/templateId'
+    get:
+      tags: [Templates]
+      summary: Get template
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Template'
+    put:
+      tags: [Templates]
+      summary: Update template
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TemplateUpdate'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Template'
+
+  /v1/templates/{templateId}/versions:
+    parameters:
+      - $ref: '#/components/parameters/templateId'
+    post:
+      tags: [Templates]
+      summary: Create a new version from current model
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemplateVersion'
+
+  /v1/templates/{templateId}/compile:
+    parameters:
+      - $ref: '#/components/parameters/templateId'
+    get:
+      tags: [Templates]
+      summary: Validate and compile template
+      description: Generates a compiled FSM and returns validation diagnostics.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  compiledModel:
+                    type: object
+                  validation:
+                    type: object
+                    properties:
+                      errors:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Error'
+
+  /v1/executions:
+    post:
+      tags: [Executions]
+      summary: Create execution
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [templateId, name]
+              properties:
+                templateId:
+                  type: string
+                name:
+                  type: string
+                description:
+                  type: string
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Execution'
+
+  /v1/executions/{executionId}:
+    parameters:
+      - $ref: '#/components/parameters/executionId'
+    get:
+      tags: [Executions]
+      summary: Get execution
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Execution'
+
+  /v1/executions/{executionId}/state:
+    parameters:
+      - $ref: '#/components/parameters/executionId'
+    get:
+      tags: [Executions]
+      summary: Get current state
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutionState'
+
+  /v1/executions/{executionId}/ledger:
+    parameters:
+      - $ref: '#/components/parameters/executionId'
+    get:
+      tags: [Executions]
+      summary: Get ledger entries
+      parameters:
+        - in: query
+          name: afterSeq
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LedgerEntry'
+
+  /v1/executions/{executionId}/replay:
+    parameters:
+      - $ref: '#/components/parameters/executionId'
+    post:
+      tags: [Executions]
+      summary: Replay execution deterministically
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                upToSeq:
+                  type: integer
+                fromSnapshotId:
+                  type: string
+      responses:
+        '202':
+          description: Accepted (replay started)
+
+  /v1/executions/{executionId}/snapshot:
+    parameters:
+      - $ref: '#/components/parameters/executionId'
+    post:
+      tags: [Executions]
+      summary: Create a snapshot
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Snapshot'
+
+  /v1/executions/{executionId}/events:
+    parameters:
+      - $ref: '#/components/parameters/executionId'
+    post:
+      tags: [Events]
+      summary: Append event (evidence)
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          schema:
+            type: string
+          description: Unique key to ensure exactly-once append
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventCreate'
+            examples:
+              email:
+                value:
+                  type: email
+                  occurredAt: "2025-09-15T12:00:00Z"
+                  source: "inbound.email"
+                  payload:
+                    subject: "I want to terminate the agreement"
+                    body: "..."
+      responses:
+        '202':
+          description: Accepted (queued for rule processing)
+    get:
+      tags: [Events]
+      summary: List events
+      parameters:
+        - in: query
+          name: afterSeq
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Event'
+
+  /v1/executions/{executionId}/messages:
+    parameters:
+      - $ref: '#/components/parameters/executionId'
+    get:
+      tags: [Events]
+      summary: List derived messages
+      parameters:
+        - in: query
+          name: afterSeq
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Message'
+
+  /v1/templates/{templateId}/rules:
+    parameters:
+      - $ref: '#/components/parameters/templateId'
+    post:
+      tags: [Rules]
+      summary: Create rule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RuleCreate'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Rule'
+
+  /v1/rules/{ruleId}/test:
+    post:
+      tags: [Rules]
+      summary: Test rule with a sample event
+      parameters:
+        - in: path
+          name: ruleId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Event'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+
+  /v1/executions/{executionId}/actions:
+    parameters:
+      - $ref: '#/components/parameters/executionId'
+    post:
+      tags: [Actions]
+      summary: Enqueue action for execution
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActionCreate'
+      responses:
+        '202':
+          description: Accepted
+
+  /v1/executions/{executionId}/tokens:
+    parameters:
+      - $ref: '#/components/parameters/executionId'
+    get:
+      tags: [Tokens]
+      summary: List tokens produced/consumed
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Token'
+
+  /v1/executions/{executionId}/tokens/mint:
+    parameters:
+      - $ref: '#/components/parameters/executionId'
+    post:
+      tags: [Tokens]
+      summary: Mint on-chain tokens from sink ledger entries (Phase 2)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, quantity, sinkNodeId]
+              properties:
+                type: { type: string }
+                quantity: { type: string, description: Decimal as string }
+                sinkNodeId: { type: string }
+      responses:
+        '202':
+          description: Accepted
+
+  /v1/executions/{executionId}/stream:
+    parameters:
+      - $ref: '#/components/parameters/executionId'
+    get:
+      tags: [Streaming]
+      summary: Server-Sent Events stream of ledger/state deltas
+      responses:
+        '200':
+          description: text/event-stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+  parameters:
+    executionId:
+      in: path
+      name: executionId
+      required: true
+      schema:
+        type: string
+    templateId:
+      in: path
+      name: templateId
+      required: true
+      schema:
+        type: string
+  schemas:
+    Template:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        description: { type: string }
+        version: { type: string }
+        model: { type: object, description: Compiled FSM JSON }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    TemplateCreate:
+      type: object
+      required: [name, model]
+      properties:
+        name: { type: string }
+        description: { type: string }
+        model: { type: object }
+    TemplateUpdate:
+      type: object
+      properties:
+        name: { type: string }
+        description: { type: string }
+        model: { type: object }
+    TemplateVersion:
+      type: object
+      properties:
+        id: { type: string }
+        templateId: { type: string }
+        version: { type: string }
+        createdAt: { type: string, format: date-time }
+    Execution:
+      type: object
+      properties:
+        id: { type: string }
+        templateId: { type: string }
+        name: { type: string }
+        description: { type: string }
+        status: { type: string, enum: [created, running, paused, completed] }
+        currentState: { type: object }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    ExecutionState:
+      type: object
+      properties:
+        state: { type: object }
+        variables: { type: object }
+        time: { type: integer }
+    EventCreate:
+      type: object
+      required: [type, payload]
+      properties:
+        type: { type: string }
+        occurredAt: { type: string, format: date-time }
+        source: { type: string }
+        payload: { type: object }
+    Event:
+      allOf:
+        - $ref: '#/components/schemas/EventCreate'
+        - type: object
+          properties:
+            id: { type: string }
+            seq: { type: integer }
+            timestamp: { type: string, format: date-time }
+    Message:
+      type: object
+      properties:
+        id: { type: string }
+        type: { type: string }
+        payload: { type: object }
+        derivedFrom: { type: array, items: { type: string } }
+        timestamp: { type: string, format: date-time }
+    RuleCreate:
+      type: object
+      required: [type, definition]
+      properties:
+        type: { type: string, enum: [deterministic, ai] }
+        definition: { type: object, description: DSL/JSON rule definition }
+        deterministic: { type: boolean }
+        aiModel: { type: string }
+    Rule:
+      allOf:
+        - $ref: '#/components/schemas/RuleCreate'
+        - type: object
+          properties:
+            id: { type: string }
+            templateId: { type: string }
+    ActionCreate:
+      type: object
+      required: [type, input]
+      properties:
+        type: { type: string, enum: [email, webhook, docusign_envelope, chain_write, token_mint] }
+        input: { type: object }
+        dedupeKey: { type: string }
+    LedgerEntry:
+      type: object
+      properties:
+        seq: { type: integer }
+        timestamp: { type: string, format: date-time }
+        kind: { type: string }
+        details: { type: object }
+        hash: { type: string }
+    Snapshot:
+      type: object
+      properties:
+        id: { type: string }
+        executionId: { type: string }
+        time: { type: integer }
+        state: { type: object }
+        createdAt: { type: string, format: date-time }
+    Token:
+      type: object
+      properties:
+        id: { type: string }
+        type: { type: string }
+        quantity: { type: string }
+        unit: { type: string }
+        metadata: { type: object }
+        producedByNodeId: { type: string }
+        consumedByNodeId: { type: string }
+        createdAt: { type: string, format: date-time }
+    Error:
+      type: object
+      properties:
+        code: { type: string }
+        message: { type: string }
