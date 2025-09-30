@@ -71,8 +71,18 @@ const GroupManagementPanel: React.FC<GroupManagementPanelProps> = ({ className }
   const scenario = useSimulationStore(state => state.scenario);
   const loadScenario = useSimulationStore(state => state.loadScenario);
   const saveSnapshot = useSimulationStore(state => state.saveSnapshot);
-  
-  const [viewMode, setViewMode] = useState<"all" | "grouped" | "filtered">("all");
+
+  // Sync viewMode with scenario state
+  const scenarioViewMode = scenario?.groups?.visualMode || "all";
+  const [viewMode, setViewMode] = useState<"all" | "grouped" | "filtered">(scenarioViewMode);
+
+  // Update viewMode when scenario changes
+  React.useEffect(() => {
+    if (scenario?.groups?.visualMode) {
+      setViewMode(scenario.groups.visualMode);
+    }
+  }, [scenario?.groups?.visualMode]);
+
   const [isCreateGroupDialogOpen, setIsCreateGroupDialogOpen] = useState(false);
   const [isCreateTagDialogOpen, setIsCreateTagDialogOpen] = useState(false);
   const [selectedNodes, setSelectedNodes] = useState<string[]>([]);
@@ -163,26 +173,94 @@ const GroupManagementPanel: React.FC<GroupManagementPanelProps> = ({ className }
     );
   }, [scenario?.nodes]);
 
+  const handleViewModeChange = (newMode: "all" | "grouped" | "filtered") => {
+    if (!scenario) return;
+
+    saveSnapshot(`Change view mode: ${newMode}`);
+
+    if (newMode === "grouped") {
+      // Convert tags to GroupNodes and persist them
+      const { createAutomaticGroups, createGroupNodeFromInfo } = require("@/lib/utils/advancedGroupingUtils");
+
+      const groups = createAutomaticGroups(scenario);
+      const activeFilters = scenario.groups?.activeFilters || [];
+
+      // Filter groups based on active filters
+      const enabledGroups = activeFilters.length > 0
+        ? groups.filter(group => activeFilters.includes(group.tagName))
+        : groups;
+
+      // Create GroupNodes
+      const groupNodes = enabledGroups.map(group => createGroupNodeFromInfo(group, {}));
+
+      // Remove old GroupNodes and add new ones
+      const nodesWithoutGroups = scenario.nodes.filter(node => node.type !== "Group");
+
+      const updatedScenario = {
+        ...scenario,
+        nodes: [...nodesWithoutGroups, ...groupNodes],
+        groups: {
+          ...scenario.groups,
+          visualMode: "grouped" as const,
+        },
+      };
+
+      loadScenario(updatedScenario);
+      setViewMode("grouped");
+    } else if (newMode === "all") {
+      // Remove all GroupNodes when switching to "all" mode
+      const nodesWithoutGroups = scenario.nodes.filter(node => node.type !== "Group");
+
+      const updatedScenario = {
+        ...scenario,
+        nodes: nodesWithoutGroups,
+        groups: {
+          ...scenario.groups,
+          visualMode: "all" as const,
+        },
+      };
+
+      loadScenario(updatedScenario);
+      setViewMode("all");
+    } else {
+      // "filtered" mode - keep scenario as is, just update mode
+      const updatedScenario = {
+        ...scenario,
+        groups: {
+          ...scenario.groups,
+          visualMode: "filtered" as const,
+        },
+      };
+
+      loadScenario(updatedScenario);
+      setViewMode("filtered");
+    }
+  };
+
   const handleToggleTag = (tagName: string) => {
     if (!scenario) return;
-    
+
     saveSnapshot(`Toggle tag filter: ${tagName}`);
-    
+
     const activeFilters = scenario.groups?.activeFilters || [];
     const newActiveFilters = activeFilters.includes(tagName)
       ? activeFilters.filter(t => t !== tagName)
       : [...activeFilters, tagName];
-    
+
     const updatedScenario = {
       ...scenario,
       groups: {
         ...scenario.groups,
         activeFilters: newActiveFilters,
-        visualMode: newActiveFilters.length > 0 ? "filtered" as const : "all" as const,
       },
     };
-    
+
     loadScenario(updatedScenario);
+
+    // If in grouped mode and filters changed, regenerate groups
+    if (viewMode === "grouped") {
+      handleViewModeChange("grouped");
+    }
   };
 
   const handleCreateGroup = () => {
@@ -316,7 +394,7 @@ const GroupManagementPanel: React.FC<GroupManagementPanelProps> = ({ className }
       {/* View Mode Selector */}
       <div className="flex items-center space-x-2">
         <Label className="text-xs">View:</Label>
-        <Select value={viewMode} onValueChange={(value: "all" | "grouped" | "filtered") => setViewMode(value)}>
+        <Select value={viewMode} onValueChange={(value: "all" | "grouped" | "filtered") => handleViewModeChange(value)}>
           <SelectTrigger className="h-7 text-xs">
             <SelectValue />
           </SelectTrigger>

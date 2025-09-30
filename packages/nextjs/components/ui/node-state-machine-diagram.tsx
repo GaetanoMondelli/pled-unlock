@@ -11,13 +11,104 @@ import ReactFlow, {
   Handle,
 } from "reactflow";
 import "reactflow/dist/style.css";
-import LabeledSmoothStepEdge from "@/components/ui/edges/LabeledSmoothStepEdge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Code } from "lucide-react";
 import type { AnyNode, NodeStateMachineState, StateMachineInfo } from "@/lib/simulation/types";
 // FSLGenerator removed - using simulation store state machine directly
+
+// Simple Dagre-like layout for directed graphs
+const layoutNodes = (nodes: string[], edges: Array<{from: string, to: string}>) => {
+  const nodeMap = new Map<string, {level: number, index: number}>();
+  const levels: string[][] = [];
+
+  // Build adjacency and in-degree
+  const adj = new Map<string, Set<string>>();
+  const inDegree = new Map<string, number>();
+
+  nodes.forEach(n => {
+    adj.set(n, new Set());
+    inDegree.set(n, 0);
+  });
+
+  edges.forEach(e => {
+    if (e.from !== e.to) { // Ignore self-loops
+      adj.get(e.from)?.add(e.to);
+      inDegree.set(e.to, (inDegree.get(e.to) || 0) + 1);
+    }
+  });
+
+  // Topological sort with Kahn's algorithm
+  const queue: string[] = [];
+  nodes.forEach(n => {
+    if (inDegree.get(n) === 0) queue.push(n);
+  });
+
+  if (queue.length === 0 && nodes.length > 0) {
+    // Cyclic graph - start from first node
+    queue.push(nodes[0]);
+  }
+
+  const visited = new Set<string>();
+  let currentLevel = 0;
+
+  while (queue.length > 0 || visited.size < nodes.length) {
+    const levelNodes: string[] = [];
+    const levelSize = queue.length;
+
+    if (levelSize === 0) {
+      // Handle remaining nodes in cycles
+      const unvisited = nodes.find(n => !visited.has(n));
+      if (unvisited) queue.push(unvisited);
+      else break;
+    }
+
+    for (let i = 0; i < Math.max(1, levelSize); i++) {
+      const node = queue.shift();
+      if (!node || visited.has(node)) continue;
+
+      visited.add(node);
+      levelNodes.push(node);
+
+      // Add children to next level
+      adj.get(node)?.forEach(child => {
+        if (!visited.has(child)) {
+          const deg = inDegree.get(child)! - 1;
+          inDegree.set(child, deg);
+          if (deg === 0) queue.push(child);
+        }
+      });
+    }
+
+    if (levelNodes.length > 0) {
+      levels.push(levelNodes);
+      levelNodes.forEach((n, idx) => {
+        nodeMap.set(n, {level: currentLevel, index: idx});
+      });
+      currentLevel++;
+    }
+  }
+
+  // Calculate positions
+  const positions = new Map<string, {x: number, y: number}>();
+  const horizontalSpacing = 250;
+  const verticalSpacing = 100;
+  const maxNodesInLevel = Math.max(...levels.map(l => l.length), 1);
+
+  levels.forEach((level, levelIdx) => {
+    const x = 150 + (levelIdx * horizontalSpacing);
+    const levelHeight = (level.length - 1) * verticalSpacing;
+    const startY = 100 + (maxNodesInLevel * verticalSpacing / 2) - (levelHeight / 2);
+
+    level.forEach((node, nodeIdx) => {
+      const y = startY + (nodeIdx * verticalSpacing);
+      positions.set(node, {x, y: Math.max(100, y)});
+    });
+  });
+
+  return positions;
+};
 
 interface StateNodeData {
   label: string;
@@ -51,71 +142,73 @@ interface NodeStateMachineDiagramProps {
 // Node component for state machine states WITH VARIABLES
 const StateNode: React.FC<{ data: StateNodeData; selected?: boolean }> = ({ data, selected }) => {
   const getStateColor = () => {
-    if (data.isSelected) return "border-blue-600 bg-blue-100 text-blue-800";
-    if (data.isActive) return "border-green-600 bg-green-100 text-green-800";
-    if (data.stateType === "initial") return "border-teal-500 bg-teal-50 text-teal-800";
-    if (data.stateType === "final") return "border-indigo-500 bg-indigo-50 text-indigo-800";
-    if (data.stateType === "error") return "border-red-500 bg-red-50 text-red-800";
-    return "border-slate-300 bg-slate-50 text-slate-600";
+    if (data.isSelected) return "border-blue-600 bg-blue-50 text-blue-900";
+    if (data.isActive) return "border-green-600 bg-green-50 text-green-900";
+    if (data.stateType === "initial") return "border-teal-500 bg-teal-50 text-teal-900";
+    if (data.stateType === "final") return "border-indigo-500 bg-indigo-50 text-indigo-900";
+    if (data.stateType === "error") return "border-red-500 bg-red-50 text-red-900";
+    return "border-slate-300 bg-white text-slate-700";
   };
+
+  // Simplify state label - remove prefix for cleaner display
+  const simplifiedLabel = data.label.includes('_')
+    ? data.label.split('_').slice(1).join(' ')
+    : data.label;
 
   return (
     <div className="relative">
       {/* Target (incoming) */}
-      <Handle type="target" position={Position.Left} className="!bg-slate-400 w-2.5 h-2.5" />
+      <Handle type="target" position={Position.Left} className="!bg-slate-400 !w-2.5 !h-2.5" />
       <div
         className={cn(
-          "px-3 py-2 rounded-lg border-2 text-xs font-medium transition-all min-w-[120px]",
+          "px-2.5 py-1 rounded-md border-2 text-xs font-medium transition-all min-w-[120px] max-w-[160px] shadow-sm",
           getStateColor(),
           selected && "ring-2 ring-primary ring-offset-1"
         )}
       >
-        <div className="font-bold">{data.label}</div>
+        <div className="font-semibold text-xs truncate">{simplifiedLabel}</div>
         {data.variables && data.isActive && (
-          <div className="mt-1 text-xs opacity-75 space-y-0.5">
+          <div className="mt-0.5 text-[9px] opacity-75 space-y-0.5">
             {/* Standard buffer info for Queue/DataSource nodes */}
             {(data.variables.buffer_size !== undefined || data.variables.output_buffer_size !== undefined) && (
-              <>
-                <div>buf: {data.variables.buffer_size || 0}</div>
-                <div>out: {data.variables.output_buffer_size || 0}</div>
-                {data.variables.time_anchor && <div>t: {data.variables.time_anchor}s</div>}
-              </>
+              <div className="flex gap-2">
+                <span>buf: {data.variables.buffer_size || 0}</span>
+                <span>out: {data.variables.output_buffer_size || 0}</span>
+              </div>
             )}
 
             {/* ProcessNode specific info */}
             {data.variables.inputs_ready && (
-              <div className="text-green-700">✓ {data.variables.inputs_ready.join(', ')}</div>
+              <div className="text-green-700 truncate">✓ {data.variables.inputs_ready.join(', ')}</div>
             )}
             {data.variables.inputs_missing && data.variables.inputs_missing.length > 0 && (
-              <div className="text-red-700">✗ {data.variables.inputs_missing.join(', ')}</div>
+              <div className="text-red-700 truncate">✗ {data.variables.inputs_missing.join(', ')}</div>
             )}
             {data.variables.outputs_generated && data.variables.outputs_generated.length > 0 && (
-              <div className="text-blue-700">→ {data.variables.outputs_generated.join(', ')}</div>
+              <div className="text-blue-700 truncate">→ {data.variables.outputs_generated.join(', ')}</div>
             )}
             {data.variables.current_formula && (
-              <div className="text-purple-700 font-mono text-[10px]">{data.variables.current_formula}</div>
+              <div className="text-purple-700 font-mono text-[8px] truncate" title={data.variables.current_formula}>
+                {data.variables.current_formula}
+              </div>
             )}
           </div>
         )}
         {data.isActive && !data.isSelected && (
-          <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-pulse" />
+          <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-green-500 rounded-full animate-pulse" />
         )}
         {data.isSelected && (
-          <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full" />
+          <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-blue-500 rounded-full" />
         )}
       </div>
       {/* Source (outgoing) */}
-      <Handle type="source" position={Position.Right} className="!bg-slate-400 w-2.5 h-2.5" />
+      <Handle type="source" position={Position.Right} className="!bg-slate-400 !w-2.5 !h-2.5" />
     </div>
   );
 };
 
 const nodeTypes = {
   stateNode: StateNode,
-};
-
-const edgeTypes = {
-  labeledSmooth: LabeledSmoothStepEdge,
 };
 
 export const NodeStateMachineDiagram: React.FC<NodeStateMachineDiagramProps> = ({
@@ -181,21 +274,7 @@ export const NodeStateMachineDiagram: React.FC<NodeStateMachineDiagramProps> = (
       }
     };
 
-    const states = getStatesForNodeType(nodeConfig.type).map((state, index) => {
-      const row = Math.floor(index / 2);
-      const col = index % 2;
-      return {
-        id: state,
-        label: state,
-        type: index === 0 ? "initial" as const : "intermediate" as const,
-        position: {
-          x: 80 + (col * 220),
-          y: 40 + (row * 80)
-        }
-      };
-    });
-
-    // Define basic transitions based on node type
+    // Define basic transitions based on node type (MUST be before states calculation)
     const getTransitionsForNodeType = (nodeType: string) => {
       switch (nodeType) {
         case 'DataSource':
@@ -226,7 +305,7 @@ export const NodeStateMachineDiagram: React.FC<NodeStateMachineDiagramProps> = (
           return fsmNode.fsm?.transitions?.map((t: any) => ({
             from: t.from,
             to: t.to,
-            label: t.trigger + (t.condition ? ` (${t.condition})` : '')
+            label: t.trigger + (t.condition ? ` [${t.condition}]` : '')
           })) || [];
         case 'Sink':
           return [
@@ -238,7 +317,18 @@ export const NodeStateMachineDiagram: React.FC<NodeStateMachineDiagramProps> = (
       }
     };
 
+    const stateNames = getStatesForNodeType(nodeConfig.type);
     const transitions = getTransitionsForNodeType(nodeConfig.type);
+
+    // Use the layoutNodes function defined at the top
+    const positions = layoutNodes(stateNames, transitions);
+
+    const states = stateNames.map((state, index) => ({
+      id: state,
+      label: state,
+      type: index === 0 ? "initial" as const : "intermediate" as const,
+      position: positions.get(state) || { x: 80, y: 40 + (index * 80) }
+    }));
 
     // Create React Flow nodes for each state with variables
     const rfNodes: Node<StateNodeData>[] = states.map((state) => ({
@@ -260,26 +350,47 @@ export const NodeStateMachineDiagram: React.FC<NodeStateMachineDiagramProps> = (
       targetPosition: Position.Left,
     }));
 
-    // Create React Flow edges for each transition with proper arrows
-    const rfEdges: Edge[] = transitions.map((transition, index) => ({
-      id: `edge-${index}`,
-      source: transition.from,
-      target: transition.to,
-      label: transition.label,
-      type: "labeledSmooth",
-      animated: currentState === transition.from,
-      markerEnd: {
-        type: MarkerType.ArrowClosed,
-        width: 20,
-        height: 20,
-        color: currentState === transition.from ? "#475569" : "#94a3b8",
-      },
-      style: {
-        stroke: currentState === transition.from ? "#475569" : "#94a3b8",
-        strokeWidth: currentState === transition.from ? 2 : 1.5
-      },
-      data: { active: currentState === transition.from },
-    }));
+    // Create React Flow edges ONLY for actual transitions (no ghost edges!)
+    const rfEdges: Edge[] = transitions.map((transition, index) => {
+      const isActive = currentState === transition.from;
+      const isSelectedTransition = overrideActiveState === transition.from;
+      const isSelfLoop = transition.from === transition.to;
+
+      return {
+        id: `edge-${transition.from}-${transition.to}-${index}`,
+        source: transition.from,
+        target: transition.to,
+        label: transition.label,
+        type: isSelfLoop ? 'default' : 'smoothstep', // Use smoothstep for better curves
+        animated: isActive,
+        labelStyle: {
+          fill: isActive ? '#10b981' : '#64748b',
+          fontWeight: isActive ? 600 : 400,
+          fontSize: 11,
+        },
+        labelBgStyle: {
+          fill: '#ffffff',
+          fillOpacity: 0.85,
+        },
+        labelBgPadding: [4, 4] as [number, number],
+        labelBgBorderRadius: 3,
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          width: 16,
+          height: 16,
+          color: isActive ? "#10b981" : isSelectedTransition ? "#3b82f6" : "#64748b",
+        },
+        style: {
+          stroke: isActive ? "#10b981" : isSelectedTransition ? "#3b82f6" : "#64748b",
+          strokeWidth: isActive || isSelectedTransition ? 2.5 : 1.8,
+        },
+        ...(isSelfLoop && {
+          // Self-loop styling
+          sourceHandle: 'source',
+          targetHandle: 'target',
+        }),
+      };
+    });
 
     return { nodes: rfNodes, edges: rfEdges, runtimeVariables: variables };
   }, [nodeConfig.type, stateMachineInfo?.currentState, overrideActiveState, activityLogs, selectedLogEntry]);
@@ -346,25 +457,37 @@ export const NodeStateMachineDiagram: React.FC<NodeStateMachineDiagramProps> = (
           nodes={nodes}
           edges={edges}
           nodeTypes={nodeTypes}
-          edgeTypes={edgeTypes}
           fitView
-          fitViewOptions={{ padding: 0.4, minZoom: 0.5, maxZoom: 1.5 }}
+          fitViewOptions={{
+            padding: 0.25,
+            minZoom: 0.4,
+            maxZoom: 1.5,
+            duration: 400
+          }}
           nodesDraggable={false}
           nodesConnectable={false}
           elementsSelectable={false}
           panOnDrag={true}
           zoomOnScroll={true}
           zoomOnPinch={true}
-          zoomOnDoubleClick={false}
+          zoomOnDoubleClick={true}
+          preventScrolling={false}
           className="bg-transparent"
           proOptions={{ hideAttribution: true }}
           defaultEdgeOptions={{
-            type: 'labeledSmooth',
+            type: 'smoothstep',
             animated: false,
           }}
+          minZoom={0.3}
+          maxZoom={3}
         >
-          <Background color="#f1f5f9" gap={20} size={0.5} />
-          <Controls showZoom={true} showFitView={true} showInteractive={false} />
+          <Background color="#e2e8f0" gap={16} size={0.5} />
+          <Controls
+            showZoom={true}
+            showFitView={true}
+            showInteractive={false}
+            className="!bg-white !border !border-slate-200 !shadow-sm"
+          />
         </ReactFlow>
       </div>
     </div>

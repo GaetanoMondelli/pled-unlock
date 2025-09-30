@@ -60,6 +60,9 @@ export const HistoryEntrySchema = z.object({
   bufferSize: z.number().optional(), // Input buffer size at time of action
   outputBufferSize: z.number().optional(), // Output buffer size at time of action
 
+  // EVENT TYPE - NEW: Distinguish external vs execution events
+  eventType: z.enum(["external_event", "execution_event"]).optional(),
+
   // Enhanced lineage tracking fields
   operationType: z.enum(["creation", "aggregation", "transformation", "consumption", "transfer"]).optional(),
   aggregationDetails: AggregationDetailsSchema.optional(),
@@ -288,6 +291,10 @@ export const ScenarioSchema = z.object({
     })).optional(),
     visualMode: z.enum(["all", "grouped", "filtered"]).default("all"),
     activeFilters: z.array(z.string()).optional(), // Active tag filters
+    groupPositions: z.record(z.object({
+      x: z.number(),
+      y: z.number(),
+    })).optional(), // Deprecated: now stored in GroupNode.position
   }).optional(),
 });
 export type Scenario = z.infer<typeof ScenarioSchema>;

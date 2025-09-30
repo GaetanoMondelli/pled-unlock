@@ -2,7 +2,7 @@
 
 import React, { useMemo } from "react";
 import { Handle, Position } from "reactflow";
-import { Minimize2, Maximize2, Folder, FolderOpen } from "lucide-react";
+import { Minimize2, Maximize2, Folder, FolderOpen, ChevronDown, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { type RFNodeData } from "@/lib/simulation/types";
 
@@ -43,7 +43,7 @@ const GroupNodeDisplay: React.FC<GroupNodeDisplayProps> = ({ data, selected = fa
   return (
     <div
       className={cn(
-        "group-node relative rounded-lg shadow-lg transition-all duration-200",
+        "group/groupnode relative rounded-lg shadow-lg transition-all duration-200",
         selected ? "ring-2 ring-blue-400 ring-offset-2" : "",
       )}
       style={{
@@ -53,6 +53,20 @@ const GroupNodeDisplay: React.FC<GroupNodeDisplayProps> = ({ data, selected = fa
         borderLeft: `4px solid ${groupColor}`,
       }}
     >
+      {/* Navigate Into Group Button - appears on hover */}
+      <button
+        className="absolute -top-2 -right-2 w-6 h-6 bg-blue-500 hover:bg-blue-600 text-white rounded-full opacity-0 group-hover/groupnode:opacity-100 transition-opacity flex items-center justify-center shadow-lg z-10"
+        onClick={(e) => {
+          e.stopPropagation();
+          // Trigger double-click behavior to navigate into group
+          const event = new MouseEvent('dblclick', { bubbles: true });
+          e.currentTarget.parentElement?.dispatchEvent(event);
+        }}
+        title="Explore group contents"
+      >
+        <Maximize2 className="h-3 w-3" />
+      </button>
+
       {/* Header */}
       <div
         className="flex items-center justify-between p-3 rounded-t-lg"
@@ -72,7 +86,7 @@ const GroupNodeDisplay: React.FC<GroupNodeDisplayProps> = ({ data, selected = fa
         
         <div className="flex items-center gap-1">
           {/* Node count badge */}
-          <span 
+          <span
             className="text-xs px-2 py-1 rounded-full font-medium"
             style={{
               backgroundColor: `${groupColor}30`,
@@ -81,13 +95,21 @@ const GroupNodeDisplay: React.FC<GroupNodeDisplayProps> = ({ data, selected = fa
           >
             {containedNodes.length} nodes
           </span>
-          
-          {/* Collapse/Expand indicator */}
-          {isCollapsed ? (
-            <Maximize2 className="h-3 w-3 text-gray-500" />
-          ) : (
-            <Minimize2 className="h-3 w-3 text-gray-500" />
-          )}
+
+          {/* Collapse/Expand button */}
+          <button
+            className="p-1 hover:bg-white/50 rounded transition-colors"
+            onClick={(e) => {
+              e.stopPropagation();
+            }}
+            title={isCollapsed ? "Expand" : "Collapse"}
+          >
+            {isCollapsed ? (
+              <ChevronRight className="h-3 w-3 text-gray-600" />
+            ) : (
+              <ChevronDown className="h-3 w-3 text-gray-600" />
+            )}
+          </button>
         </div>
       </div>
 

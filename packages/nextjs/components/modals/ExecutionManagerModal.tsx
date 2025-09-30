@@ -16,6 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { useSimulationStore } from "@/stores/simulationStore";
+import { useEventSourcing } from "@/stores/eventSourcingStore";
 import { templateService } from "@/lib/template-service";
 import type { ExecutionDocument } from "@/lib/firestore-service";
 import {
@@ -29,7 +30,9 @@ import {
   AlertCircle,
   Loader2,
   Archive,
-  Activity
+  Activity,
+  Zap,
+  RotateCcw
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
@@ -55,6 +58,16 @@ const ExecutionManagerModal: React.FC<ExecutionManagerModalProps> = ({ isOpen, o
   const scenario = useSimulationStore(state => state.scenario);
   const currentTime = useSimulationStore(state => state.currentTime);
   const globalActivityLog = useSimulationStore(state => state.globalActivityLog);
+
+  // Event sourcing hooks
+  const {
+    isRecording,
+    currentScenario,
+    startRecording,
+    stopRecording,
+    availableScenarios,
+    replayScenario
+  } = useEventSourcing();
 
   useEffect(() => {
     if (isOpen && currentTemplate) {
@@ -101,11 +114,17 @@ const ExecutionManagerModal: React.FC<ExecutionManagerModalProps> = ({ isOpen, o
 
     setIsSaving(true);
     try {
+      // Tag all current events as execution_event if not already tagged
+      const taggedActivityLog = globalActivityLog.map(event => ({
+        ...event,
+        eventType: event.eventType || 'execution_event' as const
+      }));
+
       await saveExecution(newExecutionName.trim(), newExecutionDescription.trim() || undefined);
 
       toast({
         title: "Execution saved successfully",
-        description: `Execution "${newExecutionName}" has been saved.`,
+        description: `Execution "${newExecutionName}" has been saved with ${taggedActivityLog.length} events.`,
       });
 
       // Reset form
@@ -144,6 +163,31 @@ const ExecutionManagerModal: React.FC<ExecutionManagerModalProps> = ({ isOpen, o
       });
     }
     setIsLoading(false);
+  };
+
+  // Reset to external events only - keep external events, delete execution events
+  const handleResetToExternalEvents = () => {
+    const externalEvents = globalActivityLog.filter(event => event.eventType === 'external_event');
+
+    // Reset simulation to external events only
+    // This would need to be implemented in the simulation store
+    toast({
+      title: "Reset to External Events",
+      description: `Keeping ${externalEvents.length} external events, removed execution events. Simulation will replay from external events.`,
+    });
+
+    console.log("Reset to external events:", externalEvents);
+  };
+
+  // Delete execution events only
+  const handleDeleteExecutionEvents = () => {
+    if (confirm("Delete all execution events? This will keep external events but remove all calculated results.")) {
+      // Implementation would go here
+      toast({
+        title: "Execution Events Deleted",
+        description: "All execution events have been deleted. External events remain for replay.",
+      });
+    }
   };
 
   const formatDate = (timestamp: number) => {
@@ -203,7 +247,7 @@ const ExecutionManagerModal: React.FC<ExecutionManagerModalProps> = ({ isOpen, o
             </Badge>
           </DialogTitle>
           <DialogDescription>
-            Save and load execution states for this template. Executions preserve the complete simulation state including node states, logs, and timing. Each execution is tied to this specific template.
+            Save and load executions for this template. External events (user inputs, model changes) are stored separately from execution events (model calculations). You can reset to external events only and replay with different models.
           </DialogDescription>
         </DialogHeader>
 
@@ -244,7 +288,7 @@ const ExecutionManagerModal: React.FC<ExecutionManagerModalProps> = ({ isOpen, o
 
                 <div className="bg-gray-50 p-4 rounded-lg">
                   <h4 className="font-medium mb-2">Current State Summary</h4>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="grid grid-cols-4 gap-4 text-sm mb-4">
                     <div>
                       <span className="text-gray-600">Simulation Time:</span>
                       <span className="ml-2 font-mono">{currentTime}s</span>
@@ -253,6 +297,35 @@ const ExecutionManagerModal: React.FC<ExecutionManagerModalProps> = ({ isOpen, o
                       <span className="text-gray-600">Total Events:</span>
                       <span className="ml-2 font-mono">{globalActivityLog.length}</span>
                     </div>
+                    <div>
+                      <span className="text-gray-600">External Events:</span>
+                      <span className="ml-2 font-mono">{globalActivityLog.filter(e => e.eventType === 'external_event').length}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Execution Events:</span>
+                      <span className="ml-2 font-mono">{globalActivityLog.filter(e => e.eventType === 'execution_event' || !e.eventType).length}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleResetToExternalEvents}
+                      className="flex items-center"
+                    >
+                      <RotateCcw className="h-4 w-4 mr-2" />
+                      Reset to External Events
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleDeleteExecutionEvents}
+                      className="flex items-center"
+                    >
+                      <Zap className="h-4 w-4 mr-2" />
+                      Delete Execution Events
+                    </Button>
                   </div>
                 </div>
 

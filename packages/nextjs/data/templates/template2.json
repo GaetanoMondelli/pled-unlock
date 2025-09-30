@@ -1,6 +1,6 @@
 {
   "name": "Template2",
-  "description": "template 2",
+  "description": "template 2 (Updated: 29/09/2025, 11:22:55) (Updated: 29/09/2025, 11:23:18) (Updated: 29/09/2025, 11:23:59) (Updated: 29/09/2025, 11:37:21) (Updated: 29/09/2025, 11:37:41) (Updated: 29/09/2025, 12:01:25) (Updated: 29/09/2025, 12:01:54) (Updated: 29/09/2025, 18:50:32) (Updated: 30/09/2025, 11:26:00) (Updated: 30/09/2025, 11:26:08) (Updated: 30/09/2025, 11:26:09) (Updated: 30/09/2025, 11:26:53) (Updated: 30/09/2025, 15:48:05) (Updated: 30/09/2025, 15:48:22) (Updated: 30/09/2025, 16:11:07)",
   "scenario": {
     "version": "3.0",
     "nodes": [
@@ -9,8 +9,11 @@
         "displayName": "Bond Price Feed A",
         "position": {
           "x": 100,
-          "y": 100
+          "y": 76.55618754937069
         },
+        "tags": [
+          "Bond engine"
+        ],
         "type": "DataSource",
         "interval": 3,
         "outputs": [
@@ -36,9 +39,12 @@
         "nodeId": "DataSource_X",
         "displayName": "Interest Rate Feed X",
         "position": {
-          "x": 100,
-          "y": 350
+          "x": 69.42111419483129,
+          "y": 334.71055709741563
         },
+        "tags": [
+          "Bond engine"
+        ],
         "type": "DataSource",
         "interval": 5,
         "outputs": [
@@ -61,12 +67,46 @@
         }
       },
       {
+        "nodeId": "DataSource_B",
+        "displayName": "Price Feed B",
+        "position": {
+          "x": 100,
+          "y": 600
+        },
+        "tags": [
+          "Bond engine"
+        ],
+        "type": "DataSource",
+        "interval": 4,
+        "outputs": [
+          {
+            "name": "output",
+            "destinationNodeId": "Queue_B",
+            "destinationInputName": "input",
+            "interface": {
+              "type": "SimpleValue",
+              "requiredFields": [
+                "data.value"
+              ]
+            }
+          }
+        ],
+        "generation": {
+          "type": "random",
+          "valueMin": 1,
+          "valueMax": 10
+        }
+      },
+      {
         "nodeId": "Queue_B",
         "displayName": "Raw Market Data Queue",
         "position": {
-          "x": 400,
-          "y": 200
+          "x": 500.4832781912757,
+          "y": 184.1776554686076
         },
+        "tags": [
+          "Bond engine"
+        ],
         "type": "Queue",
         "inputs": [
           {
@@ -107,9 +147,12 @@
         "nodeId": "Process_C",
         "displayName": "Bond Valuation Engine",
         "position": {
-          "x": 700,
-          "y": 200
+          "x": 821.6570219818117,
+          "y": 97.49269444125116
         },
+        "tags": [
+          "Bond engine"
+        ],
         "type": "ProcessNode",
         "inputs": [
           {
@@ -167,9 +210,10 @@
         "nodeId": "Queue_D",
         "displayName": "Aggregated Valuation Results",
         "position": {
-          "x": 950,
-          "y": 100
+          "x": 863.5843981917002,
+          "y": 63.66616742151035
         },
+        "tags": [],
         "type": "Queue",
         "inputs": [
           {
@@ -207,51 +251,549 @@
         "capacity": 5
       },
       {
+        "nodeId": "Sink_F",
+        "displayName": "Historical Valuation Archive X",
+        "position": {
+          "x": 1174.8044296788482,
+          "y": 163.2890365448505
+        },
+        "tags": [
+          "Bond engine"
+        ],
+        "type": "Sink",
+        "inputs": []
+      },
+      {
         "nodeId": "Sink_E",
         "displayName": "Real-time Risk Monitor",
         "position": {
           "x": 950,
-          "y": 350
+          "y": 520
         },
         "type": "Sink",
-        "inputs": [
-          {
-            "name": "input",
-            "interface": {
-              "type": "Any",
-              "requiredFields": [
-                "metadata.timestamp"
-              ]
-            },
-            "required": true
-          }
-        ]
+        "inputs": []
       },
       {
-        "nodeId": "Sink_F",
-        "displayName": "Historical Valuation Archive",
+        "nodeId": "group_Bond engine",
+        "displayName": "Bond engine",
         "position": {
-          "x": 950,
-          "y": 100
+          "x": 467.77594388741204,
+          "y": 274.22280995811747
         },
-        "type": "Sink",
+        "tags": [
+          "_system_group"
+        ],
+        "isCollapsed": true,
+        "type": "Group",
+        "groupName": "Bond engine",
+        "groupColor": "#10b981",
+        "groupDescription": "Auto-generated group for \"Bond engine\" tagged nodes",
+        "containedNodes": [
+          "DataSource_A",
+          "DataSource_X",
+          "DataSource_B",
+          "Queue_B",
+          "Process_C",
+          "Sink_F"
+        ],
         "inputs": [
           {
-            "name": "input",
+            "name": "Historical Valuation Archive X.input",
             "interface": {
               "type": "Any",
               "requiredFields": [
                 "metadata.timestamp"
               ]
             },
-            "required": true
+            "required": false
           }
-        ]
+        ],
+        "outputs": [
+          {
+            "name": "Bond Valuation Engine.output1",
+            "destinationNodeId": "Queue_D",
+            "destinationInputName": "input",
+            "interface": {
+              "type": "TransformationResult",
+              "requiredFields": [
+                "data.transformedValue"
+              ]
+            }
+          },
+          {
+            "name": "Bond Valuation Engine.output2",
+            "destinationNodeId": "Sink_E",
+            "destinationInputName": "input",
+            "interface": {
+              "type": "TransformationResult",
+              "requiredFields": [
+                "data.transformedValue"
+              ]
+            }
+          }
+        ],
+        "bounds": {
+          "x": 19.42111419483129,
+          "y": 12.520633486795873,
+          "width": 1405.383315484017,
+          "height": 737.4793665132041
+        }
       }
-    ]
+    ],
+    "groups": {
+      "tags": [
+        {
+          "name": "Bond engine",
+          "color": "#3b82f6",
+          "description": "Custom tag"
+        }
+      ],
+      "visualMode": "grouped",
+      "activeFilters": [
+        "Bond engine"
+      ]
+    }
   },
   "version": "3.0",
   "id": "template2",
   "createdAt": 1758892908188,
-  "updatedAt": 1758919527296
+  "updatedAt": 1759245068946,
+  "executionState": {
+    "scenario": {
+      "version": "3.0",
+      "nodes": [
+        {
+          "nodeId": "DataSource_A",
+          "displayName": "Bond Price Feed A",
+          "position": {
+            "x": 100,
+            "y": 76.55618754937069
+          },
+          "tags": [
+            "Bond engine"
+          ],
+          "type": "DataSource",
+          "interval": 3,
+          "outputs": [
+            {
+              "name": "output",
+              "destinationNodeId": "Queue_B",
+              "destinationInputName": "input",
+              "interface": {
+                "type": "SimpleValue",
+                "requiredFields": [
+                  "data.value"
+                ]
+              }
+            }
+          ],
+          "generation": {
+            "type": "random",
+            "valueMin": 1,
+            "valueMax": 10
+          }
+        },
+        {
+          "nodeId": "DataSource_X",
+          "displayName": "Interest Rate Feed X",
+          "position": {
+            "x": 69.42111419483129,
+            "y": 334.71055709741563
+          },
+          "tags": [
+            "Bond engine"
+          ],
+          "type": "DataSource",
+          "interval": 5,
+          "outputs": [
+            {
+              "name": "output",
+              "destinationNodeId": "Queue_B",
+              "destinationInputName": "input",
+              "interface": {
+                "type": "SimpleValue",
+                "requiredFields": [
+                  "data.value"
+                ]
+              }
+            }
+          ],
+          "generation": {
+            "type": "random",
+            "valueMin": 100,
+            "valueMax": 200
+          }
+        },
+        {
+          "nodeId": "DataSource_B",
+          "displayName": "Price Feed B",
+          "position": {
+            "x": 100,
+            "y": 600
+          },
+          "tags": [
+            "Bond engine"
+          ],
+          "type": "DataSource",
+          "interval": 4,
+          "outputs": [
+            {
+              "name": "output",
+              "destinationNodeId": "Queue_B",
+              "destinationInputName": "input",
+              "interface": {
+                "type": "SimpleValue",
+                "requiredFields": [
+                  "data.value"
+                ]
+              }
+            }
+          ],
+          "generation": {
+            "type": "random",
+            "valueMin": 1,
+            "valueMax": 10
+          }
+        },
+        {
+          "nodeId": "Queue_B",
+          "displayName": "Raw Market Data Queue",
+          "position": {
+            "x": 500.4832781912757,
+            "y": 184.1776554686076
+          },
+          "tags": [
+            "Bond engine"
+          ],
+          "type": "Queue",
+          "inputs": [
+            {
+              "name": "input",
+              "interface": {
+                "type": "SimpleValue",
+                "requiredFields": [
+                  "data.value"
+                ]
+              },
+              "required": true
+            }
+          ],
+          "outputs": [
+            {
+              "name": "output",
+              "destinationNodeId": "Process_C",
+              "destinationInputName": "inputA",
+              "interface": {
+                "type": "AggregationResult",
+                "requiredFields": [
+                  "data.aggregatedValue"
+                ]
+              }
+            }
+          ],
+          "aggregation": {
+            "method": "sum",
+            "formula": "sum(input.data.value)",
+            "trigger": {
+              "type": "time",
+              "window": 10
+            }
+          },
+          "capacity": 10
+        },
+        {
+          "nodeId": "Process_C",
+          "displayName": "Bond Valuation Engine",
+          "position": {
+            "x": 821.6570219818117,
+            "y": 97.49269444125116
+          },
+          "tags": [
+            "Bond engine"
+          ],
+          "type": "ProcessNode",
+          "inputs": [
+            {
+              "name": "inputA",
+              "nodeId": "Queue_B",
+              "sourceOutputName": "output",
+              "interface": {
+                "type": "AggregationResult",
+                "requiredFields": [
+                  "data.aggregatedValue"
+                ]
+              },
+              "alias": "queueB",
+              "required": true
+            }
+          ],
+          "outputs": [
+            {
+              "name": "output1",
+              "destinationNodeId": "Queue_D",
+              "destinationInputName": "input",
+              "interface": {
+                "type": "TransformationResult",
+                "requiredFields": [
+                  "data.transformedValue"
+                ]
+              },
+              "transformation": {
+                "formula": "queueB.data.aggregatedValue + 10",
+                "fieldMapping": {
+                  "data.transformedValue": "queueB.data.aggregatedValue + 10"
+                }
+              }
+            },
+            {
+              "name": "output2",
+              "destinationNodeId": "Sink_E",
+              "destinationInputName": "input",
+              "interface": {
+                "type": "TransformationResult",
+                "requiredFields": [
+                  "data.transformedValue"
+                ]
+              },
+              "transformation": {
+                "formula": "queueB.data.aggregatedValue * 0.5",
+                "fieldMapping": {
+                  "data.transformedValue": "queueB.data.aggregatedValue * 0.5"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "nodeId": "Queue_D",
+          "displayName": "Aggregated Valuation Results",
+          "position": {
+            "x": 863.5843981917002,
+            "y": 63.66616742151035
+          },
+          "tags": [],
+          "type": "Queue",
+          "inputs": [
+            {
+              "name": "input",
+              "interface": {
+                "type": "TransformationResult",
+                "requiredFields": [
+                  "data.transformedValue"
+                ]
+              },
+              "required": true
+            }
+          ],
+          "outputs": [
+            {
+              "name": "output",
+              "destinationNodeId": "Sink_F",
+              "destinationInputName": "input",
+              "interface": {
+                "type": "AggregationResult",
+                "requiredFields": [
+                  "data.aggregatedValue"
+                ]
+              }
+            }
+          ],
+          "aggregation": {
+            "method": "average",
+            "formula": "avg(input.data.transformedValue)",
+            "trigger": {
+              "type": "time",
+              "window": 5
+            }
+          },
+          "capacity": 5
+        },
+        {
+          "nodeId": "Sink_F",
+          "displayName": "Historical Valuation Archive X",
+          "position": {
+            "x": 1174.8044296788482,
+            "y": 163.2890365448505
+          },
+          "tags": [
+            "Bond engine"
+          ],
+          "type": "Sink",
+          "inputs": []
+        },
+        {
+          "nodeId": "Sink_E",
+          "displayName": "Real-time Risk Monitor",
+          "position": {
+            "x": 950,
+            "y": 520
+          },
+          "type": "Sink",
+          "inputs": []
+        },
+        {
+          "nodeId": "group_Bond engine",
+          "displayName": "Bond engine",
+          "position": {
+            "x": 467.77594388741204,
+            "y": 274.22280995811747
+          },
+          "tags": [
+            "_system_group"
+          ],
+          "isCollapsed": true,
+          "type": "Group",
+          "groupName": "Bond engine",
+          "groupColor": "#10b981",
+          "groupDescription": "Auto-generated group for \"Bond engine\" tagged nodes",
+          "containedNodes": [
+            "DataSource_A",
+            "DataSource_X",
+            "DataSource_B",
+            "Queue_B",
+            "Process_C",
+            "Sink_F"
+          ],
+          "inputs": [
+            {
+              "name": "Historical Valuation Archive X.input",
+              "interface": {
+                "type": "Any",
+                "requiredFields": [
+                  "metadata.timestamp"
+                ]
+              },
+              "required": false
+            }
+          ],
+          "outputs": [
+            {
+              "name": "Bond Valuation Engine.output1",
+              "destinationNodeId": "Queue_D",
+              "destinationInputName": "input",
+              "interface": {
+                "type": "TransformationResult",
+                "requiredFields": [
+                  "data.transformedValue"
+                ]
+              }
+            },
+            {
+              "name": "Bond Valuation Engine.output2",
+              "destinationNodeId": "Sink_E",
+              "destinationInputName": "input",
+              "interface": {
+                "type": "TransformationResult",
+                "requiredFields": [
+                  "data.transformedValue"
+                ]
+              }
+            }
+          ],
+          "bounds": {
+            "x": 19.42111419483129,
+            "y": 12.520633486795873,
+            "width": 1405.383315484017,
+            "height": 737.4793665132041
+          }
+        }
+      ],
+      "groups": {
+        "tags": [
+          {
+            "name": "Bond engine",
+            "color": "#3b82f6",
+            "description": "Custom tag"
+          }
+        ],
+        "visualMode": "grouped",
+        "activeFilters": [
+          "Bond engine"
+        ]
+      }
+    },
+    "nodeStates": {
+      "DataSource_A": {
+        "lastEmissionTime": -1,
+        "stateMachine": {
+          "currentState": "source_idle",
+          "transitionHistory": []
+        }
+      },
+      "DataSource_X": {
+        "lastEmissionTime": -1,
+        "stateMachine": {
+          "currentState": "source_idle",
+          "transitionHistory": []
+        }
+      },
+      "DataSource_B": {
+        "lastEmissionTime": -1,
+        "stateMachine": {
+          "currentState": "source_idle",
+          "transitionHistory": []
+        }
+      },
+      "Queue_B": {
+        "inputBuffer": [],
+        "outputBuffer": [],
+        "lastAggregationTime": -1,
+        "stateMachine": {
+          "currentState": "queue_idle",
+          "transitionHistory": []
+        }
+      },
+      "Process_C": {
+        "inputBuffers": {},
+        "lastFiredTime": -1,
+        "stateMachine": {
+          "currentState": "process_idle",
+          "transitionHistory": []
+        }
+      },
+      "Queue_D": {
+        "inputBuffer": [],
+        "outputBuffer": [],
+        "lastAggregationTime": -1,
+        "stateMachine": {
+          "currentState": "queue_idle",
+          "transitionHistory": []
+        }
+      },
+      "Sink_F": {
+        "consumedTokenCount": 0,
+        "lastConsumedTime": -1,
+        "consumedTokens": [],
+        "stateMachine": {
+          "currentState": "sink_idle",
+          "transitionHistory": []
+        }
+      },
+      "Sink_E": {
+        "consumedTokenCount": 0,
+        "lastConsumedTime": -1,
+        "consumedTokens": [],
+        "stateMachine": {
+          "currentState": "sink_idle",
+          "transitionHistory": []
+        }
+      }
+    },
+    "currentTime": 0,
+    "eventCounter": 0,
+    "nodeActivityLogs": {
+      "DataSource_A": [],
+      "DataSource_X": [],
+      "DataSource_B": [],
+      "Queue_B": [],
+      "Process_C": [],
+      "Queue_D": [],
+      "Sink_F": [],
+      "Sink_E": [],
+      "group_Bond engine": []
+    },
+    "globalActivityLog": [],
+    "simulationSpeed": 1,
+    "lastSavedAt": 1759245067845
+  }
 }

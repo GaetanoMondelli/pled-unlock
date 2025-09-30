@@ -181,7 +181,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       initialLogs[node.nodeId] = [];
       switch (node.type) {
         case "DataSource":
-          initialNodeStates[node.nodeId] = { 
+          initialNodeStates[node.nodeId] = {
             lastEmissionTime: -1,
             stateMachine: {
               currentState: "source_idle",
@@ -190,9 +190,9 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
           } as DataSourceState;
           break;
         case "Queue":
-          initialNodeStates[node.nodeId] = { 
-            inputBuffer: [], 
-            outputBuffer: [], 
+          initialNodeStates[node.nodeId] = {
+            inputBuffer: [],
+            outputBuffer: [],
             lastAggregationTime: -1,
             stateMachine: {
               currentState: "queue_idle",
@@ -202,8 +202,8 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
           break;
         case "ProcessNode":
           const inputBuffers: Record<string, Token[]> = {};
-          initialNodeStates[node.nodeId] = { 
-            inputBuffers, 
+          initialNodeStates[node.nodeId] = {
+            inputBuffers,
             lastFiredTime: -1,
             stateMachine: {
               currentState: "process_idle",
@@ -237,6 +237,9 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
               transitionHistory: []
             }
           } as any; // ModuleState
+          break;
+        case "Group":
+          // Group nodes don't need simulation state, they're visual only
           break;
       }
     });
@@ -373,6 +376,56 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
                 // Check if ProcessNode can fire now that it received a token
                 const updatedPnState = get().nodeStates[destNodeConfig.nodeId] as ProcessNodeState;
                 _tryFireProcessNode(destNodeConfig, updatedPnState, newTime);
+              } else if (destNodeConfig.type === "FSMProcessNode") {
+                // Handle FSM token reception - add to input buffer and check transitions
+                const fsmState = destNodeState as any; // FSMProcessNodeState
+                const currentFSMState = fsmState.currentFSMState || 'idle';
+
+                // Add token to input buffer
+                const inputBuffers = fsmState.inputBuffers || {};
+                const bufferKey = 'input'; // Use default input name
+                inputBuffers[bufferKey] = [...(inputBuffers[bufferKey] || []), token];
+                _updateNodeState(destNodeConfig.nodeId, { inputBuffers });
+
+                _logNodeActivity(
+                  destNodeConfig.nodeId,
+                  {
+                    action: "token_received",
+                    value: token.value,
+                    details: `Token received from ${nodeConfig.displayName}`,
+                  },
+                  newTime,
+                );
+
+                // Check for token_received transitions
+                const tokenReceivedTransitions = destNodeConfig.fsm?.transitions?.filter((t: any) =>
+                  t.trigger === 'token_received' && t.from === currentFSMState
+                ) || [];
+
+                tokenReceivedTransitions.forEach((transition: any) => {
+                  get()._executeFSMTransition(destNodeConfig, fsmState, transition, newTime);
+                });
+
+                // Check for condition-based transitions with the new token
+                const conditionTransitions = destNodeConfig.fsm?.transitions?.filter((t: any) => t.trigger === 'condition') || [];
+                conditionTransitions.forEach((transition: any) => {
+                  if (transition.from === fsmState.currentFSMState && transition.condition) {
+                    const formulaContext = {
+                      ...fsmState.fsmVariables,
+                      ...Object.fromEntries(
+                        Object.entries(inputBuffers).map(([key, tokens]: [string, any]) => [
+                          key,
+                          tokens[tokens.length - 1] // Use the latest token
+                        ])
+                      )
+                    };
+
+                    const { value: conditionResult } = evaluateFormula(transition.condition, formulaContext);
+                    if (conditionResult) {
+                      get()._executeFSMTransition(destNodeConfig, fsmState, transition, newTime);
+                    }
+                  }
+                });
               } else if (destNodeConfig.type === "Sink") {
                 _transitionNodeState(destNodeConfig.nodeId, 'sink_processing', newTime, 'token_received');
                 const sinkState = destNodeState as SinkState;
@@ -654,8 +707,18 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
         const conditionTransitions = fsmConfig.fsm?.transitions?.filter((t: any) => t.trigger === 'condition') || [];
         conditionTransitions.forEach((transition: any) => {
           if (transition.from === currentState && transition.condition) {
-            // Evaluate condition with current FSM variables
-            const { value: conditionResult } = evaluateFormula(transition.condition, fsmState.fsmVariables);
+            // Evaluate condition with current FSM variables AND input tokens
+            const formulaContext = {
+              ...fsmState.fsmVariables,
+              ...Object.fromEntries(
+                Object.entries(fsmState.inputBuffers || {}).map(([key, tokens]: [string, any]) => [
+                  key,
+                  tokens[0] // Use first token in buffer
+                ])
+              )
+            };
+
+            const { value: conditionResult } = evaluateFormula(transition.condition, formulaContext);
             if (conditionResult) {
               get()._executeFSMTransition(fsmConfig, fsmState, transition, newTime);
             }
@@ -948,6 +1011,56 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
                 // Check if ProcessNode can fire now that it received a token
                 const updatedPnState = get().nodeStates[destNodeConfig.nodeId] as ProcessNodeState;
                 get()._tryFireProcessNode(destNodeConfig, updatedPnState, newTime);
+              } else if (destNodeConfig.type === "FSMProcessNode") {
+                // Handle FSM token forwarding from Queue
+                const fsmState = get().nodeStates[destNodeConfig.nodeId] as any;
+                const currentFSMState = fsmState.currentFSMState || 'idle';
+
+                // Add token to input buffer
+                const inputBuffers = fsmState.inputBuffers || {};
+                const bufferKey = 'input';
+                inputBuffers[bufferKey] = [...(inputBuffers[bufferKey] || []), tokenToForward];
+                _updateNodeState(destNodeConfig.nodeId, { inputBuffers });
+
+                _logNodeActivity(
+                  destNodeConfig.nodeId,
+                  {
+                    action: "token_received",
+                    value: tokenToForward.value,
+                    details: `Token received from ${qConfigSource.displayName}`,
+                  },
+                  newTime,
+                );
+
+                // Check for token_received transitions
+                const tokenReceivedTransitions = destNodeConfig.fsm?.transitions?.filter((t: any) =>
+                  t.trigger === 'token_received' && t.from === currentFSMState
+                ) || [];
+
+                tokenReceivedTransitions.forEach((transition: any) => {
+                  get()._executeFSMTransition(destNodeConfig, fsmState, transition, newTime);
+                });
+
+                // Check condition-based transitions
+                const conditionTransitions = destNodeConfig.fsm?.transitions?.filter((t: any) => t.trigger === 'condition') || [];
+                conditionTransitions.forEach((transition: any) => {
+                  if (transition.from === fsmState.currentFSMState && transition.condition) {
+                    const formulaContext = {
+                      ...fsmState.fsmVariables,
+                      ...Object.fromEntries(
+                        Object.entries(inputBuffers).map(([key, tokens]: [string, any]) => [
+                          key,
+                          tokens[tokens.length - 1]
+                        ])
+                      )
+                    };
+
+                    const { value: conditionResult } = evaluateFormula(transition.condition, formulaContext);
+                    if (conditionResult) {
+                      get()._executeFSMTransition(destNodeConfig, fsmState, transition, newTime);
+                    }
+                  }
+                });
               }
             }
           });

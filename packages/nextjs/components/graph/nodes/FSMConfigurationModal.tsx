@@ -52,14 +52,119 @@ const FSMConfigurationModal: React.FC<FSMConfigurationModalProps> = ({
   const [stateActions, setStateActions] = useState(currentConfig.fsm?.stateActions || {});
   const [newStateName, setNewStateName] = useState("");
 
+  // FSL Parser - same as in fsl-editor.tsx
+  const parseFSL = (fslCode: string) => {
+    const result = {
+      states: [] as string[],
+      transitions: [] as any[],
+      stateActions: {} as any,
+      errors: [] as string[]
+    };
+
+    try {
+      const lines = fslCode.split('\n').map(line => line.trim()).filter(Boolean);
+      let currentState: string | null = null;
+
+      for (const line of lines) {
+        // State definition: state stateName { ... }
+        if (line.startsWith('state ')) {
+          const stateMatch = line.match(/state\s+(\w+)\s*\{?/);
+          if (stateMatch) {
+            currentState = stateMatch[1];
+            if (!result.states.includes(currentState)) {
+              result.states.push(currentState);
+              result.stateActions[currentState] = { logs: [], onEntry: [], onExit: [] };
+            }
+          }
+        }
+        // Transition: on trigger -> targetState
+        else if (line.includes('->') && currentState) {
+          const transitionMatch = line.match(/on\s+(.+?)\s*->\s*(\w+)/);
+          if (transitionMatch) {
+            const trigger = transitionMatch[1].trim();
+            const targetState = transitionMatch[2];
+
+            // Check if it's a condition-based transition
+            if (trigger.includes('.') || trigger.includes('>') || trigger.includes('<') || trigger.includes('=')) {
+              result.transitions.push({
+                from: currentState,
+                to: targetState,
+                trigger: 'condition',
+                condition: trigger
+              });
+            } else {
+              result.transitions.push({
+                from: currentState,
+                to: targetState,
+                trigger: trigger
+              });
+            }
+          }
+        }
+        // Actions: on_entry { action(...) }
+        else if (line.includes('on_entry') && currentState) {
+          const actions = line.match(/(\w+)\([^)]*\)/g);
+          if (actions) {
+            actions.forEach(actionStr => {
+              const actionMatch = actionStr.match(/(\w+)\((.+?)\)/);
+              if (actionMatch) {
+                const action = actionMatch[1];
+                const params = actionMatch[2].replace(/['"]/g, '');
+
+                if (action === 'log') {
+                  result.stateActions[currentState].onEntry.push({
+                    action: 'log',
+                    value: params
+                  });
+                } else if (action === 'emit') {
+                  const [target, formula] = params.split(',').map(s => s.trim());
+                  result.stateActions[currentState].onEntry.push({
+                    action: 'emit',
+                    target: target,
+                    formula: formula
+                  });
+                }
+              }
+            });
+          }
+        }
+      }
+    } catch (error) {
+      result.errors.push(`Parse error: ${error instanceof Error ? error.message : String(error)}`);
+    }
+
+    return result;
+  };
+
   // Reset form when modal opens
   useEffect(() => {
     if (isOpen) {
-      setFslCode(currentConfig.fsl || "");
-      setStates(currentConfig.fsm?.states || []);
-      setInitialState(currentConfig.fsm?.initialState || "");
-      setTransitions(currentConfig.fsm?.transitions || []);
-      setStateActions(currentConfig.fsm?.stateActions || {});
+      const fslCode = currentConfig.fsl || "";
+      setFslCode(fslCode);
+
+      // If FSL exists, parse it to populate the visual editor
+      if (fslCode.trim()) {
+        const parsed = parseFSL(fslCode);
+        if (parsed.errors.length === 0) {
+          setStates(parsed.states);
+          setInitialState(parsed.states[0] || ""); // First state as initial
+          setTransitions(parsed.transitions);
+          setStateActions(parsed.stateActions);
+        } else {
+          console.warn("FSL parsing errors:", parsed.errors);
+          // Fall back to existing config
+          setStates(currentConfig.fsm?.states || []);
+          setInitialState(currentConfig.fsm?.initialState || "");
+          setTransitions(currentConfig.fsm?.transitions || []);
+          setStateActions(currentConfig.fsm?.stateActions || {});
+        }
+      } else {
+        // No FSL, use existing config
+        setStates(currentConfig.fsm?.states || []);
+        setInitialState(currentConfig.fsm?.initialState || "");
+        setTransitions(currentConfig.fsm?.transitions || []);
+        setStateActions(currentConfig.fsm?.stateActions || {});
+      }
     }
   }, [isOpen, currentConfig]);
 
@@ -127,11 +232,20 @@ const FSMConfigurationModal: React.FC<FSMConfigurationModalProps> = ({
   };
 
   const handleSave = () => {
+    // Convert states to objects with actions
+    const stateObjects = states.map(stateName => ({
+      name: stateName,
+      isInitial: stateName === initialState,
+      isFinal: false,
+      onEntry: stateActions[stateName]?.onEntry || [],
+      onExit: stateActions[stateName]?.onExit || []
+    }));
+
     const updatedConfig = {
       ...currentConfig,
       fsl: fslCode,
       fsm: {
-        states,
+        states: stateObjects,  // Use state objects instead of strings
         initialState,
         transitions,
         stateActions,
@@ -219,7 +333,7 @@ const FSMConfigurationModal: React.FC<FSMConfigurationModalProps> = ({
                 {/* States Panel */}
                 <div className="space-y-4">
                   <div>
-                    <Label className="text-sm font-medium">States</Label>
+                    <Label className="text-sm font-medium">FSM States ({states.length})</Label>
                     <div className="flex gap-2 mt-1">
                       <Input
                         placeholder="State name"

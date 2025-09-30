@@ -8,9 +8,12 @@ import NodeInspectorModal from "@/components/modals/NodeInspectorModal";
 import TokenInspectorModal from "@/components/modals/TokenInspectorModal";
 import TemplateManagerModal from "@/components/modals/TemplateManagerModal";
 import ExecutionManagerModal from "@/components/modals/ExecutionManagerModal";
+import ScenarioManagerModal from "@/components/modals/ScenarioManagerModal";
+import ModelUpgradeModal from "@/components/modals/ModelUpgradeModal";
+import JsonViewModal from "@/components/modals/JsonViewModal";
 import IntegratedAIAssistant from "@/components/ai/IntegratedAIAssistant";
 import NodeLibraryPanel from "@/components/library/NodeLibraryPanel";
-import GroupManagementPanel from "@/components/graph/GroupManagementPanel";
+import ImprovedGroupManagementPanel from "@/components/graph/ImprovedGroupManagementPanel";
 import StateInspectorPanel from "@/components/ui/state-inspector-panel";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,7 +30,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useSimulationStore } from "@/stores/simulationStore";
-import { AlertCircle, BookOpen, Edit, Pause, Play, RefreshCw, StepForward, Brain, Eye, EyeOff, Activity, Library, Undo2, Redo2, FileText, Archive, ScrollText, Group } from "lucide-react";
+import { useEventSourcing, setupEventSourcingIntegration } from "@/stores/eventSourcingStore";
+import { AlertCircle, BookOpen, Edit, Pause, Play, RefreshCw, StepForward, Brain, Eye, EyeOff, Activity, Library, Undo2, Redo2, FileText, Archive, ScrollText, Group, Zap, ArrowUp, Code, RotateCcw, ChevronDown, Save, Loader2 } from "lucide-react";
 import { cn } from "~~/lib/utils";
 
 export default function TemplateEditorPage() {
@@ -68,7 +72,36 @@ export default function TemplateEditorPage() {
   const [isTemplateManagerOpen, setIsTemplateManagerOpen] = useState(false);
   const [isExecutionManagerOpen, setIsExecutionManagerOpen] = useState(false);
   const [isLibraryPanelOpen, setIsLibraryPanelOpen] = useState(false);
+  const [isScenarioManagerOpen, setIsScenarioManagerOpen] = useState(false);
+  const [isModelUpgradeOpen, setIsModelUpgradeOpen] = useState(false);
+  const [isJsonViewOpen, setIsJsonViewOpen] = useState(false);
   const lastErrorCountRef = useRef(0);
+
+  // Event sourcing hooks
+  const { isRecording, currentScenario, availableScenarios } = useEventSourcing();
+
+  // Simple debugging functions
+  const handleResetAllEvents = () => {
+    if (confirm("Reset simulation? This will delete ALL events and restart from scratch.")) {
+      // Clear all events and reset simulation
+      clearErrors();
+      toast({
+        title: "Simulation Reset",
+        description: "All events cleared. Simulation restarted.",
+      });
+    }
+  };
+
+  const handleReloadFromExternalEvents = () => {
+    if (confirm("Reload from external events? This will delete execution events and replay from external events only.")) {
+      const externalCount = globalActivityLog.filter(e => e.eventType === 'external_event').length;
+
+      toast({
+        title: "Reloaded from External Events",
+        description: `Kept ${externalCount} external events, deleted execution events. Ready to replay.`,
+      });
+    }
+  };
 
   const fetchDefaultScenarioContent = useCallback(async () => {
     try {
@@ -189,6 +222,12 @@ export default function TemplateEditorPage() {
     window.scrollTo(0, 0);
   }, []);
 
+  // Set up event sourcing integration
+  useEffect(() => {
+    setupEventSourcingIntegration();
+    console.log("🔗 Event sourcing integration initialized");
+  }, []);
+
   // Navigate to template slug URL when template is loaded
   useEffect(() => {
     if (currentTemplate) {
@@ -205,6 +244,28 @@ export default function TemplateEditorPage() {
     }
   }, [currentTemplate, router]);
 
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Handler for navigating to a group (used by ImprovedGroupManagementPanel)
+  const handleNavigateToGroup = useCallback((groupTag: string, groupNodes: any[]) => {
+    // Update URL - GraphVisualization will react to this change
+    const url = new URL(window.location.href);
+    url.searchParams.set('group', groupTag);
+    window.history.pushState({}, '', url.toString());
+    // Trigger a custom event so GraphVisualization can react
+    window.dispatchEvent(new CustomEvent('urlchange'));
+  }, []);
+
+  // Handler for navigating back to template view
+  const handleNavigateBackToTemplate = useCallback(() => {
+    // Remove group param from URL - GraphVisualization will react to this change
+    const url = new URL(window.location.href);
+    url.searchParams.delete('group');
+    window.history.pushState({}, '', url.toString());
+    // Trigger a custom event so GraphVisualization can react
+    window.dispatchEvent(new CustomEvent('urlchange'));
+  }, []);
+
   // Handler for saving current template
   const handleSaveTemplate = useCallback(async () => {
     if (!currentTemplate) {
@@ -216,6 +277,7 @@ export default function TemplateEditorPage() {
       return;
     }
 
+    setIsSaving(true);
     try {
       await updateCurrentTemplate();
       toast({
@@ -228,6 +290,8 @@ export default function TemplateEditorPage() {
         title: "Save failed",
         description: `Failed to save template: ${error instanceof Error ? error.message : 'Unknown error'}`,
       });
+    } finally {
+      setIsSaving(false);
     }
   }, [currentTemplate, updateCurrentTemplate, toast]);
 
@@ -384,10 +448,20 @@ export default function TemplateEditorPage() {
                         <div className="border-t border-gray-200 my-1"></div>
                         <button
                           onClick={handleSaveTemplate}
-                          className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                          disabled={isSaving}
+                          className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          <FileText className="w-4 h-4 mr-2" />
-                          Save Template
+                          {isSaving ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Saving...
+                            </>
+                          ) : (
+                            <>
+                              <FileText className="w-4 h-4 mr-2" />
+                              Save Template
+                            </>
+                          )}
                         </button>
                       </>
                     )}
@@ -462,6 +536,33 @@ export default function TemplateEditorPage() {
                     >
                       <Group className="w-4 h-4 mr-2" />
                       Groups & Tags
+                    </button>
+                    <div className="border-t border-gray-200 my-1"></div>
+                    <button
+                      onClick={() => setIsJsonViewOpen(true)}
+                      className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                    >
+                      <Code className="w-4 h-4 mr-2" />
+                      View JSON Data
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tools Menu */}
+              <div className="relative group">
+                <button className="px-3 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded transition-colors">
+                  Tools
+                </button>
+                <div className="absolute top-full left-0 mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                  <div className="py-1">
+                    <button
+                      onClick={() => setIsModelUpgradeOpen(true)}
+                      className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                    >
+                      <ArrowUp className="w-4 h-4 mr-2" />
+                      Model Upgrade
+                      {currentScenario && <div className="w-2 h-2 bg-green-500 rounded-full ml-auto" />}
                     </button>
                   </div>
                 </div>
@@ -547,6 +648,43 @@ export default function TemplateEditorPage() {
               >
                 <StepForward className="w-3 h-3 mr-1" /> Step
               </button>
+
+              <div className="w-px h-4 bg-gray-300 mx-2"></div>
+
+              {/* Debugging Controls */}
+              <div className="relative group">
+                <button className="px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 rounded transition-colors flex items-center">
+                  <Archive className="w-3 h-3 mr-1" />
+                  {currentExecution ? currentExecution.name : currentScenario ? currentScenario.name : 'No execution'}
+                  <ChevronDown className="w-3 h-3 ml-1" />
+                </button>
+                <div className="absolute top-full left-0 mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                  <div className="py-1">
+                    <button
+                      onClick={() => setIsExecutionManagerOpen(true)}
+                      className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-100 flex items-center"
+                    >
+                      <Archive className="w-3 h-3 mr-2" />
+                      Manage Executions...
+                    </button>
+                    <div className="border-t border-gray-200 my-1"></div>
+                    <button
+                      onClick={handleResetAllEvents}
+                      className="w-full px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50 flex items-center"
+                    >
+                      <RotateCcw className="w-3 h-3 mr-2" />
+                      Reset (Delete All)
+                    </button>
+                    <button
+                      onClick={handleReloadFromExternalEvents}
+                      className="w-full px-3 py-2 text-left text-xs text-blue-600 hover:bg-blue-50 flex items-center"
+                    >
+                      <RefreshCw className="w-3 h-3 mr-2" />
+                      Reload from External Events
+                    </button>
+                  </div>
+                </div>
+              </div>
 
               <div className="w-px h-4 bg-gray-300 mx-2"></div>
 
@@ -719,7 +857,10 @@ export default function TemplateEditorPage() {
                     </div>
                   </div>
                   <div className="flex-1 min-h-0 overflow-hidden">
-                    <GroupManagementPanel className="h-full p-3" />
+                    <ImprovedGroupManagementPanel
+                      className="h-full p-3"
+                      onNavigateToGroup={handleNavigateToGroup}
+                    />
                   </div>
                 </div>
               )}
@@ -780,6 +921,18 @@ export default function TemplateEditorPage() {
       <ExecutionManagerModal
         isOpen={isExecutionManagerOpen}
         onClose={() => setIsExecutionManagerOpen(false)}
+      />
+      <ScenarioManagerModal
+        isOpen={isScenarioManagerOpen}
+        onClose={() => setIsScenarioManagerOpen(false)}
+      />
+      <ModelUpgradeModal
+        isOpen={isModelUpgradeOpen}
+        onClose={() => setIsModelUpgradeOpen(false)}
+      />
+      <JsonViewModal
+        isOpen={isJsonViewOpen}
+        onClose={() => setIsJsonViewOpen(false)}
       />
     </div>
   );

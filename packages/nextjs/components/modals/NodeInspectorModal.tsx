@@ -13,13 +13,14 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import NodeStateMachineDiagram from "@/components/ui/node-state-machine-diagram";
 import { useSimulationStore } from "@/stores/simulationStore";
 import { useToast } from "@/hooks/use-toast";
 // import { MessageInterfaces } from "@/lib/simulation/message-interfaces";
 // import { InterfaceCompatibilityValidator } from "@/lib/simulation/enhanced-node-schema";
-import { Code, Settings, Activity, ChevronDown, ChevronRight, Save, RefreshCw, MessageSquare, ArrowRight, ArrowLeft, CheckCircle, AlertTriangle, Info, Eye, EyeOff } from "lucide-react";
+import { Code, Settings, Activity, ChevronDown, ChevronRight, Save, RefreshCw, MessageSquare, ArrowRight, ArrowLeft, CheckCircle, AlertTriangle, Info, Eye, EyeOff, Tags, Plus, X } from "lucide-react";
 import type { NodeStateMachineState, StateMachineInfo } from "@/lib/simulation/types";
 // FSLGenerator removed - using simulation store state machine directly
 import { Badge } from "@/components/ui/badge";
@@ -395,6 +396,98 @@ const MessageInterfaceSection: React.FC<{ nodeConfig: any }> = ({ nodeConfig }) 
   );
 };
 
+// Message Interfaces Section - shows interface types used by the node
+const MessageInterfacesSection: React.FC<{ nodeConfig: any }> = ({ nodeConfig }) => {
+  const interfaces = useMemo(() => {
+    const inputInterfaces: string[] = [];
+    const outputInterfaces: string[] = [];
+
+    // Collect input interfaces
+    if (nodeConfig.inputInterface?.type) {
+      inputInterfaces.push(nodeConfig.inputInterface.type);
+    }
+    if (nodeConfig.inputs && Array.isArray(nodeConfig.inputs)) {
+      nodeConfig.inputs.forEach((input: any) => {
+        if (input.interface?.type) {
+          inputInterfaces.push(input.interface.type);
+        }
+      });
+    }
+
+    // Collect output interfaces
+    if (nodeConfig.outputInterface?.type) {
+      outputInterfaces.push(nodeConfig.outputInterface.type);
+    }
+    if (nodeConfig.outputs && Array.isArray(nodeConfig.outputs)) {
+      nodeConfig.outputs.forEach((output: any) => {
+        if (output.interface?.type) {
+          outputInterfaces.push(output.interface.type);
+        }
+      });
+    }
+
+    return {
+      inputs: [...new Set(inputInterfaces)],
+      outputs: [...new Set(outputInterfaces)]
+    };
+  }, [nodeConfig]);
+
+  if (interfaces.inputs.length === 0 && interfaces.outputs.length === 0) {
+    return (
+      <div className="p-4 bg-slate-50 rounded-lg">
+        <h3 className="text-sm font-medium text-slate-700 mb-2">Message Interfaces</h3>
+        <div className="text-xs text-slate-500 italic">
+          No message interfaces defined for this node type
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4 bg-slate-50 rounded-lg">
+      <h3 className="text-sm font-medium text-slate-700 mb-3">Message Interfaces</h3>
+
+      {interfaces.inputs.length > 0 && (
+        <div className="mb-3">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xs font-medium text-slate-600">Consumes</span>
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {interfaces.inputs.map((interfaceType: string) => (
+              <div
+                key={interfaceType}
+                className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-medium"
+                title={`Input interface: ${interfaceType}`}
+              >
+                {interfaceType}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {interfaces.outputs.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xs font-medium text-slate-600">Produces</span>
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {interfaces.outputs.map((interfaceType: string) => (
+              <div
+                key={interfaceType}
+                className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium"
+                title={`Output interface: ${interfaceType}`}
+              >
+                {interfaceType}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // Interface validation display component
 const InterfaceValidationSection: React.FC<{ nodeConfig: any }> = ({ nodeConfig }) => {
   const scenario = useSimulationStore(state => state.scenario);
@@ -403,13 +496,8 @@ const InterfaceValidationSection: React.FC<{ nodeConfig: any }> = ({ nodeConfig 
   useEffect(() => {
     if (scenario && nodeConfig) {
       try {
-        // Mock validation for enhanced nodes
-        if (nodeConfig.inputInterface || nodeConfig.outputInterface || nodeConfig.inputs || nodeConfig.outputs) {
-          const result = InterfaceCompatibilityValidator.validateNode(nodeConfig, scenario);
-          setValidationResult(result);
-        } else {
-          setValidationResult(null);
-        }
+        // Skip validation for now since InterfaceCompatibilityValidator is not available
+        setValidationResult(null);
       } catch (error) {
         console.warn('Interface validation error:', error);
         setValidationResult(null);
@@ -484,16 +572,20 @@ const InterfaceValidationSection: React.FC<{ nodeConfig: any }> = ({ nodeConfig 
 };
 
 // Helper components for enhanced Overview tab
-const ConfigSection: React.FC<{ 
-  nodeConfig: any; 
-  showJson: boolean; 
+const ConfigSection: React.FC<{
+  nodeConfig: any;
+  showJson: boolean;
   onToggleJson: () => void;
   editedConfigText: string;
   onConfigTextChange: (text: string) => void;
   onSaveConfig: () => void;
   hasUnsavedChanges: boolean;
   onResetConfig: () => void;
-}> = ({ nodeConfig, showJson, onToggleJson, editedConfigText, onConfigTextChange, onSaveConfig, hasUnsavedChanges, onResetConfig }) => {
+  scenario: any;
+  saveSnapshot: (description: string) => void;
+  loadScenario: (scenario: any) => void;
+  toast: any;
+}> = ({ nodeConfig, showJson, onToggleJson, editedConfigText, onConfigTextChange, onSaveConfig, hasUnsavedChanges, onResetConfig, scenario, saveSnapshot, loadScenario, toast }) => {
   const [expandedFormulas, setExpandedFormulas] = useState(new Set<number>());
 
   // Clean config (remove position and other UI stuff)
@@ -603,111 +695,89 @@ const ConfigSection: React.FC<{
               </div>
             </div>
 
-            {/* Inputs Section */}
-            {nodeConfig.inputs && nodeConfig.inputs.length > 0 && (
-              <div className="border-t pt-4">
-                <h4 className="font-semibold text-slate-700 mb-2">Inputs ({nodeConfig.inputs.length})</h4>
-                <div className="space-y-3">
-                  {nodeConfig.inputs.map((input: any, index: number) => (
-                    <div key={index} className="border border-slate-200 rounded p-3 bg-slate-50">
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-sm text-slate-700">{input.name}</span>
-                          {input.alias && <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">alias: {input.alias}</span>}
-                          {input.required && <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded">required</span>}
-                        </div>
-                        {input.nodeId && (
-                          <div className="text-xs text-slate-600">
-                            <span className="font-medium">Source:</span> {input.nodeId}
-                            {input.sourceOutputName && <span> → {input.sourceOutputName}</span>}
-                          </div>
-                        )}
-                        <div className="text-xs">
-                          <span className="font-medium text-slate-600">Interface:</span> {input.interface.type}
-                          {input.interface.requiredFields && input.interface.requiredFields.length > 0 && (
-                            <div className="mt-1 ml-2">
-                              <span className="text-slate-500">Required fields:</span>
-                              <ul className="list-disc list-inside ml-2 text-slate-500">
-                                {input.interface.requiredFields.map((field: string, i: number) => (
-                                  <li key={i} className="font-mono text-xs">{field}</li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+            {/* Inputs Section - Editable */}
+            {(nodeConfig.type === 'ProcessNode' || nodeConfig.type === 'Queue' || nodeConfig.type === 'Sink' || nodeConfig.type === 'FSMProcessNode') && (
+              <InputsOutputsEditor
+                nodeConfig={nodeConfig}
+                section="inputs"
+                onUpdate={(updatedInputs) => {
+                  if (scenario) {
+                    saveSnapshot('Update node inputs');
+                    const updatedScenario = {
+                      ...scenario,
+                      nodes: scenario.nodes.map((node: any) =>
+                        node.nodeId === nodeConfig.nodeId ? { ...node, inputs: updatedInputs } : node
+                      )
+                    };
+                    loadScenario(updatedScenario);
+                    toast({ title: "Inputs Updated", description: "Node inputs have been updated successfully." });
+                  }
+                }}
+              />
             )}
 
-            {/* Outputs Section */}
-            {nodeConfig.outputs && nodeConfig.outputs.length > 0 && (
-              <div className="border-t pt-4">
-                <h4 className="font-semibold text-slate-700 mb-2">Outputs ({nodeConfig.outputs.length})</h4>
-                <div className="space-y-3">
-                  {nodeConfig.outputs.map((output: any, index: number) => (
-                    <div key={index} className="border border-slate-200 rounded p-3 bg-slate-50">
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium text-sm text-slate-700">{output.name}</span>
-                          <span className="text-xs text-slate-500">→ {output.destinationNodeId}</span>
+            {/* Outputs Section - Editable */}
+            {(nodeConfig.type === 'DataSource' || nodeConfig.type === 'ProcessNode' || nodeConfig.type === 'Queue' || nodeConfig.type === 'FSMProcessNode') && (
+              <InputsOutputsEditor
+                nodeConfig={nodeConfig}
+                section="outputs"
+                onUpdate={(updatedOutputs) => {
+                  if (scenario) {
+                    saveSnapshot('Update node outputs');
+                    const updatedScenario = {
+                      ...scenario,
+                      nodes: scenario.nodes.map((node: any) =>
+                        node.nodeId === nodeConfig.nodeId ? { ...node, outputs: updatedOutputs } : node
+                      )
+                    };
+                    loadScenario(updatedScenario);
+                    toast({ title: "Outputs Updated", description: "Node outputs have been updated successfully." });
+                  }
+                }}
+              />
+            )}
+
+            {/* Group Node: Display aggregated inputs/outputs */}
+            {nodeConfig.type === 'Group' && (
+              <div className="border-t pt-4 space-y-4">
+                <div>
+                  <h4 className="font-semibold text-slate-700 mb-2">Contained Nodes</h4>
+                  <div className="text-xs text-slate-600 space-y-1">
+                    {nodeConfig.containedNodes?.map((nodeId: string) => (
+                      <div key={nodeId} className="p-2 bg-slate-50 rounded">• {nodeId}</div>
+                    )) || <div className="text-slate-400 italic">No nodes in group</div>}
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="font-semibold text-slate-700 mb-2">Inputs ({nodeConfig.inputs?.length || 0})</h4>
+                  <div className="space-y-2">
+                    {nodeConfig.inputs?.map((input: any, index: number) => (
+                      <div key={index} className="border border-slate-200 rounded p-2 bg-slate-50">
+                        <div className="font-medium text-sm text-slate-700">{input.name}</div>
+                        <div className="text-xs text-slate-600 mt-1">
+                          Interface: {input.interface?.type || 'N/A'}
                         </div>
-                        {output.destinationInputName && (
-                          <div className="text-xs text-slate-600">
-                            <span className="font-medium">Target Input:</span> {output.destinationInputName}
-                          </div>
-                        )}
-                        <div className="text-xs">
-                          <span className="font-medium text-slate-600">Interface:</span> {output.interface.type}
-                          {output.interface.requiredFields && output.interface.requiredFields.length > 0 && (
-                            <div className="mt-1 ml-2">
-                              <span className="text-slate-500">Required fields:</span>
-                              <ul className="list-disc list-inside ml-2 text-slate-500">
-                                {output.interface.requiredFields.map((field: string, i: number) => (
-                                  <li key={i} className="font-mono text-xs">{field}</li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                        </div>
-                        {output.transformation && (
-                          <div className="mt-2 p-2 bg-white border rounded">
-                            <button
-                              onClick={() => toggleFormula(index)}
-                              className="flex items-center gap-2 text-xs font-medium text-slate-700 hover:text-slate-900 w-full text-left"
-                            >
-                              {expandedFormulas.has(index) ?
-                                <ChevronDown className="h-3 w-3" /> :
-                                <ChevronRight className="h-3 w-3" />
-                              }
-                              Transformation Formula
-                            </button>
-                            {expandedFormulas.has(index) && (
-                              <div className="mt-2 space-y-2">
-                                <div className="p-2 bg-slate-100 rounded text-xs font-mono">
-                                  {output.transformation.formula}
-                                </div>
-                                {output.transformation.fieldMapping && (
-                                  <div>
-                                    <span className="text-xs font-medium text-slate-600">Field Mapping:</span>
-                                    <div className="mt-1 p-2 bg-slate-100 rounded text-xs">
-                                      {Object.entries(output.transformation.fieldMapping).map(([key, value]) => (
-                                        <div key={key} className="font-mono">
-                                          <span className="text-blue-600">{key}</span> = <span className="text-green-600">{value as string}</span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        )}
                       </div>
-                    </div>
-                  ))}
+                    )) || <div className="text-xs text-slate-400 italic">No inputs</div>}
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="font-semibold text-slate-700 mb-2">Outputs ({nodeConfig.outputs?.length || 0})</h4>
+                  <div className="space-y-2">
+                    {nodeConfig.outputs?.map((output: any, index: number) => (
+                      <div key={index} className="border border-slate-200 rounded p-2 bg-slate-50">
+                        <div className="font-medium text-sm text-slate-700">{output.name}</div>
+                        <div className="text-xs text-slate-600 mt-1">
+                          → {output.destinationNodeId || 'No destination'}
+                        </div>
+                        <div className="text-xs text-slate-600">
+                          Interface: {output.interface?.type || 'N/A'}
+                        </div>
+                      </div>
+                    )) || <div className="text-xs text-slate-400 italic">No outputs</div>}
+                  </div>
                 </div>
               </div>
             )}
@@ -959,7 +1029,708 @@ const NodeActivityLogWithStateTransitions: React.FC<{
   );
 };
 
+// Inputs/Outputs Editor Component
+const InputsOutputsEditor: React.FC<{
+  nodeConfig: any;
+  section: 'inputs' | 'outputs';
+  onUpdate: (updated: any[]) => void;
+}> = ({ nodeConfig, section, onUpdate }) => {
+  const scenario = useSimulationStore(state => state.scenario);
+  const [isAdding, setIsAdding] = useState(false);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+
+  // Form state
+  const [formData, setFormData] = useState({
+    name: '',
+    alias: '',
+    nodeId: '',
+    sourceOutputName: '',
+    destinationNodeId: '',
+    destinationInputName: '',
+    interfaceType: 'SimpleValue',
+    requiredFields: ['data.value'],
+    required: false,
+    formula: '',
+  });
+
+  const items = nodeConfig[section] || [];
+  const availableNodes = scenario?.nodes.filter(n => n.nodeId !== nodeConfig.nodeId) || [];
+
+  const handleAdd = () => {
+    if (!formData.name.trim()) {
+      return; // Name is required
+    }
+
+    const newItem = section === 'inputs'
+      ? {
+          name: formData.name,
+          nodeId: formData.nodeId || '',
+          sourceOutputName: formData.sourceOutputName || 'output',
+          interface: {
+            type: formData.interfaceType,
+            requiredFields: formData.requiredFields,
+          },
+          alias: formData.alias || undefined,
+          required: formData.required,
+        }
+      : {
+          name: formData.name,
+          destinationNodeId: formData.destinationNodeId || '', // Can be empty
+          destinationInputName: formData.destinationInputName || 'input',
+          interface: {
+            type: formData.interfaceType,
+            requiredFields: formData.requiredFields,
+          },
+          ...(formData.formula && {
+            transformation: {
+              formula: formData.formula,
+              fieldMapping: {},
+            }
+          }),
+        };
+
+    onUpdate([...items, newItem]);
+    resetForm();
+  };
+
+  const handleEdit = (index: number) => {
+    const item = items[index];
+    if (section === 'inputs') {
+      setFormData({
+        ...formData,
+        name: item.name,
+        alias: item.alias || '',
+        nodeId: item.nodeId || '',
+        sourceOutputName: item.sourceOutputName || '',
+        interfaceType: item.interface?.type || 'SimpleValue',
+        requiredFields: item.interface?.requiredFields || ['data.value'],
+        required: item.required || false,
+      });
+    } else {
+      setFormData({
+        ...formData,
+        name: item.name,
+        destinationNodeId: item.destinationNodeId || '',
+        destinationInputName: item.destinationInputName || '',
+        interfaceType: item.interface?.type || 'SimpleValue',
+        requiredFields: item.interface?.requiredFields || ['data.value'],
+        formula: item.transformation?.formula || '',
+      });
+    }
+    setEditingIndex(index);
+    setIsAdding(true);
+  };
+
+  const handleSaveEdit = () => {
+    if (editingIndex === null || !formData.name.trim()) return;
+
+    const updated = [...items];
+    const editedItem = section === 'inputs'
+      ? {
+          name: formData.name,
+          nodeId: formData.nodeId,
+          sourceOutputName: formData.sourceOutputName,
+          interface: {
+            type: formData.interfaceType,
+            requiredFields: formData.requiredFields,
+          },
+          alias: formData.alias || undefined,
+          required: formData.required,
+        }
+      : {
+          name: formData.name,
+          destinationNodeId: formData.destinationNodeId || '', // Can be empty
+          destinationInputName: formData.destinationInputName || 'input',
+          interface: {
+            type: formData.interfaceType,
+            requiredFields: formData.requiredFields,
+          },
+          ...(formData.formula && {
+            transformation: {
+              formula: formData.formula,
+              fieldMapping: {},
+            }
+          }),
+        };
+
+    updated[editingIndex] = editedItem;
+    onUpdate(updated);
+    resetForm();
+  };
+
+  const handleDelete = (index: number) => {
+    const updated = items.filter((_: any, i: number) => i !== index);
+    onUpdate(updated);
+  };
+
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      alias: '',
+      nodeId: '',
+      sourceOutputName: '',
+      destinationNodeId: '',
+      destinationInputName: '',
+      interfaceType: 'SimpleValue',
+      requiredFields: ['data.value'],
+      required: false,
+      formula: '',
+    });
+    setIsAdding(false);
+    setEditingIndex(null);
+  };
+
+  return (
+    <div className="border-t pt-4">
+      <div className="flex items-center justify-between mb-2">
+        <h4 className="font-semibold text-slate-700">
+          {section === 'inputs' ? 'Inputs' : 'Outputs'} ({items.length})
+        </h4>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-6 px-2"
+          onClick={() => setIsAdding(!isAdding)}
+        >
+          <Plus className="h-3 w-3" />
+        </Button>
+      </div>
+
+      {/* Existing Items */}
+      <div className="space-y-2 mb-3">
+        {items.map((item: any, index: number) => (
+          <div key={index} className="border border-slate-200 rounded p-2 bg-slate-50 group relative">
+            <button
+              onClick={() => handleDelete(index)}
+              className="absolute -top-1 -right-1 w-4 h-4 bg-red-400 hover:bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+              title="Remove"
+            >
+              <X className="h-2.5 w-2.5" />
+            </button>
+
+            <div className="flex items-center justify-between mb-1">
+              <span className="font-medium text-sm text-slate-700">{item.name}</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-5 px-1 text-xs opacity-0 group-hover:opacity-100"
+                onClick={() => handleEdit(index)}
+              >
+                Edit
+              </Button>
+            </div>
+
+            <div className="text-xs text-slate-600 space-y-0.5">
+              {section === 'inputs' ? (
+                <>
+                  {item.nodeId && <div>Source: {item.nodeId}</div>}
+                  {item.alias && <div>Alias: {item.alias}</div>}
+                </>
+              ) : (
+                <>
+                  {item.destinationNodeId && <div>→ {item.destinationNodeId}</div>}
+                  {item.transformation?.formula && (
+                    <div className="font-mono text-[10px] truncate">{item.transformation.formula}</div>
+                  )}
+                </>
+              )}
+              <div>Interface: {item.interface?.type}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Add/Edit Form */}
+      {isAdding && (
+        <div className="border border-blue-200 rounded p-3 bg-blue-50 space-y-2">
+          <Input
+            placeholder="Name (required)"
+            value={formData.name}
+            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            className="h-7 text-xs"
+            autoFocus
+          />
+
+          {section === 'inputs' ? (
+            <>
+              <select
+                value={formData.nodeId}
+                onChange={(e) => setFormData({ ...formData, nodeId: e.target.value })}
+                className="w-full h-7 text-xs border rounded px-2 bg-white"
+              >
+                <option value="">Select Source Node (optional)</option>
+                {availableNodes.map(node => (
+                  <option key={node.nodeId} value={node.nodeId}>{node.displayName}</option>
+                ))}
+              </select>
+
+              <Input
+                placeholder="Alias (optional)"
+                value={formData.alias}
+                onChange={(e) => setFormData({ ...formData, alias: e.target.value })}
+                className="h-7 text-xs"
+              />
+            </>
+          ) : (
+            <>
+              <select
+                value={formData.destinationNodeId}
+                onChange={(e) => setFormData({ ...formData, destinationNodeId: e.target.value })}
+                className="w-full h-7 text-xs border rounded px-2 bg-white"
+              >
+                <option value="">No destination (optional)</option>
+                {availableNodes.map(node => (
+                  <option key={node.nodeId} value={node.nodeId}>{node.displayName}</option>
+                ))}
+              </select>
+
+              <Input
+                placeholder="Formula (optional, e.g., input1 + input2)"
+                value={formData.formula}
+                onChange={(e) => setFormData({ ...formData, formula: e.target.value })}
+                className="h-7 text-xs font-mono"
+              />
+            </>
+          )}
+
+          <select
+            value={formData.interfaceType}
+            onChange={(e) => setFormData({ ...formData, interfaceType: e.target.value })}
+            className="w-full h-7 text-xs border rounded px-2 bg-white"
+          >
+            <option value="SimpleValue">SimpleValue</option>
+            <option value="AggregationResult">AggregationResult</option>
+            <option value="TransformationResult">TransformationResult</option>
+            <option value="Any">Any</option>
+          </select>
+
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              className="h-6 text-xs"
+              onClick={editingIndex !== null ? handleSaveEdit : handleAdd}
+              disabled={!formData.name.trim()}
+            >
+              {editingIndex !== null ? 'Save' : 'Add'}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-6 text-xs"
+              onClick={resetForm}
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Tags Section Component
+const TagsSection: React.FC<{
+  nodeConfig: any;
+  onTagsUpdate: (newTags: string[]) => void;
+}> = ({ nodeConfig, onTagsUpdate }) => {
+  const scenario = useSimulationStore(state => state.scenario);
+  const [newTagInput, setNewTagInput] = useState("");
+  const [isAddingTag, setIsAddingTag] = useState(false);
+
+  const currentTags = nodeConfig.tags || [];
+
+  // Get available tags from scenario (both from registry and existing nodes)
+  const availableTags = useMemo(() => {
+    if (!scenario) return [];
+
+    const allTags = new Set<string>();
+
+    // Add tags from the global tag registry
+    if (scenario.groups?.tags) {
+      scenario.groups.tags.forEach(tag => allTags.add(tag.name));
+    }
+
+    // Add tags from existing nodes
+    if (scenario.nodes) {
+      scenario.nodes.forEach(node => {
+        if (node.tags) {
+          node.tags.forEach(tag => allTags.add(tag));
+        }
+      });
+    }
+
+    return Array.from(allTags).filter(tag => !currentTags.includes(tag));
+  }, [scenario, currentTags]);
+
+  const handleAddTag = (tag: string) => {
+    if (tag && !currentTags.includes(tag)) {
+      onTagsUpdate([...currentTags, tag]);
+    }
+    setNewTagInput("");
+    setIsAddingTag(false);
+  };
+
+  const handleRemoveTag = (tagToRemove: string) => {
+    onTagsUpdate(currentTags.filter(tag => tag !== tagToRemove));
+  };
+
+  const handleCreateNewTag = () => {
+    if (newTagInput.trim()) {
+      handleAddTag(newTagInput.trim());
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h3 className="font-semibold text-slate-700 flex items-center gap-2">
+          <Tags className="h-4 w-4" />
+          Tags
+          <Badge variant="outline" className="text-xs">
+            {currentTags.length}
+          </Badge>
+        </h3>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-6 px-2"
+          onClick={() => setIsAddingTag(!isAddingTag)}
+        >
+          <Plus className="h-3 w-3" />
+        </Button>
+      </div>
+
+      {/* Current Tags */}
+      <div className="flex flex-wrap gap-2">
+        {currentTags.map(tag => (
+          <Badge
+            key={tag}
+            variant="secondary"
+            className="text-xs px-2 py-1 flex items-center gap-1 cursor-pointer hover:bg-red-100 hover:text-red-700 group"
+            onClick={() => handleRemoveTag(tag)}
+            title={`Click to remove "${tag}"`}
+          >
+            {tag}
+            <X className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+          </Badge>
+        ))}
+        {currentTags.length === 0 && (
+          <span className="text-xs text-gray-500 italic">No tags assigned</span>
+        )}
+      </div>
+
+      {/* Add Tag Interface */}
+      {isAddingTag && (
+        <div className="space-y-2">
+          {/* Available Tags */}
+          {availableTags.length > 0 && (
+            <div>
+              <div className="text-xs font-medium text-gray-600 mb-1">Available Tags:</div>
+              <div className="flex flex-wrap gap-1">
+                {availableTags.map(tag => (
+                  <Badge
+                    key={tag}
+                    variant="outline"
+                    className="text-xs px-2 py-1 cursor-pointer hover:bg-blue-100 hover:border-blue-300"
+                    onClick={() => handleAddTag(tag)}
+                  >
+                    {tag}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Create New Tag */}
+          <div className="flex gap-2">
+            <Input
+              placeholder="Create new tag..."
+              value={newTagInput}
+              onChange={(e) => setNewTagInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleCreateNewTag();
+                }
+                if (e.key === 'Escape') {
+                  setIsAddingTag(false);
+                  setNewTagInput("");
+                }
+              }}
+              className="h-7 text-xs"
+              autoFocus
+            />
+            <Button
+              size="sm"
+              className="h-7 px-2 text-xs"
+              onClick={handleCreateNewTag}
+              disabled={!newTagInput.trim()}
+            >
+              Add
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 px-2 text-xs"
+              onClick={() => {
+                setIsAddingTag(false);
+                setNewTagInput("");
+              }}
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // FSLAnalysisSection component REMOVED - user requested clean implementation without FSLGenerator
+
+// State Actions Editor Component
+const StateActionsEditor: React.FC<{
+  stateName: string;
+  stateIndex: number;
+  actions: any[];
+  nodeConfig: any;
+  onActionsUpdate: (newActions: any[]) => void;
+  onAutoGenerateOutput?: (outputName: string) => void;
+}> = ({ stateName, stateIndex, actions, nodeConfig, onActionsUpdate, onAutoGenerateOutput }) => {
+  const [isAddingAction, setIsAddingAction] = useState(false);
+  const [newActionType, setNewActionType] = useState<'emit' | 'log'>('emit');
+  const [newActionFormula, setNewActionFormula] = useState('');
+  const [newActionTarget, setNewActionTarget] = useState('');
+  const [newActionLogValue, setNewActionLogValue] = useState('');
+
+  // Get available output destinations
+  const availableOutputs = nodeConfig.outputs || [];
+
+  // Get existing output names
+  const existingOutputNames = availableOutputs.map((o: any) => o.name);
+
+  const handleAddAction = () => {
+    if (newActionType === 'emit') {
+      if (!newActionFormula || !newActionTarget) {
+        return;
+      }
+
+      // Auto-generate output if it doesn't exist
+      if (!existingOutputNames.includes(newActionTarget)) {
+        onAutoGenerateOutput?.(newActionTarget);
+      }
+
+      const newAction = {
+        action: 'emit',
+        target: newActionTarget,
+        formula: newActionFormula
+      };
+      onActionsUpdate([...actions, newAction]);
+    } else if (newActionType === 'log') {
+      if (!newActionLogValue) {
+        return;
+      }
+      const newAction = {
+        action: 'log',
+        value: newActionLogValue
+      };
+      onActionsUpdate([...actions, newAction]);
+    }
+
+    // Reset form
+    setNewActionFormula('');
+    setNewActionTarget('');
+    setNewActionLogValue('');
+    setIsAddingAction(false);
+  };
+
+  const handleRemoveAction = (actionIndex: number) => {
+    const updatedActions = actions.filter((_, idx) => idx !== actionIndex);
+    onActionsUpdate(updatedActions);
+  };
+
+  return (
+    <div className="border border-slate-200 rounded p-3 bg-slate-50">
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="font-medium text-sm text-slate-700">{stateName}</span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-500">{actions.length} action(s)</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2"
+              onClick={() => setIsAddingAction(!isAddingAction)}
+            >
+              <Plus className="h-3 w-3" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Existing Actions */}
+        {actions.length > 0 && (
+          <div className="space-y-2">
+            {actions.map((action: any, actionIndex: number) => (
+              <div key={actionIndex} className="p-2 bg-white border rounded group relative">
+                <button
+                  onClick={() => handleRemoveAction(actionIndex)}
+                  className="absolute -top-1 -right-1 w-4 h-4 bg-red-400 hover:bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                  title="Remove action"
+                >
+                  <X className="h-2.5 w-2.5" />
+                </button>
+
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-medium text-slate-700 uppercase">{action.action}</span>
+                  {action.action === 'emit' && action.target && (
+                    <span className="text-xs text-slate-500">→ {action.target}</span>
+                  )}
+                </div>
+
+                {action.action === 'emit' && action.formula && (
+                  <div className="mt-2">
+                    <div className="text-xs font-medium text-slate-600 mb-1">Formula:</div>
+                    <div className="p-2 bg-slate-100 rounded text-xs font-mono text-slate-800">
+                      {action.formula}
+                    </div>
+                  </div>
+                )}
+
+                {action.action === 'log' && action.value && (
+                  <div className="mt-2">
+                    <div className="text-xs font-medium text-slate-600 mb-1">Message:</div>
+                    <div className="p-2 bg-slate-100 rounded text-xs text-slate-700">
+                      "{action.value}"
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {actions.length === 0 && !isAddingAction && (
+          <div className="text-xs text-slate-500 italic">No actions - Click + to add</div>
+        )}
+
+        {/* Add Action Form */}
+        {isAddingAction && (
+          <div className="mt-2 p-3 bg-white border border-blue-200 rounded space-y-3">
+            <div>
+              <label className="text-xs font-medium text-slate-600 mb-1 block">Action Type</label>
+              <div className="flex gap-2">
+                <Button
+                  variant={newActionType === 'emit' ? 'default' : 'outline'}
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => setNewActionType('emit')}
+                >
+                  Emit Output
+                </Button>
+                <Button
+                  variant={newActionType === 'log' ? 'default' : 'outline'}
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => setNewActionType('log')}
+                >
+                  Log Message
+                </Button>
+              </div>
+            </div>
+
+            {newActionType === 'emit' && (
+              <>
+                <div>
+                  <label className="text-xs font-medium text-slate-600 mb-1 block">
+                    Output Name <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    placeholder="Type new output name (e.g., output1, result)"
+                    value={newActionTarget}
+                    onChange={(e) => setNewActionTarget(e.target.value)}
+                    className="h-7 text-xs"
+                    autoFocus
+                    list="existing-outputs"
+                  />
+                  <datalist id="existing-outputs">
+                    {availableOutputs.map((output: any) => (
+                      <option key={output.name} value={output.name} />
+                    ))}
+                  </datalist>
+                  {newActionTarget && !existingOutputNames.includes(newActionTarget) && (
+                    <div className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                      <span>✓</span> <span>Will auto-create output "{newActionTarget}"</span>
+                    </div>
+                  )}
+                  {newActionTarget && existingOutputNames.includes(newActionTarget) && (
+                    <div className="text-xs text-blue-600 mt-1 flex items-center gap-1">
+                      <span>→</span> <span>Using existing output "{newActionTarget}"</span>
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-slate-600 mb-1 block">
+                    Value Formula <span className="text-red-500">*</span>
+                  </label>
+                  <Textarea
+                    value={newActionFormula}
+                    onChange={(e) => setNewActionFormula(e.target.value)}
+                    placeholder="e.g., inputA.data.value * 2 + inputB.data.value"
+                    className="h-16 text-xs font-mono resize-none"
+                  />
+                  <div className="text-xs text-slate-500 mt-1">
+                    Use input aliases (e.g., inputA, inputB) to reference input buffers
+                  </div>
+                </div>
+              </>
+            )}
+
+            {newActionType === 'log' && (
+              <div>
+                <label className="text-xs font-medium text-slate-600 mb-1 block">
+                  Log Message <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  value={newActionLogValue}
+                  onChange={(e) => setNewActionLogValue(e.target.value)}
+                  placeholder="Enter log message..."
+                  className="h-7 text-xs"
+                />
+              </div>
+            )}
+
+            <div className="flex gap-2 justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => {
+                  setIsAddingAction(false);
+                  setNewActionFormula('');
+                  setNewActionTarget('');
+                  setNewActionLogValue('');
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                className="h-7 text-xs"
+                onClick={handleAddAction}
+                disabled={
+                  (newActionType === 'emit' && (!newActionFormula || !newActionTarget)) ||
+                  (newActionType === 'log' && !newActionLogValue)
+                }
+              >
+                Add Action
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 const NodeInspectorModal: React.FC = () => {
   const selectedNodeId = useSimulationStore(state => state.selectedNodeId);
@@ -969,7 +1740,8 @@ const NodeInspectorModal: React.FC = () => {
   const setSelectedNodeId = useSimulationStore(state => state.setSelectedNodeId);
   const scenario = useSimulationStore(state => state.scenario);
   const loadScenario = useSimulationStore(state => state.loadScenario);
-  
+  const saveSnapshot = useSimulationStore(state => state.saveSnapshot);
+
   const { toast } = useToast();
 
   const [editedConfigText, setEditedConfigText] = useState<string>("");
@@ -1050,6 +1822,113 @@ const NodeInspectorModal: React.FC = () => {
     setEditedConfigText(originalConfigText);
   };
 
+  const handleTagsUpdate = async (newTags: string[]) => {
+    if (!selectedNodeId || !scenario) return;
+
+    try {
+      // Find any new tags that need to be added to the registry
+      const existingRegistryTags = new Set((scenario.groups?.tags || []).map(t => t.name));
+      const existingNodeTags = new Set<string>();
+      scenario.nodes.forEach(node => {
+        if (node.tags) node.tags.forEach(tag => existingNodeTags.add(tag));
+      });
+
+      const newTagsToRegister = newTags.filter(tag =>
+        !existingRegistryTags.has(tag) && !existingNodeTags.has(tag)
+      );
+
+      let updatedScenario = { ...scenario };
+
+      // Add new tags to registry
+      if (newTagsToRegister.length > 0) {
+        const newRegistryTags = newTagsToRegister.map(tagName => ({
+          name: tagName,
+          color: "#3b82f6",
+          description: "Auto-created tag"
+        }));
+
+        updatedScenario = {
+          ...updatedScenario,
+          groups: {
+            ...updatedScenario.groups,
+            tags: [...(updatedScenario.groups?.tags || []), ...newRegistryTags]
+          }
+        };
+      }
+
+      // Update node tags
+      updatedScenario = {
+        ...updatedScenario,
+        nodes: updatedScenario.nodes.map((node: any) =>
+          node.nodeId === selectedNodeId ? { ...node, tags: newTags } : node
+        )
+      };
+
+      // Apply the changes
+      await loadScenario(updatedScenario);
+
+      toast({
+        title: "Tags Updated",
+        description: `Node tags have been updated successfully.`
+      });
+
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Update Failed",
+        description: error instanceof Error ? error.message : "Failed to update tags."
+      });
+    }
+  };
+
+  const handleStateActionsUpdate = async (stateIndex: number, newActions: any[]) => {
+    if (!selectedNodeId || !scenario || !nodeConfig) return;
+
+    try {
+      // Clone the FSM config
+      const updatedFsm = JSON.parse(JSON.stringify(nodeConfig.fsm));
+
+      // Update the state's onEntry actions
+      if (updatedFsm.states && updatedFsm.states[stateIndex]) {
+        if (typeof updatedFsm.states[stateIndex] === 'string') {
+          // Convert string state to object format
+          updatedFsm.states[stateIndex] = {
+            name: updatedFsm.states[stateIndex],
+            onEntry: newActions
+          };
+        } else {
+          // Update existing object format
+          updatedFsm.states[stateIndex].onEntry = newActions;
+        }
+      }
+
+      // Create updated scenario with modified FSM
+      const updatedScenario = {
+        ...scenario,
+        nodes: scenario.nodes.map((node: any) =>
+          node.nodeId === selectedNodeId
+            ? { ...node, fsm: updatedFsm }
+            : node
+        )
+      };
+
+      // Apply the changes
+      await loadScenario(updatedScenario);
+
+      toast({
+        title: "State Actions Updated",
+        description: `Actions for state have been updated successfully.`
+      });
+
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Update Failed",
+        description: error instanceof Error ? error.message : "Failed to update state actions."
+      });
+    }
+  };
+
   const handleOpenChange = (open: boolean) => {
     if (!open) {
       setSelectedNodeId(null);
@@ -1084,8 +1963,8 @@ const NodeInspectorModal: React.FC = () => {
             
             <TabsContent value="overview" className="mt-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-                <ConfigSection 
-                  nodeConfig={nodeConfig} 
+                <ConfigSection
+                  nodeConfig={nodeConfig}
                   showJson={showConfigJson}
                   onToggleJson={() => setShowConfigJson(!showConfigJson)}
                   editedConfigText={editedConfigText}
@@ -1093,12 +1972,34 @@ const NodeInspectorModal: React.FC = () => {
                   onSaveConfig={handleSaveConfig}
                   hasUnsavedChanges={hasUnsavedChanges}
                   onResetConfig={handleResetConfig}
+                  scenario={scenario}
+                  saveSnapshot={saveSnapshot}
+                  loadScenario={loadScenario}
+                  toast={toast}
                 />
-                <StateSection 
-                  nodeState={nodeState} 
+                <StateSection
+                  nodeState={nodeState}
                   showJson={showStateJson}
                   onToggleJson={() => setShowStateJson(!showStateJson)}
                 />
+              </div>
+
+              {/* Tags Section - full width below the grid */}
+              <div className="mt-6">
+                <TagsSection
+                  nodeConfig={nodeConfig}
+                  onTagsUpdate={handleTagsUpdate}
+                />
+              </div>
+
+              {/* Message Interfaces Section - below tags */}
+              <div className="mt-6">
+                <MessageInterfacesSection nodeConfig={nodeConfig} />
+              </div>
+
+              {/* Interface Validation Section - if available */}
+              <div className="mt-6">
+                <InterfaceValidationSection nodeConfig={nodeConfig} />
               </div>
             </TabsContent>
 
@@ -1128,24 +2029,32 @@ const NodeInspectorModal: React.FC = () => {
 
                     {/* States */}
                     <div className="mb-4">
-                      <h4 className="font-medium text-sm mb-2">States ({nodeConfig.fsm?.states?.length || 0})</h4>
+                      <h4 className="font-medium text-sm mb-2">FSM States ({nodeConfig.fsm?.states?.length || 0})</h4>
                       <div className="space-y-2">
-                        {nodeConfig.fsm?.states?.map((state, index) => (
-                          <div key={index} className="bg-white border rounded p-2">
-                            <div className="flex items-center gap-2 mb-1">
-                              <Badge variant={state.isInitial ? "default" : "secondary"} className="text-xs">
-                                {state.name}
-                              </Badge>
-                              {state.isInitial && <span className="text-xs text-green-600">Initial</span>}
-                              {state.isFinal && <span className="text-xs text-blue-600">Final</span>}
-                            </div>
-                            {state.onEntry && state.onEntry.length > 0 && (
-                              <div className="text-xs text-slate-600">
-                                On Entry: {state.onEntry.map(action => `${action.action}(${action.target || action.value || ''})`).join(', ')}
+                        {nodeConfig.fsm?.states?.map((state, index) => {
+                          // Handle both string and object formats
+                          const stateName = typeof state === 'string' ? state : state.name;
+                          const isInitial = typeof state === 'object' ? state.isInitial : index === 0;
+                          const isFinal = typeof state === 'object' ? state.isFinal : false;
+                          const onEntry = typeof state === 'object' ? state.onEntry : null;
+
+                          return (
+                            <div key={index} className="bg-white border rounded p-2">
+                              <div className="flex items-center gap-2 mb-1">
+                                <Badge variant={isInitial ? "default" : "secondary"} className="text-xs">
+                                  {stateName}
+                                </Badge>
+                                {isInitial && <span className="text-xs text-green-600">Initial</span>}
+                                {isFinal && <span className="text-xs text-blue-600">Final</span>}
                               </div>
-                            )}
-                          </div>
-                        )) || <div className="text-sm text-slate-500">No states defined</div>}
+                              {onEntry && onEntry.length > 0 && (
+                                <div className="text-xs text-slate-600">
+                                  On Entry: {onEntry.map((action: any) => `${action.action}(${action.target || action.value || ''})`).join(', ')}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        }) || <div className="text-sm text-slate-500">No states defined</div>}
                       </div>
                     </div>
 
@@ -1164,6 +2073,30 @@ const NodeInspectorModal: React.FC = () => {
                             </span>
                           </div>
                         )) || <div className="text-sm text-slate-500">No transitions defined</div>}
+                      </div>
+                    </div>
+
+                    {/* State Actions */}
+                    <div className="mb-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-medium text-sm">State Actions</h4>
+                      </div>
+                      <div className="space-y-3">
+                        {nodeConfig.fsm?.states?.map((state, stateIndex) => {
+                          const stateName = typeof state === 'string' ? state : state.name;
+                          const onEntry = typeof state === 'object' ? state.onEntry : null;
+
+                          return (
+                            <StateActionsEditor
+                              key={stateIndex}
+                              stateName={stateName}
+                              stateIndex={stateIndex}
+                              actions={onEntry || []}
+                              nodeConfig={nodeConfig}
+                              onActionsUpdate={(newActions) => handleStateActionsUpdate(stateIndex, newActions)}
+                            />
+                          );
+                        }) || <div className="text-sm text-slate-500">No state actions defined</div>}
                       </div>
                     </div>
 

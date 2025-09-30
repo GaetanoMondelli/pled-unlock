@@ -34,6 +34,10 @@ const FSMProcessNodeDisplay: React.FC<FSMProcessNodeDisplayProps> = ({ data, sel
   const totalInputTokens = Object.values(inputBuffers).reduce((sum: number, buffer: any[]) => sum + buffer.length, 0);
 
   const totalStates = fsmDefinition?.states?.length || 0;
+
+  // Extract state names - handle both string array and object array formats
+  const stateNames = fsmDefinition?.states ?
+    fsmDefinition.states.map((state: any) => typeof state === 'string' ? state : state.name) : [];
   const totalTransitions = fsmDefinition?.transitions?.length || 0;
 
   // Get state color based on current state
@@ -116,7 +120,7 @@ const FSMProcessNodeDisplay: React.FC<FSMProcessNodeDisplayProps> = ({ data, sel
         <div className="flex items-center gap-2 mb-2">
           <Activity className="h-3 w-3 text-slate-500" />
           <span className="text-xs text-slate-600 font-medium">
-            States ({totalStates})
+            FSM States ({totalStates})
           </span>
           {!isExpanded && (
             <span className="text-xs text-slate-400">- Current: {currentFSMState}</span>
@@ -125,7 +129,7 @@ const FSMProcessNodeDisplay: React.FC<FSMProcessNodeDisplayProps> = ({ data, sel
 
         {isExpanded ? (
           <div className="flex flex-wrap gap-1">
-            {fsmDefinition?.states?.map((state: string) => (
+            {stateNames.map((state: string) => (
               <Badge
                 key={state}
                 variant="outline"
@@ -142,7 +146,8 @@ const FSMProcessNodeDisplay: React.FC<FSMProcessNodeDisplayProps> = ({ data, sel
                 {state}
                 {state === fsmDefinition?.initialState && " (initial)"}
               </Badge>
-            )) || (
+            ))}
+            {stateNames.length === 0 && (
               <span className="text-xs text-slate-400 italic">No states defined</span>
             )}
           </div>
