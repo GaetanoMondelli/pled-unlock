@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { bucket } from "@/app/lib/firebase";
+import { pledStorageService } from "@/lib/firebase/pled-storage-service";
 
 export const dynamic = "force-dynamic";
-
-const filePath = "pled.json";
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,29 +11,49 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid request: templates array is required" }, { status: 400 });
     }
 
-    // Get current data from Firebase Storage
-    const file = bucket.file(filePath);
-    const [fileContents] = await file.download();
-    const currentData = JSON.parse(fileContents.toString());
+    console.log("POST /api/templates - Adding templates to PLED service");
 
-    // Add new templates to existing ones
-    const updatedData = {
-      ...currentData,
-      procedureTemplates: [...(currentData.procedureTemplates || []), ...templates],
-    };
+    // Initialize PLED collection if needed
+    await pledStorageService.initializePledStorage();
 
-    // Save back to Firebase Storage
-    await file.save(JSON.stringify(updatedData, null, 2), {
-      contentType: "application/json",
-    });
+    const addedTemplates = [];
+    for (const templateData of templates) {
+      try {
+        const templateId = await pledStorageService.createTemplate({
+          name: templateData.name,
+          description: templateData.description,
+          scenario: templateData.scenario,
+          version: templateData.version || '1.0',
+        });
+        addedTemplates.push({ id: templateId, name: templateData.name });
+      } catch (error) {
+        console.error(`Failed to add template ${templateData.name}:`, error);
+      }
+    }
 
     return NextResponse.json({
       success: true,
-      message: `Added ${templates.length} templates successfully`,
-      addedTemplates: templates.map((t: any) => ({ id: t.templateId, name: t.name })),
+      message: `Added ${addedTemplates.length} templates successfully`,
+      addedTemplates,
     });
   } catch (error) {
     console.error("Error adding templates:", error);
+
+    // Check if it's a Firebase configuration issue
+    if (error instanceof Error && (
+      error.message.includes('FAILED_PRECONDITION') ||
+      error.message.includes('Datastore Mode') ||
+      error.message.includes('Firestore API is not available')
+    )) {
+      return NextResponse.json(
+        {
+          error: "Template management unavailable",
+          details: "Firebase in Datastore Mode - template features disabled",
+        },
+        { status: 503 },
+      );
+    }
+
     return NextResponse.json(
       {
         error: "Failed to add templates",
@@ -48,16 +66,45 @@ export async function POST(request: NextRequest) {
 
 export async function GET() {
   try {
-    const file = bucket.file(filePath);
-    const [fileContents] = await file.download();
-    const data = JSON.parse(fileContents.toString());
+    console.log("GET /api/templates - Loading procedure templates from PLED service");
+
+    // Initialize PLED collection if needed
+    await pledStorageService.initializePledStorage();
+
+    // Get templates from PLED service
+    const pledTemplates = await pledStorageService.listTemplates();
+
+    // Convert to procedure templates format for compatibility
+    const procedureTemplates = pledTemplates.map(template => ({
+      templateId: template.id,
+      name: template.name,
+      description: template.description,
+      scenario: template.scenario,
+      version: template.version,
+      createdAt: template.createdAt,
+    }));
 
     return NextResponse.json({
-      templates: data.procedureTemplates || [],
-      count: (data.procedureTemplates || []).length,
+      templates: procedureTemplates,
+      count: procedureTemplates.length,
     });
   } catch (error) {
     console.error("Error fetching templates:", error);
+
+    // Check if it's a Firebase configuration issue
+    if (error instanceof Error && (
+      error.message.includes('FAILED_PRECONDITION') ||
+      error.message.includes('Datastore Mode') ||
+      error.message.includes('Firestore API is not available')
+    )) {
+      console.warn('Firebase Datastore Mode detected - returning empty templates');
+      return NextResponse.json({
+        templates: [],
+        count: 0,
+        warning: 'Template management unavailable - Firebase in Datastore Mode'
+      });
+    }
+
     return NextResponse.json(
       {
         error: "Failed to fetch templates",

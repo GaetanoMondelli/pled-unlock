@@ -23,7 +23,7 @@ const getStateMachineDisplay = (currentState?: string) => {
 };
 
 const DataSourceNodeDisplay: React.FC<NodeProps<RFNodeData>> = ({ data, selected, id }) => {
-  const config = data.config as DataSourceNode;
+  const config = data.config as DataSourceNode | undefined;
   const stateMachineInfo = getStateMachineDisplay(data.stateMachine?.currentState);
   const { deleteElements } = useReactFlow();
 
@@ -74,9 +74,13 @@ const DataSourceNodeDisplay: React.FC<NodeProps<RFNodeData>> = ({ data, selected
         {/* Config Section */}
         <div className="space-y-0.5">
           <p className="font-medium text-muted-foreground">CONFIG:</p>
-          <p>Int: {config.interval}s</p>
-          <p>Range: [{config.generation.valueMin}-{config.generation.valueMax}]</p>
-          <p>To: {config.outputs[0]?.destinationNodeId || 'None'}</p>
+          <p>Int: {config?.interval ? `${config.interval}s` : '—'}</p>
+          <p>
+            Range: [
+            {config?.generation?.valueMin ?? '—'}-
+            {config?.generation?.valueMax ?? '—'}]
+          </p>
+          <p>To: {config?.outputs?.[0]?.destinationNodeId || 'None'}</p>
         </div>
         
         {/* Separator */}

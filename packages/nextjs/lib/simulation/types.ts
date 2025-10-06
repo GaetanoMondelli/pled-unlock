@@ -1,5 +1,47 @@
 import { z } from "zod";
 
+// Basic Enhanced FSM schema to avoid circular dependency
+export const EnhancedFSMProcessNodeSchema = z.object({
+  nodeId: z.string(),
+  type: z.literal("EnhancedFSMProcessNode"),
+  displayName: z.string(),
+  x: z.number(),
+  y: z.number(),
+  eventInputs: z.array(z.any()).default([]),
+  messageInputs: z.array(z.any()).default([]),
+  tokenInputs: z.array(z.any()).default([]),
+  outputs: z.array(z.any()).default([]),
+  fsm: z.any(), // Simplified to avoid complexity
+});
+
+export interface EnhancedFSMProcessNodeState {
+  currentState: string;
+  previousState?: string;
+  stateChangedAt: number;
+  variables: Record<string, any>;
+  stateVariables: Record<string, any>;
+  eventBuffer: any[];
+  messageBuffer: any[];
+  tokenBuffers: Record<string, any[]>;
+  lastProcessedTime: number;
+  processedEventCount: number;
+  processedMessageCount: number;
+  feedbackDepth: number;
+  circuitBreakerState: {
+    isOpen: boolean;
+    eventCount: number;
+    windowStartTime: number;
+  };
+  stateHistory: Array<{
+    state: string;
+    enteredAt: number;
+  }>;
+  transitionHistory: any[];
+  pendingActions: any[];
+  actionHistory: any[];
+  errors: any[];
+}
+
 export const SourceTokenSummarySchema = z.object({
   id: z.string(),
   originNodeId: z.string(),
@@ -274,7 +316,7 @@ export const GroupNodeSchema = BaseNodeSchema.extend({
 export type GroupNode = z.infer<typeof GroupNodeSchema>;
 
 // Union type for all nodes
-export const AnyNodeSchema = z.union([DataSourceNodeSchema, QueueNodeSchema, ProcessNodeSchema, FSMProcessNodeSchema, SinkNodeSchema, ModuleNodeSchema, GroupNodeSchema]);
+export const AnyNodeSchema = z.union([DataSourceNodeSchema, QueueNodeSchema, ProcessNodeSchema, FSMProcessNodeSchema, EnhancedFSMProcessNodeSchema, SinkNodeSchema, ModuleNodeSchema, GroupNodeSchema]);
 export type AnyNode = z.infer<typeof AnyNodeSchema>;
 
 // Scenario Schema
@@ -371,7 +413,7 @@ export interface ModuleState extends NodeState {
   internalEventCounter: number;
 }
 
-export type AnyNodeState = DataSourceState | QueueState | ProcessNodeState | FSMProcessNodeState | SinkState | ModuleState;
+export type AnyNodeState = DataSourceState | QueueState | ProcessNodeState | FSMProcessNodeState | EnhancedFSMProcessNodeState | SinkState | ModuleState;
 
 // For React Flow
 export interface RFNodeData {

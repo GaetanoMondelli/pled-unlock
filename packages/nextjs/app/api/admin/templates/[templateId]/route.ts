@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { dataService } from "@/lib/platform/dataService";
+import { pledStorageService } from "@/lib/firebase/pled-storage-service";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest, { params }: { params: { templateId: string } }) {
   try {
     const { templateId } = params;
-    console.log(`GET /api/admin/templates/${templateId} - Loading template`);
+    console.log(`GET /api/admin/templates/${templateId} - Loading template from PLED service`);
 
-    const template = await dataService.getTemplate(templateId);
+    const template = await pledStorageService.getTemplate(templateId);
 
     if (!template) {
       return NextResponse.json(
@@ -20,6 +20,19 @@ export async function GET(request: NextRequest, { params }: { params: { template
     return NextResponse.json({ template });
   } catch (error) {
     console.error("Error loading template:", error);
+
+    // Check if it's a Firebase configuration issue
+    if (error instanceof Error && (
+      error.message.includes('FAILED_PRECONDITION') ||
+      error.message.includes('Datastore Mode') ||
+      error.message.includes('Firestore API is not available')
+    )) {
+      return NextResponse.json(
+        { error: "Template not found - Firebase in Datastore Mode" },
+        { status: 404 }
+      );
+    }
+
     return NextResponse.json(
       {
         error: "Failed to load template",
@@ -36,8 +49,8 @@ export async function PUT(request: NextRequest, { params }: { params: { template
     const body = await request.json();
     console.log(`PUT /api/admin/templates/${templateId} - Updating template`);
 
-    await dataService.updateTemplate(templateId, body);
-    const template = await dataService.getTemplate(templateId);
+    await pledStorageService.updateTemplate(templateId, body);
+    const template = await pledStorageService.getTemplate(templateId);
 
     if (!template) {
       return NextResponse.json(
@@ -53,6 +66,22 @@ export async function PUT(request: NextRequest, { params }: { params: { template
     });
   } catch (error) {
     console.error("Error updating template:", error);
+
+    // Check if it's a Firebase configuration issue
+    if (error instanceof Error && (
+      error.message.includes('FAILED_PRECONDITION') ||
+      error.message.includes('Datastore Mode') ||
+      error.message.includes('Firestore API is not available')
+    )) {
+      return NextResponse.json(
+        {
+          error: "Template management unavailable",
+          details: "Firebase in Datastore Mode - template features disabled",
+        },
+        { status: 503 }
+      );
+    }
+
     return NextResponse.json(
       {
         error: "Failed to update template",
@@ -68,7 +97,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { templ
     const { templateId } = params;
     console.log(`DELETE /api/admin/templates/${templateId} - Deleting template`);
 
-    await dataService.deleteTemplate(templateId);
+    await pledStorageService.deleteTemplate(templateId);
 
     return NextResponse.json({
       success: true,
@@ -76,6 +105,22 @@ export async function DELETE(request: NextRequest, { params }: { params: { templ
     });
   } catch (error) {
     console.error("Error deleting template:", error);
+
+    // Check if it's a Firebase configuration issue
+    if (error instanceof Error && (
+      error.message.includes('FAILED_PRECONDITION') ||
+      error.message.includes('Datastore Mode') ||
+      error.message.includes('Firestore API is not available')
+    )) {
+      return NextResponse.json(
+        {
+          error: "Template management unavailable",
+          details: "Firebase in Datastore Mode - template features disabled",
+        },
+        { status: 503 }
+      );
+    }
+
     return NextResponse.json(
       {
         error: "Failed to delete template",

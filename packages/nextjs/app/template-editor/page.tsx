@@ -201,16 +201,33 @@ export default function TemplateEditorPage() {
         await loadTemplates();
 
         const templates = useSimulationStore.getState().availableTemplates;
+        console.log("Templates loaded:", templates.length);
+
         if (templates.length === 0) {
           console.log("No templates found, opening template manager...");
           setIsTemplateManagerOpen(true);
+        } else {
+          // Auto-load the default template so the editor starts with something loaded
+          const defaultTemplate = templates.find(t => t.isDefault) || templates[0];
+          if (defaultTemplate) {
+            console.log(`Auto-loading template: ${defaultTemplate.name} (ID: ${defaultTemplate.id})`);
+            try {
+              const loadTemplate = useSimulationStore.getState().loadTemplate;
+              await loadTemplate(defaultTemplate.id);
+              console.log("Template loaded successfully");
+            } catch (templateError) {
+              console.error("Error loading default template:", templateError);
+              // Continue anyway - user can manually select a template
+            }
+          }
         }
-        // Don't auto-load any template - let user choose
       } catch (error) {
         console.error("Error loading templates:", error);
         // If template loading fails, still allow user to work
+      } finally {
+        console.log("Setting loading to false");
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
 
     loadOnce();
@@ -368,6 +385,21 @@ export default function TemplateEditorPage() {
         toast({ title: "Success", description: "Scenario loaded from editor." });
         setDefaultScenarioContent(scenarioEditText);
         setIsScenarioEditorOpen(false);
+
+        // Auto-save the changes to the current template if one is loaded
+        if (currentTemplate) {
+          try {
+            await updateCurrentTemplate();
+            toast({ title: "Template Saved", description: `Changes saved to "${currentTemplate.name}"` });
+          } catch (saveError) {
+            console.error("Error auto-saving template:", saveError);
+            toast({
+              variant: "destructive",
+              title: "Save Warning",
+              description: "Scenario loaded but failed to save to template. Use File > Save Template to save manually."
+            });
+          }
+        }
       }
     } catch (e: any) {
       toast({ variant: "destructive", title: "JSON Parse Error", description: `Invalid JSON: ${e.message}` });

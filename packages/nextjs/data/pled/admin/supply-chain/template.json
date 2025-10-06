@@ -1,0 +1,336 @@
+{
+  "id": "supply-chain",
+  "name": "Supply Chain Monitoring",
+  "description": "Bond and supply chain scenario prototype",
+  "version": "3.0",
+  "isDefault": false,
+  "createdAt": 1725062400000,
+  "updatedAt": 1725062400000,
+  "scenario": {
+    "version": "3.0",
+    "nodes": [
+      {
+        "nodeId": "DataSource_A",
+        "displayName": "Bond Price Feed A",
+        "position": {
+          "x": 100,
+          "y": 76.55618754937069
+        },
+        "tags": [
+          "Bond engine"
+        ],
+        "type": "DataSource",
+        "interval": 3,
+        "outputs": [
+          {
+            "name": "output",
+            "destinationNodeId": "Queue_B",
+            "destinationInputName": "input",
+            "interface": {
+              "type": "SimpleValue",
+              "requiredFields": [
+                "data.value"
+              ]
+            }
+          }
+        ],
+        "generation": {
+          "type": "random",
+          "valueMin": 1,
+          "valueMax": 10
+        }
+      },
+      {
+        "nodeId": "DataSource_X",
+        "displayName": "Interest Rate Feed X",
+        "position": {
+          "x": 69.42111419483129,
+          "y": 334.71055709741563
+        },
+        "tags": [
+          "Bond engine"
+        ],
+        "type": "DataSource",
+        "interval": 5,
+        "outputs": [
+          {
+            "name": "output",
+            "destinationNodeId": "Queue_B",
+            "destinationInputName": "input",
+            "interface": {
+              "type": "SimpleValue",
+              "requiredFields": [
+                "data.value"
+              ]
+            }
+          }
+        ],
+        "generation": {
+          "type": "random",
+          "valueMin": 100,
+          "valueMax": 200
+        }
+      },
+      {
+        "nodeId": "DataSource_B",
+        "displayName": "Price Feed B",
+        "position": {
+          "x": 100,
+          "y": 600
+        },
+        "tags": [
+          "Bond engine"
+        ],
+        "type": "DataSource",
+        "interval": 4,
+        "outputs": [
+          {
+            "name": "output",
+            "destinationNodeId": "Queue_B",
+            "destinationInputName": "input",
+            "interface": {
+              "type": "SimpleValue",
+              "requiredFields": [
+                "data.value"
+              ]
+            }
+          }
+        ],
+        "generation": {
+          "type": "random",
+          "valueMin": 50,
+          "valueMax": 75
+        }
+      },
+      {
+        "nodeId": "Queue_B",
+        "displayName": "Queue B",
+        "position": {
+          "x": 395.0701502650502,
+          "y": 283.7012448132782
+        },
+        "tags": [
+          "Bond engine"
+        ],
+        "type": "Queue",
+        "inputs": [
+          {
+            "name": "input",
+            "interface": {
+              "type": "SimpleValue",
+              "requiredFields": [
+                "data.value"
+              ]
+            },
+            "required": true
+          }
+        ],
+        "outputs": [
+          {
+            "name": "output",
+            "destinationNodeId": "Process_C",
+            "destinationInputName": "inputA",
+            "interface": {
+              "type": "AggregationResult",
+              "requiredFields": [
+                "data.aggregatedValue"
+              ]
+            }
+          }
+        ],
+        "aggregation": {
+          "method": "sum",
+          "formula": "sum(input.data.value)",
+          "trigger": {
+            "type": "time",
+            "window": 10
+          }
+        },
+        "capacity": 10
+      },
+      {
+        "nodeId": "Process_C",
+        "displayName": "Processor C",
+        "position": {
+          "x": 696.3485015794506,
+          "y": 267.73783860033286
+        },
+        "tags": [
+          "Bond engine"
+        ],
+        "type": "ProcessNode",
+        "inputs": [
+          {
+            "name": "inputA",
+            "nodeId": "Queue_B",
+            "sourceOutputName": "output",
+            "interface": {
+              "type": "AggregationResult",
+              "requiredFields": [
+                "data.aggregatedValue"
+              ]
+            }
+          }
+        ],
+        "outputs": [
+          {
+            "name": "output",
+            "destinationNodeId": "Queue_D",
+            "destinationInputName": "input",
+            "interface": {
+              "type": "SimpleValue",
+              "requiredFields": [
+                "data.value"
+              ]
+            }
+          }
+        ],
+        "processing": {
+          "type": "stateful",
+          "logic": "const value = inputA.data.aggregatedValue; const risk = value > 500 ? 'HIGH_RISK' : 'NORMAL'; return { data: { value, risk } };"
+        }
+      },
+      {
+        "nodeId": "Queue_D",
+        "displayName": "Queue D",
+        "position": {
+          "x": 985.338329051723,
+          "y": 262.5661682233189
+        },
+        "tags": [
+          "Bond engine"
+        ],
+        "type": "Queue",
+        "inputs": [
+          {
+            "name": "input",
+            "interface": {
+              "type": "SimpleValue",
+              "requiredFields": [
+                "data.value",
+                "data.risk"
+              ]
+            },
+            "required": true
+          }
+        ],
+        "outputs": [
+          {
+            "name": "output_high",
+            "destinationNodeId": "Action_F",
+            "destinationInputName": "input",
+            "interface": {
+              "type": "SimpleValue",
+              "requiredFields": [
+                "data.value",
+                "data.risk"
+              ]
+            }
+          },
+          {
+            "name": "output_normal",
+            "destinationNodeId": "Executor_E",
+            "destinationInputName": "input",
+            "interface": {
+              "type": "SimpleValue",
+              "requiredFields": [
+                "data.value",
+                "data.risk"
+              ]
+            }
+          }
+        ],
+        "capacity": 20,
+        "routing": {
+          "rules": [
+            {
+              "name": "High risk",
+              "condition": "input.data.risk === 'HIGH_RISK'",
+              "outputName": "output_high"
+            },
+            {
+              "name": "Normal",
+              "condition": "input.data.risk !== 'HIGH_RISK'",
+              "outputName": "output_normal"
+            }
+          ]
+        }
+      },
+      {
+        "nodeId": "Executor_E",
+        "displayName": "Executor E",
+        "position": {
+          "x": 1319.087956719294,
+          "y": 203.31148021108145
+        },
+        "tags": [
+          "Bond engine"
+        ],
+        "type": "ActionNode",
+        "inputs": [
+          {
+            "name": "input",
+            "interface": {
+              "type": "SimpleValue",
+              "requiredFields": [
+                "data.value",
+                "data.risk"
+              ]
+            },
+            "required": true
+          }
+        ],
+        "trigger": {
+          "type": "threshold",
+          "value": 200
+        },
+        "action": {
+          "type": "webhook",
+          "url": "https://example.com/execute",
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "bodyTemplate": "{ \"value\": {{input.data.value}}, \"risk\": \"{{input.data.risk}}\" }"
+        }
+      },
+      {
+        "nodeId": "Action_F",
+        "displayName": "Risk Mitigation",
+        "position": {
+          "x": 1323.4056372735067,
+          "y": 375
+        },
+        "tags": [
+          "Bond engine"
+        ],
+        "type": "ActionNode",
+        "inputs": [
+          {
+            "name": "input",
+            "interface": {
+              "type": "SimpleValue",
+              "requiredFields": [
+                "data.value",
+                "data.risk"
+              ]
+            },
+            "required": true
+          }
+        ],
+        "trigger": {
+          "type": "immediate"
+        },
+        "action": {
+          "type": "webhook",
+          "url": "https://example.com/risk",
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "bodyTemplate": "{ \"value\": {{input.data.value}}, \"action\": \"ESCALATE\" }"
+        }
+      }
+    ]
+  }
+}

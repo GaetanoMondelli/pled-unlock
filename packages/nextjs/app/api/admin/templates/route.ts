@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { dataService } from "@/lib/platform/dataService";
+import { pledStorageService } from "@/lib/firebase/pled-storage-service";
 
 function slugify(text: string): string {
   return text
@@ -13,9 +13,13 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    console.log("GET /api/admin/templates - Loading templates from dataService (adapter-backed)");
+    console.log("GET /api/admin/templates - Loading templates from PLED Storage service");
 
-    const templates = await dataService.listTemplates();
+    // Initialize PLED storage if needed
+    await pledStorageService.initializePledStorage();
+
+    // Get templates from PLED storage service
+    const templates = await pledStorageService.listTemplates();
 
     return NextResponse.json({
       templates,
@@ -23,6 +27,21 @@ export async function GET() {
     });
   } catch (error) {
     console.error("Error loading templates:", error);
+
+    // Check if it's a Firebase configuration issue
+    if (error instanceof Error && (
+      error.message.includes('FAILED_PRECONDITION') ||
+      error.message.includes('Datastore Mode') ||
+      error.message.includes('Firestore API is not available')
+    )) {
+      console.warn('Firebase Datastore Mode detected - templates unavailable');
+      return NextResponse.json({
+        templates: [],
+        count: 0,
+        warning: 'Template management unavailable - Firebase in Datastore Mode'
+      });
+    }
+
     return NextResponse.json(
       {
         error: "Failed to load templates",
@@ -44,16 +63,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Template name is required" }, { status: 400 });
     }
 
+    // Initialize PLED storage if needed
+    await pledStorageService.initializePledStorage();
+
     let templateId: string;
 
     if (fromDefault) {
-      // Create from default template (look for isDefault=true)
-      const templates = await dataService.listTemplates();
+      // Create from default template
+      const templates = await pledStorageService.listTemplates();
       const defaultTemplate = templates.find(t => t.isDefault);
       if (!defaultTemplate) {
         return NextResponse.json({ error: "No default template found" }, { status: 400 });
       }
-      templateId = await dataService.createTemplate({
+      templateId = await pledStorageService.createTemplate({
         name,
         description,
         scenario: defaultTemplate.scenario,
@@ -66,7 +88,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Scenario is required when not creating from default" }, { status: 400 });
       }
 
-      templateId = await dataService.createTemplate({
+      templateId = await pledStorageService.createTemplate({
         name,
         description,
         scenario,
@@ -74,7 +96,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const template = await dataService.getTemplate(templateId);
+    const template = await pledStorageService.getTemplate(templateId);
 
     return NextResponse.json({
       success: true,
@@ -85,6 +107,22 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error creating template:", error);
+
+    // Check if it's a Firebase configuration issue
+    if (error instanceof Error && (
+      error.message.includes('FAILED_PRECONDITION') ||
+      error.message.includes('Datastore Mode') ||
+      error.message.includes('Firestore API is not available')
+    )) {
+      return NextResponse.json(
+        {
+          error: "Template management unavailable",
+          details: "Firebase in Datastore Mode - template features disabled",
+        },
+        { status: 503 },
+      );
+    }
+
     return NextResponse.json(
       {
         error: "Failed to create template",

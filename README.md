@@ -175,10 +175,28 @@ Next steps we plan:
 - Add env-based switching (e.g., `DATA_BACKEND=postgres`) and a `BlobStore` adapter for binary assets.
 - Gradually remove direct references to Firebase files after migration is complete.
 
+### Current Firestore configuration
 
+The app now defaults to the file-backed document store so local template editing works without Firestore. Templates and executions are stored under `packages/nextjs/data/pled/{user}/{template}/…` (defaults to `user=admin`). To explicitly enable Firestore, set `DATA_BACKEND=firestore` (e.g., in `.env.local`) **and** provide valid Firebase Admin credentials.
 
+### Plan to move to Firestore Native mode
 
+1. Create or upgrade a Firebase project with Cloud Firestore in Native mode. Datastore-mode projects cannot be switched, so create a new project if needed.
+2. Generate a service account JSON for the new project and base64-encode it to refresh `FIREBASE_SERVICE_ACCOUNT`. Update `FIREBASE_PROJECT_ID` and related env vars.
+3. Set `DATA_BACKEND=firestore` (and restart the app) so the Firestore adapter is used.
+4. Verify CRUD flows in the template editor against the new Firestore instance, and migrate any seed data as required.
 
+### Uploading templates/executions to Firebase Storage
+
+Use `scripts/upload-pled-assets.cjs` to push the local data directory to Cloud Storage in the format `pled/{user}/{template}/...`.
+
+```bash
+cd packages/nextjs
+PLED_STORAGE_USER=gaetano \
+node scripts/upload-pled-assets.cjs
+```
+
+Required env vars: `FIREBASE_SERVICE_ACCOUNT` (base64 JSON) and `FIREBASE_STORAGE_BUCKET`. Optionally set `PLED_TEMPLATE_ID` to limit the upload to a single template directory. Each template is uploaded to `pled/{user}/{template}/template.json`; executions (if present) live in `pled/{user}/{template}/executions/*.json`.
 
 
 

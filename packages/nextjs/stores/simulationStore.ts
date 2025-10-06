@@ -119,16 +119,79 @@ interface SimulationState {
   _restoreExecutionState: (execution: ExecutionDocument) => void;
 }
 
+// Simple default scenario to prevent loading issues
+const DEFAULT_SCENARIO: Scenario = {
+  id: "default",
+  name: "Default Scenario",
+  description: "A simple default scenario",
+  nodes: [
+    {
+      nodeId: "source1",
+      type: "DataSource",
+      displayName: "Source",
+      x: 100,
+      y: 100,
+      emissionRate: 1,
+      emissionValues: [1, 2, 3],
+      outputs: [{ destinationNodeId: "sink1" }]
+    },
+    {
+      nodeId: "sink1",
+      type: "Sink",
+      displayName: "Sink",
+      x: 300,
+      y: 100
+    }
+  ],
+  edges: [
+    {
+      id: "edge1",
+      source: "source1",
+      target: "sink1"
+    }
+  ]
+};
+
+// Initialize nodes configuration and states for default scenario
+const DEFAULT_NODES_CONFIG: Record<string, AnyNode> = {
+  source1: DEFAULT_SCENARIO.nodes[0] as any,
+  sink1: DEFAULT_SCENARIO.nodes[1] as any,
+};
+
+const DEFAULT_NODE_STATES: Record<string, AnyNodeState> = {
+  source1: {
+    lastEmissionTime: -1,
+    stateMachine: {
+      currentState: "source_idle",
+      transitionHistory: []
+    }
+  } as DataSourceState,
+  sink1: {
+    consumedTokenCount: 0,
+    lastConsumedTime: -1,
+    consumedTokens: [],
+    stateMachine: {
+      currentState: "sink_idle",
+      transitionHistory: []
+    }
+  } as SinkState,
+};
+
+const DEFAULT_ACTIVITY_LOGS: Record<string, HistoryEntry[]> = {
+  source1: [],
+  sink1: [],
+};
+
 export const useSimulationStore = create<SimulationState>((set, get) => ({
   // Initial state
-  scenario: null,
-  nodesConfig: {},
-  nodeStates: {},
+  scenario: DEFAULT_SCENARIO,
+  nodesConfig: DEFAULT_NODES_CONFIG,
+  nodeStates: DEFAULT_NODE_STATES,
   currentTime: 0,
   isRunning: false,
   simulationSpeed: 1,
   eventCounter: 0,
-  nodeActivityLogs: {},
+  nodeActivityLogs: DEFAULT_ACTIVITY_LOGS,
   globalActivityLog: [],
   selectedNodeId: null,
   selectedToken: null,
@@ -237,6 +300,34 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
               transitionHistory: []
             }
           } as any; // ModuleState
+          break;
+        case "EnhancedFSMProcessNode":
+          // Enhanced FSM support - basic implementation
+          const enhancedFsmNode = node as any; // EnhancedFSMProcessNode type
+          initialNodeStates[node.nodeId] = {
+            currentState: "idle",
+            previousState: undefined,
+            stateChangedAt: 0,
+            variables: {},
+            stateVariables: {},
+            eventBuffer: [],
+            messageBuffer: [],
+            tokenBuffers: { default: [] },
+            lastProcessedTime: 0,
+            processedEventCount: 0,
+            processedMessageCount: 0,
+            feedbackDepth: 0,
+            circuitBreakerState: {
+              isOpen: false,
+              eventCount: 0,
+              windowStartTime: 0,
+            },
+            stateHistory: [{ state: "idle", enteredAt: 0 }],
+            transitionHistory: [],
+            pendingActions: [],
+            actionHistory: [],
+            errors: []
+          } as any; // EnhancedFSMProcessNodeState
           break;
         case "Group":
           // Group nodes don't need simulation state, they're visual only
@@ -426,6 +517,26 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
                     }
                   }
                 });
+              } else if (destNodeConfig.type === "EnhancedFSMProcessNode") {
+                // Handle Enhanced FSM token reception - convert to event
+                const enhancedFsmState = destNodeState as any; // EnhancedFSMProcessNodeState
+
+                // Add token to token buffer for processing by Enhanced FSM engine
+                const tokenBufferKey = 'default';
+                enhancedFsmState.tokenBuffers[tokenBufferKey] = [
+                  ...(enhancedFsmState.tokenBuffers[tokenBufferKey] || []),
+                  token
+                ];
+
+                _logNodeActivity(
+                  destNodeConfig.nodeId,
+                  {
+                    action: "token_received",
+                    value: token.value,
+                    details: `Token received from ${nodeConfig.displayName} (Enhanced FSM)`,
+                  },
+                  newTime,
+                );
               } else if (destNodeConfig.type === "Sink") {
                 _transitionNodeState(destNodeConfig.nodeId, 'sink_processing', newTime, 'token_received');
                 const sinkState = destNodeState as SinkState;
@@ -724,6 +835,51 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
             }
           }
         });
+      }
+    });
+
+    // Process Enhanced FSM nodes - simplified version
+    Object.values(nodesConfig).forEach(nodeConfig => {
+      if (nodeConfig.type === "EnhancedFSMProcessNode") {
+        const enhancedFsmConfig = nodeConfig as any; // EnhancedFSMProcessNode type
+        const enhancedFsmState = get().nodeStates[enhancedFsmConfig.nodeId] as any; // EnhancedFSMProcessNodeState
+
+        // Simple processing: check for tokens in token buffer and emit them
+        if (enhancedFsmState.tokenBuffers?.default?.length > 0) {
+          const tokensToProcess = [...enhancedFsmState.tokenBuffers.default];
+          enhancedFsmState.tokenBuffers.default = []; // Clear buffer
+
+          tokensToProcess.forEach(token => {
+            // Simple token processing - just forward to outputs
+            enhancedFsmConfig.outputs?.forEach((output: any) => {
+              const destNodeConfig = nodesConfig[output.destinationNodeId];
+              if (destNodeConfig && destNodeConfig.type === "Sink") {
+                get()._transitionNodeState(destNodeConfig.nodeId, 'sink_processing', newTime, 'token_received');
+                const destNodeState = get().nodeStates[destNodeConfig.nodeId] as any;
+                const updatedConsumedTokens = [...(destNodeState.consumedTokens || []), token].slice(-50);
+                get()._updateNodeState(destNodeConfig.nodeId, {
+                  consumedTokenCount: (destNodeState.consumedTokenCount || 0) + 1,
+                  lastConsumedTime: newTime,
+                  consumedTokens: updatedConsumedTokens,
+                });
+
+                get()._logNodeActivity(destNodeConfig.nodeId, {
+                  action: "consuming",
+                  value: token.value,
+                  details: `Token ${token.id} from Enhanced FSM ${enhancedFsmConfig.displayName}`,
+                }, newTime);
+
+                get()._transitionNodeState(destNodeConfig.nodeId, 'sink_idle', newTime, 'token_consumed');
+              }
+            });
+          });
+
+          get()._logNodeActivity(enhancedFsmConfig.nodeId, {
+            action: "tokens_processed",
+            value: tokensToProcess.length,
+            details: `Processed ${tokensToProcess.length} tokens`,
+          }, newTime);
+        }
       }
     });
 
@@ -1061,6 +1217,26 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
                     }
                   }
                 });
+              } else if (destNodeConfig.type === "EnhancedFSMProcessNode") {
+                // Handle Enhanced FSM token forwarding from Queue
+                const enhancedFsmState = get().nodeStates[destNodeConfig.nodeId] as any;
+
+                // Add token to token buffer for processing by Enhanced FSM engine
+                const tokenBufferKey = 'default';
+                enhancedFsmState.tokenBuffers[tokenBufferKey] = [
+                  ...(enhancedFsmState.tokenBuffers[tokenBufferKey] || []),
+                  tokenToForward
+                ];
+
+                _logNodeActivity(
+                  destNodeConfig.nodeId,
+                  {
+                    action: "token_received",
+                    value: tokenToForward.value,
+                    details: `Token received from ${qConfigSource.displayName} (Enhanced FSM)`,
+                  },
+                  newTime,
+                );
               }
             }
           });
@@ -1204,9 +1380,12 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       if (error instanceof Error && (
         error.message.includes('Firebase') ||
         error.message.includes('service account') ||
-        error.message.includes('FIREBASE_SERVICE_ACCOUNT')
+        error.message.includes('FIREBASE_SERVICE_ACCOUNT') ||
+        error.message.includes('FAILED_PRECONDITION') ||
+        error.message.includes('Datastore Mode') ||
+        error.message.includes('Firestore API is not available')
       )) {
-        console.warn('Template management unavailable: Firebase not configured');
+        console.warn('Template management unavailable: Firebase/Firestore configuration issue');
         set({ availableTemplates: [] });
       } else {
         set(state => ({
@@ -1712,6 +1891,26 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
           // Recursively try to fire the destination ProcessNode
           const updatedDestPnState = get().nodeStates[destNodeConfig.nodeId] as ProcessNodeState;
           get()._tryFireProcessNode(destNodeConfig, updatedDestPnState, newTime);
+        } else if (destNodeConfig.type === "EnhancedFSMProcessNode") {
+          // Handle Enhanced FSM token reception from ProcessNode
+          const enhancedFsmState = destNodeState as any;
+
+          // Add token to token buffer for processing by Enhanced FSM engine
+          const tokenBufferKey = 'default';
+          enhancedFsmState.tokenBuffers[tokenBufferKey] = [
+            ...(enhancedFsmState.tokenBuffers[tokenBufferKey] || []),
+            newToken
+          ];
+
+          _logNodeActivity(
+            destNodeConfig.nodeId,
+            {
+              action: "token_received",
+              value: newToken.value,
+              details: `Token received from ${pnConfig.displayName} (Enhanced FSM)`,
+            },
+            newTime,
+          );
         } else if (destNodeConfig.type === "Sink") {
           const sinkState = destNodeState as SinkState;
           _transitionNodeState(destNodeConfig.nodeId, 'sink_processing', newTime, 'token_received');
@@ -2004,6 +2203,34 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
                 transitionHistory: []
               }
             } as any; // FSMProcessNodeState;
+            break;
+          case "EnhancedFSMProcessNode":
+            // Enhanced FSM support - basic implementation
+            const enhancedFsmNode2 = node as any; // EnhancedFSMProcessNode type
+            initialNodeStates[node.nodeId] = {
+              currentState: "idle",
+              previousState: undefined,
+              stateChangedAt: 0,
+              variables: {},
+              stateVariables: {},
+              eventBuffer: [],
+              messageBuffer: [],
+              tokenBuffers: { default: [] },
+              lastProcessedTime: 0,
+              processedEventCount: 0,
+              processedMessageCount: 0,
+              feedbackDepth: 0,
+              circuitBreakerState: {
+                isOpen: false,
+                eventCount: 0,
+                windowStartTime: 0,
+              },
+              stateHistory: [{ state: "idle", enteredAt: 0 }],
+              transitionHistory: [],
+              pendingActions: [],
+              actionHistory: [],
+              errors: []
+            } as any; // EnhancedFSMProcessNodeState
             break;
           case "Sink":
             initialNodeStates[node.nodeId] = {

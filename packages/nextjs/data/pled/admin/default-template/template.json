@@ -1,0 +1,221 @@
+{
+  "id": "default-template",
+  "name": "Default Template",
+  "description": "Default simulation template",
+  "version": "3.0",
+  "isDefault": true,
+  "createdAt": 1725062400000,
+  "updatedAt": 1725062400000,
+  "scenario": {
+    "version": "3.0",
+    "nodes": [
+      {
+        "nodeId": "DataSource_A",
+        "displayName": "Source A",
+        "position": {
+          "x": 100,
+          "y": 100
+        },
+        "type": "DataSource",
+        "interval": 3,
+        "outputs": [
+          {
+            "name": "output",
+            "destinationNodeId": "Queue_B",
+            "destinationInputName": "input",
+            "interface": {
+              "type": "SimpleValue",
+              "requiredFields": [
+                "data.value"
+              ]
+            }
+          }
+        ],
+        "generation": {
+          "type": "random",
+          "valueMin": 1,
+          "valueMax": 10
+        }
+      },
+      {
+        "nodeId": "DataSource_X",
+        "displayName": "Source X",
+        "position": {
+          "x": 100,
+          "y": 350
+        },
+        "type": "DataSource",
+        "interval": 5,
+        "outputs": [
+          {
+            "name": "output",
+            "destinationNodeId": "Queue_B",
+            "destinationInputName": "input",
+            "interface": {
+              "type": "SimpleValue",
+              "requiredFields": [
+                "data.value"
+              ]
+            }
+          }
+        ],
+        "generation": {
+          "type": "random",
+          "valueMin": 100,
+          "valueMax": 200
+        }
+      },
+      {
+        "nodeId": "Queue_B",
+        "displayName": "Queue B",
+        "position": {
+          "x": 400,
+          "y": 200
+        },
+        "type": "Queue",
+        "inputs": [
+          {
+            "name": "input",
+            "interface": {
+              "type": "SimpleValue",
+              "requiredFields": [
+                "data.value"
+              ]
+            },
+            "required": true
+          }
+        ],
+        "outputs": [
+          {
+            "name": "output",
+            "destinationNodeId": "Process_C",
+            "destinationInputName": "inputA",
+            "interface": {
+              "type": "AggregationResult",
+              "requiredFields": [
+                "data.aggregatedValue"
+              ]
+            }
+          }
+        ],
+        "aggregation": {
+          "method": "sum",
+          "formula": "sum(input.data.value)",
+          "trigger": {
+            "type": "time",
+            "window": 10
+          }
+        },
+        "capacity": 10
+      },
+      {
+        "nodeId": "Process_C",
+        "displayName": "Processor C",
+        "position": {
+          "x": 700,
+          "y": 200
+        },
+        "type": "ProcessNode",
+        "inputs": [
+          {
+            "name": "inputA",
+            "nodeId": "Queue_B",
+            "sourceOutputName": "output",
+            "interface": {
+              "type": "AggregationResult",
+              "requiredFields": [
+                "data.aggregatedValue"
+              ]
+            }
+          }
+        ],
+        "outputs": [
+          {
+            "name": "output",
+            "destinationNodeId": "Queue_D",
+            "destinationInputName": "input",
+            "interface": {
+              "type": "SimpleValue",
+              "requiredFields": [
+                "data.value"
+              ]
+            }
+          }
+        ],
+        "processing": {
+          "type": "stateful",
+          "logic": "return { data: { value: inputA.data.aggregatedValue * 0.9 }};"
+        }
+      },
+      {
+        "nodeId": "Queue_D",
+        "displayName": "Queue D",
+        "position": {
+          "x": 1000,
+          "y": 200
+        },
+        "type": "Queue",
+        "inputs": [
+          {
+            "name": "input",
+            "interface": {
+              "type": "SimpleValue",
+              "requiredFields": [
+                "data.value"
+              ]
+            },
+            "required": true
+          }
+        ],
+        "outputs": [
+          {
+            "name": "output",
+            "destinationNodeId": "Executor_E",
+            "destinationInputName": "input",
+            "interface": {
+              "type": "SimpleValue",
+              "requiredFields": [
+                "data.value"
+              ]
+            }
+          }
+        ],
+        "capacity": 15
+      },
+      {
+        "nodeId": "Executor_E",
+        "displayName": "Executor E",
+        "position": {
+          "x": 1300,
+          "y": 200
+        },
+        "type": "ActionNode",
+        "inputs": [
+          {
+            "name": "input",
+            "interface": {
+              "type": "SimpleValue",
+              "requiredFields": [
+                "data.value"
+              ]
+            },
+            "required": true
+          }
+        ],
+        "trigger": {
+          "type": "threshold",
+          "value": 50
+        },
+        "action": {
+          "type": "webhook",
+          "url": "https://example.com/action",
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "bodyTemplate": "{ \"value\": {{input.data.value}} }"
+        }
+      }
+    ]
+  }
+}
