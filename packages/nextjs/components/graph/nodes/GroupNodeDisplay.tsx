@@ -135,16 +135,17 @@ const GroupNodeDisplay: React.FC<GroupNodeDisplayProps> = ({ data, selected = fa
             
             {containedNodes.length > 0 && (
               <div>
-                <div className="text-xs font-medium text-gray-700 mb-1">Contained Nodes:</div>
-                <div className="text-xs text-gray-600 space-y-0.5 max-h-20 overflow-y-auto">
-                  {containedNodes.slice(0, 8).map((nodeId, index) => (
-                    <div key={nodeId} className="truncate">
-                      • {nodeId.replace(/_\d+$/, '')}
+                <div className="text-xs font-medium text-gray-700 mb-1">Contains {containedNodes.length} nodes:</div>
+                <div className="text-xs text-gray-600 space-y-0.5 max-h-24 overflow-y-auto bg-gray-50 rounded p-2">
+                  {containedNodes.slice(0, 6).map((nodeId, index) => (
+                    <div key={nodeId} className="truncate flex items-center justify-between">
+                      <span>• {nodeId.split('_')[0]}</span>
+                      <span className="text-gray-400 text-[10px]">{nodeId.split('_')[1] || ''}</span>
                     </div>
                   ))}
-                  {containedNodes.length > 8 && (
-                    <div className="text-gray-400">
-                      ... and {containedNodes.length - 8} more
+                  {containedNodes.length > 6 && (
+                    <div className="text-gray-400 text-center italic">
+                      +{containedNodes.length - 6} more nodes
                     </div>
                   )}
                 </div>
@@ -152,9 +153,25 @@ const GroupNodeDisplay: React.FC<GroupNodeDisplayProps> = ({ data, selected = fa
             )}
             
             {(inputCount > 0 || outputCount > 0) && (
-              <div className="flex justify-between text-xs text-gray-500 border-t pt-2">
-                <span>{inputCount} inputs</span>
-                <span>{outputCount} outputs</span>
+              <div className="space-y-1 border-t pt-2">
+                {inputCount > 0 && (
+                  <div>
+                    <span className="text-xs font-medium text-gray-700">Inputs ({inputCount}):</span>
+                    <div className="text-[10px] text-gray-500 ml-2">
+                      {inputs.slice(0, 3).map(input => input.name.split('.')[1] || input.name).join(', ')}
+                      {inputCount > 3 && ` +${inputCount - 3} more`}
+                    </div>
+                  </div>
+                )}
+                {outputCount > 0 && (
+                  <div>
+                    <span className="text-xs font-medium text-gray-700">Outputs ({outputCount}):</span>
+                    <div className="text-[10px] text-gray-500 ml-2">
+                      {outputs.slice(0, 3).map(output => output.name.split('.')[1] || output.name).join(', ')}
+                      {outputCount > 3 && ` +${outputCount - 3} more`}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

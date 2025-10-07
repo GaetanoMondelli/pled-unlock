@@ -203,23 +203,12 @@ export default function TemplateEditorPage() {
         const templates = useSimulationStore.getState().availableTemplates;
         console.log("Templates loaded:", templates.length);
 
-        if (templates.length === 0) {
-          console.log("No templates found, opening template manager...");
+        // Always open template manager modal if no template is currently loaded
+        if (!useSimulationStore.getState().currentTemplate) {
+          console.log(`Found ${templates.length} templates. Opening template manager for user selection.`);
           setIsTemplateManagerOpen(true);
         } else {
-          // Auto-load the default template so the editor starts with something loaded
-          const defaultTemplate = templates.find(t => t.isDefault) || templates[0];
-          if (defaultTemplate) {
-            console.log(`Auto-loading template: ${defaultTemplate.name} (ID: ${defaultTemplate.id})`);
-            try {
-              const loadTemplate = useSimulationStore.getState().loadTemplate;
-              await loadTemplate(defaultTemplate.id);
-              console.log("Template loaded successfully");
-            } catch (templateError) {
-              console.error("Error loading default template:", templateError);
-              // Continue anyway - user can manually select a template
-            }
-          }
+          console.log(`Template already loaded: ${useSimulationStore.getState().currentTemplate?.name}`);
         }
       } catch (error) {
         console.error("Error loading templates:", error);
@@ -245,21 +234,28 @@ export default function TemplateEditorPage() {
     console.log("🔗 Event sourcing integration initialized");
   }, []);
 
-  // Navigate to template slug URL when template is loaded
+  // Navigate to template ID URL when template is loaded
   useEffect(() => {
     if (currentTemplate) {
-      const templateSlug = currentTemplate.name
-        .toLowerCase()
-        .replace(/[^\w ]+/g, '')
-        .replace(/ +/g, '-');
-      const expectedPath = `/template-editor/${templateSlug}`;
+      const expectedPath = `/template-editor/${currentTemplate.id}`;
+      const currentPath = window.location.pathname;
 
       // Only navigate if we're not already on the correct template path
-      if (window.location.pathname !== expectedPath) {
-        router.push(expectedPath);
+      if (currentPath !== expectedPath) {
+        console.log(`Template loaded: "${currentTemplate.name}" (ID: ${currentTemplate.id})`);
+        console.log(`Current path: ${currentPath}`);
+        console.log(`Expected path: ${expectedPath}`);
+        console.log(`Navigating to template URL...`);
+
+        // Use replace to avoid creating browser history entries that could cause loops
+        router.replace(expectedPath);
+      } else {
+        console.log(`Already on correct template path: ${expectedPath}`);
       }
+    } else {
+      console.log(`No current template loaded, staying on base path`);
     }
-  }, [currentTemplate, router]);
+  }, [currentTemplate?.id, currentTemplate?.name, router]); // Include name to help with debugging
 
   const [isSaving, setIsSaving] = useState(false);
 

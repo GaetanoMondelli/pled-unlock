@@ -186,7 +186,7 @@ export function createGroupNodeFromInfo(groupInfo: GroupInfo, storedPositions?: 
     tags: ["_system_group"],
     groupName: groupInfo.tagName,
     groupColor: getTagColor(groupInfo.tagName),
-    groupDescription: `Auto-generated group for "${groupInfo.tagName}" tagged nodes`,
+    groupDescription: `${groupInfo.nodes.length} nodes with "${groupInfo.tagName}" tag`,
     containedNodes: groupInfo.nodes.map(n => n.nodeId),
     isCollapsed: true,
     inputs: groupInfo.externalInputs.map(input => ({
@@ -231,7 +231,13 @@ function getTagColor(tagName: string): string {
  * Generates a scenario with groups based on tags
  */
 export function generateGroupedScenario(originalScenario: Scenario): Scenario {
-  const groups = createAutomaticGroups(originalScenario);
+  const allGroups = createAutomaticGroups(originalScenario);
+
+  // Filter groups based on enabledTagGroups if specified
+  const enabledTags = originalScenario.groups?.enabledTagGroups || [];
+  const groups = enabledTags.length > 0
+    ? allGroups.filter(g => enabledTags.includes(g.tagName))
+    : allGroups;
 
   if (groups.length === 0) {
     return originalScenario; // No groups to create
@@ -245,19 +251,69 @@ export function generateGroupedScenario(originalScenario: Scenario): Scenario {
 
   // Filter out grouped nodes from the original nodes (when in grouped view)
   const groupedNodeIds = new Set<string>();
+  const nodeToGroupMap = new Map<string, string>(); // Maps original nodeId to group nodeId
   groups.forEach(group => {
-    group.nodes.forEach(node => groupedNodeIds.add(node.nodeId));
+    const groupNodeId = `group_${group.tagName}`;
+    group.nodes.forEach(node => {
+      groupedNodeIds.add(node.nodeId);
+      nodeToGroupMap.set(node.nodeId, groupNodeId);
+    });
   });
 
-  // Keep ungrouped nodes and add group nodes
-  const ungroupedNodes = originalScenario.nodes.filter(node => !groupedNodeIds.has(node.nodeId));
+
+  // Keep ALL original nodes and redirect connections to grouped nodes to point to the group instead
+  const allNodesWithRedirectedConnections = originalScenario.nodes.map(node => {
+    if (groupedNodeIds.has(node.nodeId)) {
+      // Mark grouped nodes as hidden but keep them intact
+      return {
+        ...node,
+        _isGrouped: true, // Internal flag to indicate this node is grouped (for rendering)
+      };
+    } else {
+      // For ungrouped nodes, check if any of their outputs connect to grouped nodes
+      if ('outputs' in node && node.outputs) {
+        const updatedOutputs = node.outputs.map(output => {
+          if (output.destinationNodeId && nodeToGroupMap.has(output.destinationNodeId)) {
+            // This node is connecting TO a grouped node, redirect to group instead
+            const originalTargetNodeId = output.destinationNodeId;
+            const targetGroupId = nodeToGroupMap.get(originalTargetNodeId)!;
+            const targetGroup = groups.find(g => `group_${g.tagName}` === targetGroupId);
+
+            if (targetGroup) {
+              // Find the external input that matches this connection
+              const externalInput = targetGroup.externalInputs.find(ei =>
+                ei.targetNodeId === originalTargetNodeId && ei.targetInputName === output.destinationInputName
+              );
+
+              if (externalInput) {
+                console.log(`Redirecting connection from ${node.nodeId} to group ${targetGroupId} instead of ${originalTargetNodeId}`);
+                return {
+                  ...output,
+                  destinationNodeId: targetGroupId,
+                  destinationInputName: `input-${externalInput.name}`,
+                };
+              }
+            }
+          }
+          return output;
+        });
+
+        return {
+          ...node,
+          outputs: updatedOutputs,
+        };
+      }
+    }
+    return node;
+  });
 
   return {
     ...originalScenario,
-    nodes: [...ungroupedNodes, ...groupNodes],
+    nodes: [...allNodesWithRedirectedConnections, ...groupNodes],
     groups: {
       ...originalScenario.groups,
       visualMode: "grouped",
+      groupedNodeIds: Array.from(groupedNodeIds), // Track which nodes are grouped
     },
   };
 }

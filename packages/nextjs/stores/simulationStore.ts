@@ -42,6 +42,114 @@ const MAX_SINK_TOKENS_STORED = 50;
 const MAX_NODE_ACTIVITY_LOGS = 500;
 const MAX_GLOBAL_ACTIVITY_LOGS = 1000;
 
+/**
+ * Prepares a scenario for saving by ensuring it contains original nodes, not grouped ones
+ */
+function getSaveReadyScenario(scenario: Scenario): Scenario {
+  console.log("🔄 getSaveReadyScenario called with visualMode:", scenario?.groups?.visualMode);
+
+  if (!scenario?.groups?.visualMode || scenario.groups.visualMode === "all") {
+    console.log("❌ Not grouped, saving as-is");
+    return scenario;
+  }
+
+  console.log("✅ Scenario is grouped, proceeding with connection restoration...");
+
+  // If grouped, restore the original scenario by removing Group nodes and restoring original connections
+  const groupNodes = scenario.nodes.filter(n => n.type === "Group");
+  const groupedNodeIds = scenario.groups?.groupedNodeIds || [];
+
+  console.log("getSaveReadyScenario - Found group nodes:", groupNodes.map(g => ({ id: g.nodeId, containedNodes: 'containedNodes' in g ? g.containedNodes : 'NO_CONTAINED_NODES' })));
+
+  // Create a map from group node ID to the original nodes it contained
+  const groupToOriginalNodesMap = new Map<string, string[]>();
+  groupNodes.forEach(groupNode => {
+    if ('containedNodes' in groupNode && groupNode.containedNodes) {
+      console.log(`Group ${groupNode.nodeId} contains nodes:`, groupNode.containedNodes);
+      groupToOriginalNodesMap.set(groupNode.nodeId, groupNode.containedNodes);
+    } else {
+      console.warn(`Group ${groupNode.nodeId} has no containedNodes!`);
+    }
+  });
+
+  const originalNodes = scenario.nodes
+    .filter(n => n.type !== "Group") // Remove all Group nodes
+    .map(node => {
+      // Remove internal grouping flags
+      const { _isGrouped, ...cleanNode } = node as any;
+
+      // If this node has outputs connecting to group nodes, restore the original connections
+      if ('outputs' in cleanNode && cleanNode.outputs) {
+        const restoredOutputs = cleanNode.outputs.map((output: any) => {
+          // Check if this output is connecting to a group node
+          const targetGroupId = output.destinationNodeId;
+          if (targetGroupId && targetGroupId.startsWith('group_')) {
+            console.log(`Found connection from ${cleanNode.nodeId} to group ${targetGroupId}, input: ${output.destinationInputName}`);
+
+            // Find the group node and determine which original node this should connect to
+            const containedNodes = groupToOriginalNodesMap.get(targetGroupId) || [];
+            console.log(`Group ${targetGroupId} contains nodes:`, containedNodes);
+
+            // Parse the input name to find which original node this was meant for
+            // Format is "input-{originalNodeDisplayName}.{inputName}"
+            const inputMatch = output.destinationInputName?.match(/^input-(.+)\.(.+)$/);
+            console.log(`Input name "${output.destinationInputName}" parsing result:`, inputMatch);
+
+            if (inputMatch) {
+              const [, originalNodeDisplayName, originalInputName] = inputMatch;
+              console.log(`Looking for original node with display name: "${originalNodeDisplayName}"`);
+
+              // Find the original node by display name
+              const originalTargetNode = scenario.nodes.find(n =>
+                containedNodes.includes(n.nodeId) && n.displayName === originalNodeDisplayName
+              );
+
+              console.log(`Original target node found:`, originalTargetNode ? `${originalTargetNode.nodeId} (${originalTargetNode.displayName})` : 'NOT FOUND');
+
+              if (originalTargetNode) {
+                console.log(`✅ Restoring connection from ${cleanNode.nodeId} to ${originalTargetNode.nodeId} (was connecting to group ${targetGroupId})`);
+                return {
+                  ...output,
+                  destinationNodeId: originalTargetNode.nodeId,
+                  destinationInputName: originalInputName,
+                };
+              } else {
+                console.error(`❌ Could not find original target node for ${originalNodeDisplayName} in group ${targetGroupId}`);
+              }
+            } else {
+              console.error(`❌ Could not parse input name: ${output.destinationInputName}`);
+            }
+          }
+          return output;
+        });
+
+        return {
+          ...cleanNode,
+          outputs: restoredOutputs,
+        };
+      }
+
+      return cleanNode;
+    });
+
+  // IMPORTANT: Preserve the enabledTagGroups so it gets saved with the template
+  const savedEnabledTagGroups = scenario.groups?.enabledTagGroups || [];
+  console.log("💾 Saving scenario with enabledTagGroups:", savedEnabledTagGroups);
+
+  return {
+    ...scenario,
+    nodes: originalNodes,
+    groups: {
+      ...scenario.groups,
+      visualMode: "all",
+      activeFilters: [],
+      groupedNodeIds: [], // Clear grouped node tracking
+      // CRITICAL: Keep the enabled tag groups so they get saved
+      enabledTagGroups: savedEnabledTagGroups,
+    },
+  };
+}
+
 interface ScenarioSnapshot {
   scenario: Scenario | null;
   timestamp: number;
@@ -209,8 +317,11 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
 
   // Actions
   loadScenario: async (scenarioData: any) => {
+    console.log('🔄 Loading scenario with data:', scenarioData);
     const { scenario: parsedScenario, errors } = validateScenario(scenarioData);
+    console.log('🔍 Validation result - errors:', errors.length, 'parsed scenario:', !!parsedScenario);
     if (errors.length > 0) {
+      console.error('❌ Scenario validation failed with errors:', errors);
       set({
         errorMessages: errors,
         scenario: null,
@@ -335,6 +446,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       }
     });
 
+    console.log('✅ Scenario validation successful! Setting scenario with', parsedScenario.nodes?.length, 'nodes');
     set({
       scenario: parsedScenario,
       nodesConfig,
@@ -1403,6 +1515,22 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       // Load the scenario from the template
       await get().loadScenario(template.scenario);
 
+      // Check if the template was saved with grouping enabled and restore it
+      if (template.scenario.groups?.enabledTagGroups && template.scenario.groups.enabledTagGroups.length > 0) {
+        console.log(`Template has grouping enabled. Restoring grouping for tags:`, template.scenario.groups.enabledTagGroups);
+
+        // Import the grouping utility function
+        const { generateGroupedScenario } = await import('@/lib/utils/advancedGroupingUtils');
+
+        // Generate the grouped scenario using the saved enabledTagGroups
+        const groupedScenario = generateGroupedScenario(template.scenario);
+
+        // Load the grouped scenario
+        await get().loadScenario(groupedScenario);
+
+        console.log(`✅ Restored grouping state for template "${template.name}"`);
+      }
+
       // If template has saved execution state, restore it
       if (template.executionState) {
         console.log(`Restoring saved execution state for template "${template.name}"`);
@@ -1491,9 +1619,12 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
         throw new Error('No scenario loaded to save');
       }
 
+      // Get the scenario to save - if grouped, we need to save a clean version for loading later
+      const scenarioToSave = getSaveReadyScenario(state.scenario);
+
       // Capture complete simulation state for saving
       const completeState = {
-        scenario: state.scenario,
+        scenario: scenarioToSave,
         // Simulation execution state
         nodeStates: state.nodeStates,
         currentTime: state.currentTime,
@@ -1508,7 +1639,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       };
 
       const updatedTemplate = await templateService.updateTemplate(state.currentTemplate.id, {
-        scenario: state.scenario,
+        scenario: scenarioToSave,
         // Add execution state to template
         executionState: completeState,
         description: `${state.currentTemplate.description || ''} (Updated: ${new Date().toLocaleString()})`.trim(),

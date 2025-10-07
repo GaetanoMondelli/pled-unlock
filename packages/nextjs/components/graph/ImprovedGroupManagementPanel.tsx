@@ -38,6 +38,11 @@ const ImprovedGroupManagementPanel: React.FC<ImprovedGroupManagementPanelProps> 
   const scenario = useSimulationStore(state => state.scenario);
   const loadScenario = useSimulationStore(state => state.loadScenario);
   const saveSnapshot = useSimulationStore(state => state.saveSnapshot);
+  const updateCurrentTemplate = useSimulationStore(state => state.updateCurrentTemplate);
+  const currentTemplate = useSimulationStore(state => state.currentTemplate);
+
+  // Store the original ungrouped scenario to restore when ungrouping
+  const [originalScenario, setOriginalScenario] = useState<any>(null);
 
   const { toast } = useToast();
   const [newTagName, setNewTagName] = useState("");
@@ -87,21 +92,28 @@ const ImprovedGroupManagementPanel: React.FC<ImprovedGroupManagementPanelProps> 
     return createAutomaticGroups(scenario);
   }, [scenario]);
 
-  // Sync enabled tags from scenario when it changes (but only if actually different)
+  // Sync enabled tags from scenario when it changes
   useEffect(() => {
-    if (scenario?.groups?.enabledTagGroups) {
-      const savedTags = new Set(scenario.groups.enabledTagGroups);
-      const currentTags = Array.from(enabledTagGroups).sort().join(',');
-      const savedTagsStr = Array.from(savedTags).sort().join(',');
+    console.log("🔄 Scenario changed, checking grouping state:", scenario?.groups);
 
-      // Only update if different from current state
-      if (currentTags !== savedTagsStr) {
-        console.log("Restoring grouping state:", scenario.groups.enabledTagGroups);
-        setEnabledTagGroups(savedTags);
-        setIsGroupingEnabled(scenario.groups.enabledTagGroups.length > 0);
+    if (scenario?.groups?.enabledTagGroups && scenario.groups.enabledTagGroups.length > 0) {
+      const savedTags = new Set(scenario.groups.enabledTagGroups);
+      console.log("📋 Found saved enabled tag groups:", Array.from(savedTags));
+      setEnabledTagGroups(savedTags);
+      setIsGroupingEnabled(true);
+    } else if (scenario?.groups?.visualMode === "grouped") {
+      // Check if we're in grouped mode but no enabledTagGroups - infer from active groups
+      console.log("📋 In grouped mode but no enabledTagGroups, inferring from scenario");
+      const groupNodes = scenario.nodes.filter(n => n.type === "Group");
+      if (groupNodes.length > 0) {
+        const inferredTags = groupNodes.map(g => g.nodeId.replace('group_', ''));
+        console.log("📋 Inferred tags:", inferredTags);
+        setEnabledTagGroups(new Set(inferredTags));
+        setIsGroupingEnabled(true);
       }
+    } else {
+      console.log("📋 No grouping found in scenario");
     }
-    // Don't reset to empty if no saved state - preserve user's current selection
   }, [scenario]);
 
   const handleCreateTag = () => {
@@ -182,13 +194,30 @@ const ImprovedGroupManagementPanel: React.FC<ImprovedGroupManagementPanelProps> 
     });
   };
 
-  const handleToggleTagGroup = (tagName: string, enabled: boolean) => {
+  const handleToggleTagGroup = async (tagName: string, enabled: boolean) => {
     if (!scenario) {
       console.error("No scenario available!");
       return;
     }
 
     console.log("Toggle tag group:", tagName, "enabled:", enabled);
+
+    // Auto-save current template before grouping to ensure all changes are persisted
+    if (enabled && currentTemplate) {
+      try {
+        console.log("Auto-saving template before grouping...");
+        await updateCurrentTemplate();
+        console.log("Template saved successfully");
+      } catch (error) {
+        console.error("Failed to auto-save template:", error);
+        toast({
+          variant: "destructive",
+          title: "Save Failed",
+          description: "Please save your template manually before enabling grouping.",
+        });
+        return;
+      }
+    }
 
     const newEnabledTags = new Set(enabledTagGroups);
     if (enabled) {
@@ -200,56 +229,70 @@ const ImprovedGroupManagementPanel: React.FC<ImprovedGroupManagementPanelProps> 
 
     console.log("New enabled tags:", Array.from(newEnabledTags));
 
-    // If enabling tags, generate grouped scenario with actual Group nodes
+    // If enabling tags, generate grouped scenario with proper connection redirection
     let updatedScenario;
     if (newEnabledTags.size > 0) {
-      // Create groups for enabled tags only
-      const allGroups = createAutomaticGroups(scenario);
-      const enabledGroups = allGroups.filter(g => newEnabledTags.has(g.tagName));
+      // Store original scenario before grouping (only if not already stored)
+      if (!originalScenario && enabledTagGroups.size === 0) {
+        console.log("Storing original scenario before first grouping");
+        setOriginalScenario({
+          ...scenario,
+          groups: {
+            ...scenario.groups,
+            visualMode: "all" as const,
+            activeFilters: [],
+            enabledTagGroups: [],
+          },
+        });
+      }
 
-      // Get stored positions
-      const storedGroupPositions = scenario.groups?.groupPositions || {};
-      const { createGroupNodeFromInfo } = require("@/lib/utils/advancedGroupingUtils");
-      const groupNodes = enabledGroups.map(g => createGroupNodeFromInfo(g, storedGroupPositions));
-
-      // Remove grouped node IDs
-      const groupedNodeIds = new Set<string>();
-      enabledGroups.forEach(g => g.nodes.forEach(n => groupedNodeIds.add(n.nodeId)));
-
-      // Create map of grouped nodeId -> group nodeId
-      const nodeToGroupMap = new Map<string, string>();
-      enabledGroups.forEach(g => {
-        const groupId = `group_${g.tagName}`;
-        g.nodes.forEach(n => nodeToGroupMap.set(n.nodeId, groupId));
-      });
-
-      // Keep ALL nodes as-is, including grouped ones - DON'T modify their connections
-      // The visualization layer (GraphVisualization) will handle showing/hiding nodes
-      const allNodes = scenario.nodes.filter(n => n.type !== "Group"); // Remove old group nodes only
-
-      updatedScenario = {
+      // Create a scenario with only the selected tags enabled for grouping
+      const scenarioWithSelectedGroups = {
         ...scenario,
-        nodes: [...allNodes, ...groupNodes],
         groups: {
           ...scenario.groups,
-          visualMode: "grouped" as const,
-          activeFilters: Array.from(newEnabledTags),
           enabledTagGroups: Array.from(newEnabledTags),
         },
       };
-    } else {
-      // Remove all Group nodes - the original nodes are still there in the scenario
-      // Just filter out Group type nodes
-      updatedScenario = {
-        ...scenario,
-        nodes: scenario.nodes.filter(n => n.type !== "Group"),
-        groups: {
-          ...scenario.groups,
-          visualMode: "all" as const,
-          activeFilters: [],
-          enabledTagGroups: [],
-        },
+
+      // Use the generateGroupedScenario function which handles connection redirection
+      updatedScenario = generateGroupedScenario(scenarioWithSelectedGroups);
+
+      // Ensure the groups metadata is properly set
+      updatedScenario.groups = {
+        ...updatedScenario.groups,
+        visualMode: "grouped" as const,
+        activeFilters: Array.from(newEnabledTags),
+        enabledTagGroups: Array.from(newEnabledTags),
       };
+    } else {
+      // Restore the original ungrouped scenario with all nodes and connections
+      if (originalScenario) {
+        console.log("Restoring original ungrouped scenario");
+        updatedScenario = {
+          ...originalScenario,
+          groups: {
+            ...originalScenario.groups,
+            visualMode: "all" as const,
+            activeFilters: [],
+            enabledTagGroups: [],
+          },
+        };
+        setOriginalScenario(null); // Clear stored scenario
+      } else {
+        // Fallback: just remove Group nodes (original behavior)
+        console.log("No original scenario stored, falling back to removing Group nodes");
+        updatedScenario = {
+          ...scenario,
+          nodes: scenario.nodes.filter(n => n.type !== "Group"),
+          groups: {
+            ...scenario.groups,
+            visualMode: "all" as const,
+            activeFilters: [],
+            enabledTagGroups: [],
+          },
+        };
+      }
     }
 
     console.log("Loading updated scenario with visualMode:", updatedScenario.groups.visualMode);
