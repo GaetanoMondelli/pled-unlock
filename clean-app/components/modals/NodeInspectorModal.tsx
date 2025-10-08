@@ -703,13 +703,11 @@ const ConfigSection: React.FC<{
                 onUpdate={(updatedInputs) => {
                   if (scenario) {
                     saveSnapshot('Update node inputs');
-                    const updatedScenario = {
-                      ...scenario,
-                      nodes: scenario.nodes.map((node: any) =>
-                        node.nodeId === nodeConfig.nodeId ? { ...node, inputs: updatedInputs } : node
-                      )
-                    };
-                    loadScenario(updatedScenario);
+                    const success = updateNodeConfigInStore(nodeConfig.nodeId, { ...nodeConfig, inputs: updatedInputs });
+                    if (!success) {
+                      toast({ variant: "destructive", title: "Update Failed", description: "Failed to update node inputs." });
+                      return;
+                    }
                     toast({ title: "Inputs Updated", description: "Node inputs have been updated successfully." });
                   }
                 }}
@@ -724,13 +722,11 @@ const ConfigSection: React.FC<{
                 onUpdate={(updatedOutputs) => {
                   if (scenario) {
                     saveSnapshot('Update node outputs');
-                    const updatedScenario = {
-                      ...scenario,
-                      nodes: scenario.nodes.map((node: any) =>
-                        node.nodeId === nodeConfig.nodeId ? { ...node, outputs: updatedOutputs } : node
-                      )
-                    };
-                    loadScenario(updatedScenario);
+                    const success = updateNodeConfigInStore(nodeConfig.nodeId, { ...nodeConfig, outputs: updatedOutputs });
+                    if (!success) {
+                      toast({ variant: "destructive", title: "Update Failed", description: "Failed to update node outputs." });
+                      return;
+                    }
                     toast({ title: "Outputs Updated", description: "Node outputs have been updated successfully." });
                   }
                 }}
@@ -1740,6 +1736,7 @@ const NodeInspectorModal: React.FC = () => {
   const setSelectedNodeId = useSimulationStore(state => state.setSelectedNodeId);
   const scenario = useSimulationStore(state => state.scenario);
   const loadScenario = useSimulationStore(state => state.loadScenario);
+  const updateNodeConfigInStore = useSimulationStore(state => state.updateNodeConfigInStore);
   const saveSnapshot = useSimulationStore(state => state.saveSnapshot);
 
   const { toast } = useToast();
@@ -1757,11 +1754,13 @@ const NodeInspectorModal: React.FC = () => {
   const nodeState = selectedNodeId ? nodeStates[selectedNodeId] : null;
   const logs = selectedNodeId ? nodeActivityLogs[selectedNodeId] || [] : [];
 
-  // Reset selected event state when node changes
+  // Only reset selected event state when node changes if the event doesn't belong to the new node
   useEffect(() => {
-    setSelectedEventState(null);
-    setSelectedLogEntry(null);
-  }, [selectedNodeId]);
+    if (selectedLogEntry && selectedLogEntry.nodeId !== selectedNodeId) {
+      setSelectedEventState(null);
+      setSelectedLogEntry(null);
+    }
+  }, [selectedNodeId, selectedLogEntry]);
 
   useEffect(() => {
     if (nodeConfig) {
@@ -1792,16 +1791,16 @@ const NodeInspectorModal: React.FC = () => {
         return;
       }
 
-      // Create updated scenario with modified node
-      const updatedScenario = {
-        ...scenario,
-        nodes: scenario.nodes.map((node: any) =>
-          node.nodeId === selectedNodeId ? parsedConfig : node
-        )
-      };
-
-      // Apply the changes
-      await loadScenario(updatedScenario);
+      // Apply the changes using updateNodeConfigInStore (preserves simulation state)
+      const success = updateNodeConfigInStore(selectedNodeId, parsedConfig);
+      if (!success) {
+        toast({
+          variant: "destructive",
+          title: "Update Failed",
+          description: "Failed to update node configuration."
+        });
+        return;
+      }
       setOriginalConfigText(editedConfigText);
       
       toast({
@@ -1823,49 +1822,22 @@ const NodeInspectorModal: React.FC = () => {
   };
 
   const handleTagsUpdate = async (newTags: string[]) => {
-    if (!selectedNodeId || !scenario) return;
+    if (!selectedNodeId) return;
 
     try {
-      // Find any new tags that need to be added to the registry
-      const existingRegistryTags = new Set((scenario.groups?.tags || []).map(t => t.name));
-      const existingNodeTags = new Set<string>();
-      scenario.nodes.forEach(node => {
-        if (node.tags) node.tags.forEach(tag => existingNodeTags.add(tag));
-      });
+      // Simply update the node tags using updateNodeConfigInStore (preserves simulation state)
+      const currentNode = nodesConfig[selectedNodeId];
+      if (!currentNode) return;
 
-      const newTagsToRegister = newTags.filter(tag =>
-        !existingRegistryTags.has(tag) && !existingNodeTags.has(tag)
-      );
-
-      let updatedScenario = { ...scenario };
-
-      // Add new tags to registry
-      if (newTagsToRegister.length > 0) {
-        const newRegistryTags = newTagsToRegister.map(tagName => ({
-          name: tagName,
-          color: "#3b82f6",
-          description: "Auto-created tag"
-        }));
-
-        updatedScenario = {
-          ...updatedScenario,
-          groups: {
-            ...updatedScenario.groups,
-            tags: [...(updatedScenario.groups?.tags || []), ...newRegistryTags]
-          }
-        };
+      const success = updateNodeConfigInStore(selectedNodeId, { ...currentNode, tags: newTags });
+      if (!success) {
+        toast({
+          variant: "destructive",
+          title: "Update Failed",
+          description: "Failed to update node tags."
+        });
+        return;
       }
-
-      // Update node tags
-      updatedScenario = {
-        ...updatedScenario,
-        nodes: updatedScenario.nodes.map((node: any) =>
-          node.nodeId === selectedNodeId ? { ...node, tags: newTags } : node
-        )
-      };
-
-      // Apply the changes
-      await loadScenario(updatedScenario);
 
       toast({
         title: "Tags Updated",
@@ -1902,18 +1874,19 @@ const NodeInspectorModal: React.FC = () => {
         }
       }
 
-      // Create updated scenario with modified FSM
-      const updatedScenario = {
-        ...scenario,
-        nodes: scenario.nodes.map((node: any) =>
-          node.nodeId === selectedNodeId
-            ? { ...node, fsm: updatedFsm }
-            : node
-        )
-      };
+      // Apply the changes using updateNodeConfigInStore (preserves simulation state)
+      const currentNode = nodesConfig[selectedNodeId];
+      if (!currentNode) return;
 
-      // Apply the changes
-      await loadScenario(updatedScenario);
+      const success = updateNodeConfigInStore(selectedNodeId, { ...currentNode, fsm: updatedFsm });
+      if (!success) {
+        toast({
+          variant: "destructive",
+          title: "Update Failed",
+          description: "Failed to update FSM state actions."
+        });
+        return;
+      }
 
       toast({
         title: "State Actions Updated",

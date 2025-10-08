@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/dialog";
 
 interface NodeTemplate {
-  type: "DataSource" | "Queue" | "ProcessNode" | "FSMProcessNode" | "Sink" | "Module";
+  type: "DataSource" | "Queue" | "ProcessNode" | "FSMProcessNode" | "StateMultiplexer" | "Sink" | "Module";
   displayName: string;
   description: string;
   icon: React.ReactNode;
@@ -129,14 +129,14 @@ const NODE_TEMPLATES: NodeTemplate[] = [
   },
   {
     type: "FSMProcessNode",
-    displayName: "FSM Processor",
-    description: "Finite State Machine processor with dynamic outputs based on FSM actions",
-    icon: <Settings className="h-4 w-4" />,
+    displayName: "FSM",
+    description: "Finite State Machine that emits state changes to output",
+    icon: <Sparkles className="h-4 w-4" />,
     category: "processing",
-    color: "bg-orange-100 text-orange-700 border-orange-200",
+    color: "bg-blue-100 text-blue-700 border-blue-200",
     defaultConfig: {
       type: "FSMProcessNode",
-      displayName: "New FSM Processor",
+      displayName: "FSM",
       inputs: [
         {
           name: "input",
@@ -144,41 +144,90 @@ const NODE_TEMPLATES: NodeTemplate[] = [
           required: true
         }
       ],
+      outputs: [
+        {
+          name: "state_output",
+          destinationNodeId: "",
+          destinationInputName: "input",
+          interface: { type: "StateContext", requiredFields: ["data.currentState", "data.context"] }
+        }
+      ],
       fsm: {
-        states: ["off", "on"],
-        initialState: "off",
+        states: ["idle", "processing", "complete"],
+        initialState: "idle",
         transitions: [
           {
-            from: "off",
-            to: "on",
-            trigger: "token_received",
-            condition: "input.data.value > 0"
+            from: "idle",
+            to: "processing",
+            trigger: "token_received"
           },
           {
-            from: "on",
-            to: "off",
-            trigger: "token_received",
-            condition: "input.data.value <= 0"
+            from: "processing",
+            to: "complete",
+            trigger: "processing_complete"
+          },
+          {
+            from: "complete",
+            to: "idle",
+            trigger: "reset"
           }
         ],
         variables: {},
-        stateActions: {
-          "on": {
-            onEntry: {
-              "output": "1"
-            },
-            logs: ["Toggle switched ON"]
-          },
-          "off": {
-            onEntry: {
-              "output": "0"
-            },
-            logs: ["Toggle switched OFF"]
+        stateActions: {},
+        outputs: ["state_output"]
+      },
+      fsl: "state idle {\n  on token_received -> processing\n}\nstate processing {\n  on processing_complete -> complete\n}\nstate complete {\n  on reset -> idle\n}"
+    }
+  },
+  {
+    type: "StateMultiplexer",
+    displayName: "Multiplexer",
+    description: "Routes inputs to different outputs based on conditions (works with any input type)",
+    icon: <Target className="h-4 w-4" />,
+    category: "processing",
+    color: "bg-green-100 text-green-700 border-green-200",
+    defaultConfig: {
+      type: "StateMultiplexer",
+      displayName: "Multiplexer",
+      inputs: [
+        {
+          name: "input",
+          interface: { type: "Any", requiredFields: [] },
+          required: true
+        }
+      ],
+      outputs: [
+        {
+          name: "output1",
+          destinationNodeId: "",
+          destinationInputName: "input",
+          interface: { type: "Any", requiredFields: [] }
+        },
+        {
+          name: "output2",
+          destinationNodeId: "",
+          destinationInputName: "input",
+          interface: { type: "Any", requiredFields: [] }
+        }
+      ],
+      routes: [
+        {
+          condition: "input.data.currentState === 'processing'",
+          outputName: "output1",
+          action: {
+            type: "emit",
+            data: "input.data.context"
           }
         },
-        outputs: ["output"]
-      },
-      fsl: "state off {\n  on_entry { emit(output, 0); log(\"Toggle switched OFF\") }\n  on input.data.value > 0 -> on\n}\nstate on {\n  on_entry { emit(output, 1); log(\"Toggle switched ON\") }\n  on input.data.value <= 0 -> off\n}"
+        {
+          condition: "input.data.currentState === 'complete'",
+          outputName: "output2",
+          action: {
+            type: "emit",
+            data: "{ result: 'completed', context: input.data.context }"
+          }
+        }
+      ]
     }
   },
   {

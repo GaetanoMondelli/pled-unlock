@@ -55,6 +55,15 @@ export function validateScenario(data: any): { scenario: Scenario | null; errors
       case "Sink":
         // Sink nodes don't need additional validation beyond schema
         break;
+
+      case "StateMultiplexer":
+        // Validate outputs
+        node.outputs.forEach(output => {
+          if (output.destinationNodeId && !nodeIds.has(output.destinationNodeId)) {
+            errors.push(`StateMultiplexer "${node.nodeId}": output destinationNodeId "${output.destinationNodeId}" does not exist.`);
+          }
+        });
+        break;
     }
   });
 

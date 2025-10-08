@@ -315,8 +315,40 @@ export const GroupNodeSchema = BaseNodeSchema.extend({
 });
 export type GroupNode = z.infer<typeof GroupNodeSchema>;
 
+// StateMultiplexer Node Schema
+export const StateMultiplexerNodeSchema = BaseNodeSchema.extend({
+  type: z.literal("StateMultiplexer"),
+  inputs: z.array(z.object({
+    name: z.string(),
+    interface: z.object({
+      type: z.string(),
+      requiredFields: z.array(z.string())
+    }),
+    required: z.boolean()
+  })),
+  outputs: z.array(z.object({
+    name: z.string(),
+    destinationNodeId: z.string(),
+    destinationInputName: z.string(),
+    interface: z.object({
+      type: z.string(),
+      requiredFields: z.array(z.string())
+    })
+  })),
+  routes: z.array(z.object({
+    condition: z.string(),
+    outputName: z.string(),
+    action: z.object({
+      type: z.string(),
+      data: z.any()
+    })
+  })),
+  defaultOutput: z.string().optional()
+});
+export type StateMultiplexerNode = z.infer<typeof StateMultiplexerNodeSchema>;
+
 // Union type for all nodes
-export const AnyNodeSchema = z.union([DataSourceNodeSchema, QueueNodeSchema, ProcessNodeSchema, FSMProcessNodeSchema, EnhancedFSMProcessNodeSchema, SinkNodeSchema, ModuleNodeSchema, GroupNodeSchema]);
+export const AnyNodeSchema = z.union([DataSourceNodeSchema, QueueNodeSchema, ProcessNodeSchema, FSMProcessNodeSchema, EnhancedFSMProcessNodeSchema, SinkNodeSchema, ModuleNodeSchema, GroupNodeSchema, StateMultiplexerNodeSchema]);
 export type AnyNode = z.infer<typeof AnyNodeSchema>;
 
 // Scenario Schema
@@ -413,7 +445,17 @@ export interface ModuleState extends NodeState {
   internalEventCounter: number;
 }
 
-export type AnyNodeState = DataSourceState | QueueState | ProcessNodeState | FSMProcessNodeState | EnhancedFSMProcessNodeState | SinkState | ModuleState;
+export interface StateMultiplexerState extends NodeState {
+  // Input buffers for processing
+  inputBuffers: Record<string, Token[]>;
+  // Output tracking
+  lastRoutedTime?: number;
+  routedTokenCount: number;
+  // Route match tracking
+  lastMatchedRoutes: string[];
+}
+
+export type AnyNodeState = DataSourceState | QueueState | ProcessNodeState | FSMProcessNodeState | EnhancedFSMProcessNodeState | SinkState | ModuleState | StateMultiplexerState;
 
 // For React Flow
 export interface RFNodeData {

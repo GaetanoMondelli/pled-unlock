@@ -9,6 +9,8 @@ import {
   determineOperationType,
   extractUltimateSources,
 } from "@/lib/simulation/lineageHelpers";
+import { ActivityMessages, ActivityColors } from "@/lib/simulation/activityMessages";
+import { TokenLineageTracker } from "@/lib/simulation/tokenLineage";
 import {
   type AggregationDetails,
   type AnyNode,
@@ -166,6 +168,11 @@ interface SimulationState {
   eventCounter: number;
   nodeActivityLogs: Record<string, HistoryEntry[]>;
   globalActivityLog: HistoryEntry[];
+
+  // Execution-based activity storage (preserves data across resets)
+  executionHistory: ExecutionDocument[];
+  currentExecutionId: string | null;
+
   selectedNodeId: string | null;
   selectedToken: Token | null;
   isGlobalLedgerOpen: boolean;
@@ -182,6 +189,9 @@ interface SimulationState {
 
   // Actions
   loadScenario: (scenarioData: any) => Promise<void>;
+  startNewExecution: () => void;
+  endCurrentExecution: () => void;
+  restoreExecution: (executionId: string) => boolean;
   play: () => void;
   pause: () => void;
   stepForward: (timeIncrement?: number) => void;
@@ -306,6 +316,10 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
   isGlobalLedgerOpen: false,
   errorMessages: [],
 
+  // Execution history
+  executionHistory: [],
+  currentExecutionId: null,
+
   // Template and execution state
   currentTemplate: null,
   currentExecution: null,
@@ -317,6 +331,16 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
 
   // Actions
   loadScenario: async (scenarioData: any) => {
+    const currentState = get();
+
+    // BLOCK loadScenario during active simulation to prevent resets
+    if (currentState.isRunning || (currentState.currentTime > 0 && currentState.currentExecutionId)) {
+      console.warn('🚫 [BLOCKED] loadScenario called during active simulation - BLOCKING to prevent reset!');
+      console.warn('🚫 Current time:', currentState.currentTime, 'Running:', currentState.isRunning, 'Execution:', currentState.currentExecutionId);
+      console.trace('🚫 Call stack:');
+      return;
+    }
+
     console.log('🔄 Loading scenario with data:', scenarioData);
     const { scenario: parsedScenario, errors } = validateScenario(scenarioData);
     console.log('🔍 Validation result - errors:', errors.length, 'parsed scenario:', !!parsedScenario);
@@ -463,19 +487,127 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
     });
   },
 
+  startNewExecution: () => {
+    const executionId = nanoid(12);
+    const now = Date.now();
+
+    console.log(`🚀 [EXECUTION] Starting new execution: ${executionId}`);
+
+    const state = get();
+
+    // Create a proper ExecutionDocument
+    const executionDoc: ExecutionDocument = {
+      id: executionId,
+      templateId: state.currentTemplate?.id || 'no-template',
+      name: `Execution ${new Date().toLocaleTimeString()}`,
+      description: `Simulation run started at ${new Date().toLocaleString()}`,
+      scenario: state.scenario!,
+      nodeStates: { ...state.nodeStates },
+      currentTime: 0,
+      eventCounter: 0,
+      globalActivityLog: [],
+      nodeActivityLogs: Object.keys(state.nodesConfig).reduce((acc, nodeId) => {
+        acc[nodeId] = [];
+        return acc;
+      }, {} as Record<string, HistoryEntry[]>),
+      startedAt: now,
+      lastSavedAt: now,
+      isCompleted: false,
+      createdBy: 'user'
+    };
+
+    set(state => ({
+      currentExecutionId: executionId,
+      currentExecution: executionDoc,
+      // Reset activity logs for new execution
+      globalActivityLog: [],
+      nodeActivityLogs: Object.keys(state.nodesConfig).reduce((acc, nodeId) => {
+        acc[nodeId] = [];
+        return acc;
+      }, {} as Record<string, HistoryEntry[]>),
+      currentTime: 0,
+      eventCounter: 0,
+      isRunning: false
+    }));
+
+    // Clear any existing lineage data for fresh start
+    TokenLineageTracker.clearAllLineage();
+  },
+
+  endCurrentExecution: () => {
+    const state = get();
+    if (!state.currentExecutionId) return;
+
+    console.log(`🏁 [EXECUTION] Ending execution: ${state.currentExecutionId} after ${state.currentTime} ticks`);
+
+    // Update the current execution with final state
+    const executionRecord: ExecutionDocument = {
+      ...state.currentExecution!,
+      currentTime: state.currentTime,
+      eventCounter: state.eventCounter,
+      globalActivityLog: [...state.globalActivityLog],
+      nodeActivityLogs: { ...state.nodeActivityLogs },
+      nodeStates: { ...state.nodeStates },
+      lastSavedAt: Date.now(),
+      isCompleted: true
+    };
+
+    set(state => ({
+      executionHistory: [...state.executionHistory, executionRecord],
+      currentExecutionId: null,
+      currentExecution: null,
+      isRunning: false
+    }));
+  },
+
+  restoreExecution: (executionId: string) => {
+    const state = get();
+    const execution = state.executionHistory.find(ex => ex.id === executionId);
+    if (!execution) {
+      console.error(`❌ [EXECUTION] Cannot restore execution ${executionId}: not found`);
+      return false;
+    }
+
+    console.log(`🔄 [EXECUTION] Restoring execution: ${executionId} with ${execution.currentTime} ticks`);
+
+    set({
+      currentExecutionId: executionId,
+      currentExecution: execution,
+      globalActivityLog: [...execution.globalActivityLog],
+      nodeActivityLogs: { ...execution.nodeActivityLogs },
+      nodeStates: { ...execution.nodeStates },
+      currentTime: execution.currentTime,
+      eventCounter: execution.eventCounter,
+      isRunning: false
+    });
+
+    return true;
+  },
+
   play: () => {
+    const state = get();
+
+    // Start new execution if none is running
+    if (!state.currentExecutionId) {
+      state.startNewExecution();
+    }
+
     set({ isRunning: true });
     const runSimulation = () => {
-      const state = get();
-      if (state.isRunning) {
-        state.tick();
-        setTimeout(runSimulation, 1000 / state.simulationSpeed);
+      const currentState = get();
+      if (currentState.isRunning) {
+        currentState.tick();
+        setTimeout(runSimulation, 1000 / currentState.simulationSpeed);
       }
     };
     setTimeout(runSimulation, 1000 / get().simulationSpeed);
   },
 
-  pause: () => set({ isRunning: false }),
+  pause: () => {
+    set({ isRunning: false });
+    // Optionally end execution on pause, or you can add a separate stop button
+    // get().endCurrentExecution();
+  },
 
   stepForward: (timeIncrement = 1) => {
     const { tick, isRunning } = get();
@@ -512,13 +644,21 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
 
           // Process all outputs (v3 supports multiple outputs)
           nodeConfig.outputs.forEach(output => {
+            const destNodeConfig = nodesConfig[output.destinationNodeId];
             const emissionLog = _logNodeActivity(
               nodeConfig.nodeId,
-              { action: "token_emitted", value: token.value, details: `Token ${token.id} to ${output.destinationNodeId}` },
+              {
+                action: "token_emitted",
+                value: token.value,
+                details: ActivityMessages.tokenEmitted(
+                  { id: token.id, value: token.value },
+                  { id: nodeConfig.nodeId, name: nodeConfig.displayName },
+                  { id: output.destinationNodeId, name: destNodeConfig?.displayName || output.destinationNodeId }
+                )
+              },
               newTime,
             );
 
-            const destNodeConfig = nodesConfig[output.destinationNodeId];
             if (destNodeConfig) {
               const destNodeState = get().nodeStates[destNodeConfig.nodeId];
 
@@ -1810,6 +1950,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
   },
 
   _logNodeActivity: (nodeIdForLog, logCoreDetails, timestamp) => {
+    console.log(`🔄 [SIMULATION LOG] Node: ${nodeIdForLog}, Action: ${logCoreDetails.action}, Time: ${timestamp}s`);
     const currentSequence = get().eventCounter;
     set(stateFS => ({ eventCounter: stateFS.eventCounter + 1 }));
 
@@ -1866,6 +2007,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       const currentGlobalLog = state.globalActivityLog || [];
       const updatedGlobalLog = [...currentGlobalLog, newEntry].slice(-MAX_GLOBAL_ACTIVITY_LOGS);
 
+      console.log(`✅ [ACTIVITY LOGGED] Sequence: ${newEntry.sequence}, Global log size: ${updatedGlobalLog.length}`);
       return { ...state, nodeActivityLogs: newNodeActivityLogs, globalActivityLog: updatedGlobalLog };
     });
     return newEntry;
@@ -1888,7 +2030,18 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
     // Create lineage metadata for this token creation
     const lineageMetadata = createLineageMetadata("creation", sourceTokens, newToken.id);
 
-    // Removed redundant data_generated event - business logic events are sufficient
+    // Register with lineage tracker
+    const nodeConfig = get().nodesConfig[originNodeId];
+    const nodeName = nodeConfig?.displayName || originNodeId;
+    TokenLineageTracker.registerToken(
+      newToken,
+      originNodeId,
+      nodeName,
+      timestamp,
+      sourceTokens,
+      'created'
+    );
+
     return newToken;
   },
 

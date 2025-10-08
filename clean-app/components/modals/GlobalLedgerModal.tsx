@@ -13,6 +13,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { HistoryEntry } from "@/lib/simulation/types";
 import { useSimulationStore } from "@/stores/simulationStore";
+import { ActivityColors } from "@/lib/simulation/activityMessages";
 
 const GlobalActivityTable: React.FC<{ logs: HistoryEntry[] }> = ({ logs }) => {
   const nodesConfig = useSimulationStore(state => state.nodesConfig);
@@ -46,14 +47,14 @@ const GlobalActivityTable: React.FC<{ logs: HistoryEntry[] }> = ({ logs }) => {
   const renderTokenLinks = (text: string) => {
     if (!text) return text;
 
-    // Match token IDs in the format "Token ABC123XY" or just "ABC123XY" if it looks like a token ID
-    const tokenRegex = /Token (\w{8})|(\w{8}(?=\s|$|,|\.|from|to))/g;
+    // Match token IDs in the format "Token ABC123XY" - more restrictive to avoid false matches
+    const tokenRegex = /Token ([A-Za-z0-9]{8})/g;
     const parts = [];
     let lastIndex = 0;
     let match;
 
     while ((match = tokenRegex.exec(text)) !== null) {
-      const tokenId = match[1] || match[2];
+      const tokenId = match[1];
 
       // Add text before the match
       if (match.index > lastIndex) {
@@ -88,12 +89,7 @@ const GlobalActivityTable: React.FC<{ logs: HistoryEntry[] }> = ({ logs }) => {
   };
 
   const getActionColor = (action: string): string => {
-    if (action.includes("CREATED") || action.includes("EMITTED")) return "bg-green-100 text-green-800";
-    if (action.includes("AGGREGATED") || action.includes("CONSUMED")) return "bg-blue-100 text-blue-800";
-    if (action.includes("OUTPUT") || action.includes("GENERATED")) return "bg-purple-100 text-purple-800";
-    if (action.includes("ERROR")) return "bg-red-100 text-red-800";
-    if (action.includes("ARRIVED") || action.includes("ADDED")) return "bg-orange-100 text-orange-800";
-    return "bg-gray-100 text-gray-800";
+    return ActivityColors.getActionColor(action);
   };
 
   return (
@@ -165,6 +161,11 @@ const GlobalLedgerModal: React.FC = () => {
   const isGlobalLedgerOpen = useSimulationStore(state => state.isGlobalLedgerOpen);
   const toggleGlobalLedger = useSimulationStore(state => state.toggleGlobalLedger);
   const globalActivityLog = useSimulationStore(state => state.globalActivityLog);
+
+  // Debug logging
+  React.useEffect(() => {
+    console.log(`📊 [GLOBAL LEDGER] Activity log updated: ${globalActivityLog.length} entries`);
+  }, [globalActivityLog]);
 
   const handleOpenChange = (open: boolean) => {
     if (!open && isGlobalLedgerOpen) {

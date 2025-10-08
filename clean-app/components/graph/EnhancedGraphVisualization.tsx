@@ -5,7 +5,8 @@ import DataSourceNodeDisplay from "./nodes/DataSourceNodeDisplay";
 import ProcessNodeDisplay from "./nodes/ProcessNodeDisplay";
 import QueueNodeDisplay from "./nodes/QueueNodeDisplay";
 import SinkNodeDisplay from "./nodes/SinkNodeDisplay";
-import FSMProcessNodeDisplay from "./nodes/FSMProcessNodeDisplay";
+import DecoupledFSMNodeDisplay from "./nodes/DecoupledFSMNodeDisplay";
+import StateMultiplexerDisplay from "./nodes/StateMultiplexerDisplay";
 import ModuleNodeDisplay from "./nodes/ModuleNodeDisplay";
 import GroupNodeDisplay from "./nodes/GroupNodeDisplay";
 import BreadcrumbNavigation from "./BreadcrumbNavigation";
@@ -39,7 +40,8 @@ const nodeTypes = {
   DataSource: DataSourceNodeDisplay,
   Queue: QueueNodeDisplay,
   ProcessNode: ProcessNodeDisplay,
-  FSMProcessNode: FSMProcessNodeDisplay,
+  FSMProcessNode: DecoupledFSMNodeDisplay,
+  StateMultiplexer: StateMultiplexerDisplay,
   Sink: SinkNodeDisplay,
   Module: ModuleNodeDisplay,
   Group: GroupNodeDisplay,

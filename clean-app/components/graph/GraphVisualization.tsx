@@ -5,7 +5,8 @@ import DataSourceNodeDisplay from "./nodes/DataSourceNodeDisplay";
 import ProcessNodeDisplay from "./nodes/ProcessNodeDisplay";
 import QueueNodeDisplay from "./nodes/QueueNodeDisplay";
 import SinkNodeDisplay from "./nodes/SinkNodeDisplay";
-import FSMProcessNodeDisplay from "./nodes/FSMProcessNodeDisplay";
+import DecoupledFSMNodeDisplay from "./nodes/DecoupledFSMNodeDisplay";
+import StateMultiplexerDisplay from "./nodes/StateMultiplexerDisplay";
 import ModuleNodeDisplay from "./nodes/ModuleNodeDisplay";
 import GroupNodeDisplay from "./nodes/GroupNodeDisplay";
 import { type AnyNode, type RFEdgeData, type RFNodeData } from "@/lib/simulation/types";
@@ -34,7 +35,8 @@ const nodeTypes = {
   DataSource: DataSourceNodeDisplay,
   Queue: QueueNodeDisplay,
   ProcessNode: ProcessNodeDisplay,
-  FSMProcessNode: FSMProcessNodeDisplay,
+  FSMProcessNode: DecoupledFSMNodeDisplay,
+  StateMultiplexer: StateMultiplexerDisplay,
   Sink: SinkNodeDisplay,
   Module: ModuleNodeDisplay,
   Group: GroupNodeDisplay,
@@ -151,6 +153,7 @@ const GraphVisualization: React.FC = () => {
   ]);
 
   const onNodesChange: OnNodesChange = useCallback((changes) => {
+    console.log(`🔄 [NODES CHANGE] Changes:`, changes, `current time: ${currentTime}`);
     // ALWAYS apply changes to ReactFlow state first for smooth interaction
     setRfNodes(nds => applyNodeChanges(changes, nds));
 
@@ -185,6 +188,7 @@ const GraphVisualization: React.FC = () => {
       });
 
       const updatedScenario = { ...scenario, nodes: cleanedNodes };
+      console.log(`💥 [LOAD SCENARIO] From onNodesChange - node deletion, current time: ${currentTime}`);
       loadScenario(updatedScenario);
     }
   }, [scenario, loadScenario, saveSnapshot]);
@@ -548,6 +552,7 @@ const GraphVisualization: React.FC = () => {
 
   const onNodeClick = useCallback(
     (event: React.MouseEvent, node: Node<RFNodeData>) => {
+      console.log(`🎯 [NODE CLICK] Clicking node: ${node.id}, current time: ${currentTime}`);
       setSelectedNodeId(node.id);
 
       // Handle group navigation

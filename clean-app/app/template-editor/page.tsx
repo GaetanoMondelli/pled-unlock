@@ -230,8 +230,9 @@ export default function TemplateEditorPage() {
 
   // Set up event sourcing integration
   useEffect(() => {
-    setupEventSourcingIntegration();
-    console.log("🔗 Event sourcing integration initialized");
+    // TEMPORARILY DISABLED FOR DEBUGGING
+    // setupEventSourcingIntegration();
+    console.log("🔗 Event sourcing integration DISABLED for debugging");
   }, []);
 
   // Navigate to template ID URL when template is loaded
