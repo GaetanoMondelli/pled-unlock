@@ -1,0 +1,14 @@
+<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg" fill="none">
+	<!-- Background removed; the mark inherits color from CSS via currentColor -->
+	<g stroke="currentColor" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" fill="none">
+		<line x1="128" y1="128" x2="64" y2="64"/>
+		<line x1="128" y1="128" x2="192" y2="64"/>
+		<line x1="128" y1="128" x2="128" y2="200"/>
+	</g>
+	<g fill="currentColor">
+		<circle cx="128" cy="128" r="18"/>
+		<circle cx="64" cy="64" r="24"/>
+		<circle cx="192" cy="64" r="24"/>
+		<circle cx="128" cy="200" r="24"/>
+	</g>
+</svg>

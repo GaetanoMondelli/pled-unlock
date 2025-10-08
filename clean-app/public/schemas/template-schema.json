@@ -1,0 +1,517 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://docusign-unlocked.dev/schemas/template-v3.json",
+  "title": "DocuSign Unlocked Template Schema v3.0",
+  "description": "Formal JSON Schema for DocuSign Unlocked simulation templates defining data flow scenarios with nodes, connections, and processing logic",
+  "type": "object",
+  "required": ["version", "nodes"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "const": "3.0",
+      "description": "Schema version identifier"
+    },
+    "nodes": {
+      "type": "array",
+      "description": "Array of nodes that make up the simulation graph",
+      "items": {
+        "$ref": "#/definitions/Node"
+      }
+    }
+  },
+  "definitions": {
+    "Position": {
+      "type": "object",
+      "required": ["x", "y"],
+      "properties": {
+        "x": {
+          "type": "number",
+          "description": "X coordinate for node positioning in the visual editor"
+        },
+        "y": {
+          "type": "number",
+          "description": "Y coordinate for node positioning in the visual editor"
+        }
+      }
+    },
+    "Interface": {
+      "type": "object",
+      "required": ["type", "requiredFields"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["SimpleValue", "AggregationResult", "TransformationResult", "Any"],
+          "description": "Interface type defining the expected data structure"
+        },
+        "requiredFields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Array of field paths that must be present in the data"
+        }
+      }
+    },
+    "GenerationConfig": {
+      "type": "object",
+      "required": ["type", "valueMin", "valueMax"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["random", "sequence", "constant"],
+          "description": "Type of value generation strategy"
+        },
+        "valueMin": {
+          "type": "number",
+          "description": "Minimum value for random generation"
+        },
+        "valueMax": {
+          "type": "number",
+          "description": "Maximum value for random generation"
+        }
+      }
+    },
+    "AggregationTrigger": {
+      "type": "object",
+      "required": ["type", "window"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["time", "count", "threshold"],
+          "description": "Trigger mechanism for aggregation processing"
+        },
+        "window": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Time window in seconds or count threshold for triggering aggregation"
+        }
+      }
+    },
+    "AggregationConfig": {
+      "type": "object",
+      "required": ["method", "formula", "trigger"],
+      "properties": {
+        "method": {
+          "type": "string",
+          "enum": ["sum", "average", "count", "first", "last", "min", "max"],
+          "description": "Aggregation method to apply to input data"
+        },
+        "formula": {
+          "type": "string",
+          "description": "Mathematical formula for aggregation calculation"
+        },
+        "trigger": {
+          "$ref": "#/definitions/AggregationTrigger"
+        }
+      }
+    },
+    "TransformationConfig": {
+      "type": "object",
+      "required": ["formula", "fieldMapping"],
+      "properties": {
+        "formula": {
+          "type": "string",
+          "description": "Mathematical transformation formula"
+        },
+        "fieldMapping": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Maps output field paths to transformation expressions"
+        }
+      }
+    },
+    "Input": {
+      "type": "object",
+      "required": ["name", "interface", "required"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Unique identifier for this input within the node"
+        },
+        "nodeId": {
+          "type": "string",
+          "description": "Source node ID for this input connection"
+        },
+        "sourceOutputName": {
+          "type": "string",
+          "description": "Name of the output from the source node"
+        },
+        "interface": {
+          "$ref": "#/definitions/Interface"
+        },
+        "alias": {
+          "type": "string",
+          "description": "Alias name for referencing this input in formulas"
+        },
+        "required": {
+          "type": "boolean",
+          "description": "Whether this input is required for node processing"
+        }
+      }
+    },
+    "Output": {
+      "type": "object",
+      "required": ["name", "destinationNodeId", "destinationInputName", "interface"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Unique identifier for this output within the node"
+        },
+        "destinationNodeId": {
+          "type": "string",
+          "description": "Target node ID for this output connection"
+        },
+        "destinationInputName": {
+          "type": "string",
+          "description": "Name of the input on the destination node"
+        },
+        "interface": {
+          "$ref": "#/definitions/Interface"
+        },
+        "transformation": {
+          "$ref": "#/definitions/TransformationConfig",
+          "description": "Optional transformation to apply to output data"
+        }
+      }
+    },
+    "BaseNode": {
+      "type": "object",
+      "required": ["nodeId", "displayName", "position", "type"],
+      "properties": {
+        "nodeId": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+          "description": "Unique identifier for the node"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Human-readable name displayed in the editor"
+        },
+        "position": {
+          "$ref": "#/definitions/Position"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["DataSource", "Queue", "ProcessNode", "FSMProcessNode", "Sink"]
+        }
+      }
+    },
+    "DataSourceNode": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/BaseNode"
+        },
+        {
+          "type": "object",
+          "required": ["interval", "outputs", "generation"],
+          "properties": {
+            "type": {
+              "const": "DataSource"
+            },
+            "interval": {
+              "type": "number",
+              "minimum": 0.1,
+              "description": "Time interval in seconds between data generation"
+            },
+            "outputs": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Output"
+              },
+              "description": "Array of output connections"
+            },
+            "generation": {
+              "$ref": "#/definitions/GenerationConfig"
+            }
+          }
+        }
+      ]
+    },
+    "QueueNode": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/BaseNode"
+        },
+        {
+          "type": "object",
+          "required": ["inputs", "outputs", "aggregation"],
+          "properties": {
+            "type": {
+              "const": "Queue"
+            },
+            "inputs": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Input"
+              },
+              "description": "Array of input connections"
+            },
+            "outputs": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Output"
+              },
+              "description": "Array of output connections"
+            },
+            "aggregation": {
+              "$ref": "#/definitions/AggregationConfig"
+            },
+            "capacity": {
+              "type": "number",
+              "minimum": 1,
+              "description": "Maximum number of tokens the queue can hold"
+            }
+          }
+        }
+      ]
+    },
+    "ProcessNode": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/BaseNode"
+        },
+        {
+          "type": "object",
+          "required": ["inputs", "outputs"],
+          "properties": {
+            "type": {
+              "const": "ProcessNode"
+            },
+            "inputs": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Input"
+              },
+              "description": "Array of input connections"
+            },
+            "outputs": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Output"
+              },
+              "description": "Array of output connections"
+            }
+          }
+        }
+      ]
+    },
+    "FSMProcessNode": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/BaseNode"
+        },
+        {
+          "type": "object",
+          "required": ["inputs", "outputs", "fsm"],
+          "properties": {
+            "type": {
+              "const": "FSMProcessNode"
+            },
+            "inputs": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Input"
+              },
+              "description": "Array of input connections"
+            },
+            "outputs": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Output"
+              },
+              "description": "Array of output connections"
+            },
+            "fsm": {
+              "$ref": "#/definitions/FSMDefinition",
+              "description": "Finite State Machine definition"
+            },
+            "fsl": {
+              "type": "string",
+              "description": "Raw FSL (Finite State Language) code for editing and display"
+            }
+          }
+        }
+      ]
+    },
+    "FSMDefinition": {
+      "type": "object",
+      "required": ["states", "transitions"],
+      "properties": {
+        "states": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/FSMState"
+          },
+          "description": "Array of FSM states"
+        },
+        "transitions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/FSMTransition"
+          },
+          "description": "Array of FSM transitions"
+        },
+        "variables": {
+          "type": "object",
+          "description": "FSM state variables",
+          "additionalProperties": true
+        }
+      }
+    },
+    "FSMState": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "State name identifier"
+        },
+        "isInitial": {
+          "type": "boolean",
+          "description": "Whether this is the initial state"
+        },
+        "isFinal": {
+          "type": "boolean",
+          "description": "Whether this is a final state"
+        },
+        "onEntry": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/FSMAction"
+          },
+          "description": "Actions to execute when entering this state"
+        },
+        "onExit": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/FSMAction"
+          },
+          "description": "Actions to execute when exiting this state"
+        }
+      }
+    },
+    "FSMTransition": {
+      "type": "object",
+      "required": ["from", "to", "trigger"],
+      "properties": {
+        "from": {
+          "type": "string",
+          "description": "Source state name"
+        },
+        "to": {
+          "type": "string",
+          "description": "Target state name"
+        },
+        "trigger": {
+          "type": "string",
+          "enum": ["token_received", "timer", "condition", "emission_complete", "manual"],
+          "description": "Event that triggers this transition"
+        },
+        "condition": {
+          "type": "string",
+          "description": "Optional condition formula that must be true for transition"
+        },
+        "guard": {
+          "type": "string",
+          "description": "Additional guard condition"
+        }
+      }
+    },
+    "FSMAction": {
+      "type": "object",
+      "required": ["action"],
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["emit", "log", "set_variable", "increment", "decrement"],
+          "description": "Type of action to perform"
+        },
+        "target": {
+          "type": "string",
+          "description": "Target output name (for emit) or variable name (for set_variable)"
+        },
+        "value": {
+          "description": "Value to emit or set (can be any type)"
+        },
+        "formula": {
+          "type": "string",
+          "description": "Formula to evaluate for dynamic value"
+        }
+      }
+    },
+    "SinkNode": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/BaseNode"
+        },
+        {
+          "type": "object",
+          "required": ["inputs"],
+          "properties": {
+            "type": {
+              "const": "Sink"
+            },
+            "inputs": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Input"
+              },
+              "description": "Array of input connections"
+            }
+          }
+        }
+      ]
+    },
+    "Node": {
+      "oneOf": [
+        {
+          "$ref": "#/definitions/DataSourceNode"
+        },
+        {
+          "$ref": "#/definitions/QueueNode"
+        },
+        {
+          "$ref": "#/definitions/ProcessNode"
+        },
+        {
+          "$ref": "#/definitions/FSMProcessNode"
+        },
+        {
+          "$ref": "#/definitions/SinkNode"
+        }
+      ]
+    }
+  },
+  "examples": [
+    {
+      "version": "3.0",
+      "nodes": [
+        {
+          "nodeId": "DataSource_A",
+          "displayName": "Source A",
+          "position": {"x": 100, "y": 100},
+          "type": "DataSource",
+          "interval": 3,
+          "outputs": [
+            {
+              "name": "output",
+              "destinationNodeId": "Queue_B",
+              "destinationInputName": "input",
+              "interface": {
+                "type": "SimpleValue",
+                "requiredFields": ["data.value"]
+              }
+            }
+          ],
+          "generation": {
+            "type": "random",
+            "valueMin": 1,
+            "valueMax": 10
+          }
+        }
+      ]
+    }
+  ]
+}
