@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import GraphVisualization from "@/components/graph/GraphVisualization";
 import GlobalLedgerModal from "@/components/modals/GlobalLedgerModal";
 import NodeInspectorModal from "@/components/modals/NodeInspectorModal";
-import TokenInspectorModal from "@/components/modals/TokenInspectorModal";
+import SimpleTokenInspector from "@/components/modals/SimpleTokenInspector";
 import TemplateManagerModal from "@/components/modals/TemplateManagerModal";
 import ExecutionManagerModal from "@/components/modals/ExecutionManagerModal";
 import ScenarioManagerModal from "@/components/modals/ScenarioManagerModal";
@@ -941,7 +941,7 @@ export default function TemplateEditorPage() {
 
       {/* Modals */}
       <NodeInspectorModal />
-      <TokenInspectorModal />
+      <SimpleTokenInspector />
       <GlobalLedgerModal />
       <TemplateManagerModal
         isOpen={isTemplateManagerOpen}

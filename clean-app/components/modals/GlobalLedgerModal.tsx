@@ -11,7 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import type { HistoryEntry } from "@/lib/simulation/types";
+import type { HistoryEntry, Token } from "@/lib/simulation/types";
 import { useSimulationStore } from "@/stores/simulationStore";
 import { ActivityColors } from "@/lib/simulation/activityMessages";
 
@@ -21,26 +21,61 @@ const GlobalActivityTable: React.FC<{ logs: HistoryEntry[] }> = ({ logs }) => {
   const globalActivityLog = useSimulationStore(state => state.globalActivityLog);
 
   const handleTokenClick = (tokenId: string) => {
+    console.log(`🔍 [TOKEN CLICK] Inspecting token: ${tokenId}`);
+
     // Find the token in the global activity log and reconstruct it
     const tokenEvents = globalActivityLog.filter(
       log =>
         log.sourceTokenIds?.includes(tokenId) ||
-        log.details?.includes(tokenId) ||
-        (log.action === "CREATED" && log.details?.includes(tokenId)),
+        log.details?.includes(`Token ${tokenId}`) ||
+        log.details?.includes(tokenId)
     );
 
+    console.log(`🔍 [TOKEN CLICK] Found ${tokenEvents.length} events for token ${tokenId}`);
+
     if (tokenEvents.length > 0) {
-      const createEvent = tokenEvents.find(e => e.action === "CREATED" && e.details?.includes(tokenId));
+      // Look for token creation events (token_emitted, processing, firing)
+      const createEvent = tokenEvents.find(e =>
+        (e.action === "token_emitted" ||
+         e.action === "processing" ||
+         e.action === "firing") &&
+        e.details?.includes(tokenId)
+      );
+
       if (createEvent) {
-        const reconstructedToken = {
+        console.log(`🔍 [TOKEN CLICK] Found creation event:`, createEvent);
+
+        const reconstructedToken: Token = {
           id: tokenId,
-          value: createEvent.value,
+          value: createEvent.value !== undefined ? createEvent.value : 0,
           createdAt: createEvent.timestamp,
           originNodeId: createEvent.nodeId,
-          history: tokenEvents.filter(e => e.details?.includes(tokenId)),
+          history: tokenEvents,
         };
+
+        console.log(`🔍 [TOKEN CLICK] Setting selected token:`, reconstructedToken);
         setSelectedToken(reconstructedToken);
+      } else {
+        // If no creation event found, try to reconstruct from any event
+        const firstEvent = tokenEvents[0];
+        if (firstEvent) {
+          console.log(`🔍 [TOKEN CLICK] Using first event as fallback:`, firstEvent);
+
+          const reconstructedToken: Token = {
+            id: tokenId,
+            value: firstEvent.value !== undefined ? firstEvent.value : 0,
+            createdAt: firstEvent.timestamp,
+            originNodeId: firstEvent.nodeId,
+            history: tokenEvents,
+          };
+
+          setSelectedToken(reconstructedToken);
+        } else {
+          console.warn(`🔍 [TOKEN CLICK] Could not reconstruct token ${tokenId}`);
+        }
       }
+    } else {
+      console.warn(`🔍 [TOKEN CLICK] No events found for token ${tokenId}`);
     }
   };
 

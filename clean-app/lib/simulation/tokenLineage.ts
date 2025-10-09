@@ -123,7 +123,7 @@ export class TokenLineageTracker {
   /**
    * Get all ancestor tokens (recursive back to sources)
    */
-  private static getAncestors(tokenId: string): TokenLineageNode[] {
+  static getAncestors(tokenId: string): TokenLineageNode[] {
     const ancestors: TokenLineageNode[] = [];
     const visited = new Set<string>();
 
@@ -150,7 +150,7 @@ export class TokenLineageTracker {
   /**
    * Get all descendant tokens (recursive forward to all derivatives)
    */
-  private static getDescendants(tokenId: string): TokenLineageNode[] {
+  static getDescendants(tokenId: string): TokenLineageNode[] {
     const descendants: TokenLineageNode[] = [];
     const visited = new Set<string>();
 
@@ -177,7 +177,7 @@ export class TokenLineageTracker {
   /**
    * Get sibling tokens (created in same operation)
    */
-  private static getSiblings(tokenId: string): TokenLineageNode[] {
+  static getSiblings(tokenId: string): TokenLineageNode[] {
     const node = this.lineageMap.get(tokenId);
     if (!node) return [];
 
@@ -198,7 +198,7 @@ export class TokenLineageTracker {
   /**
    * Get full path through nodes (chronological journey)
    */
-  private static getFullPath(tokenId: string): TokenLineageNode[] {
+  static getFullPath(tokenId: string): TokenLineageNode[] {
     const path: TokenLineageNode[] = [];
 
     // Start with ancestors

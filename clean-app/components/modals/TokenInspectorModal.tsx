@@ -10,6 +10,7 @@ import type { HistoryEntry, Token } from "@/lib/simulation/types";
 import { useSimulationStore } from "@/stores/simulationStore";
 import D3TokenTree from "@/components/workflow-builder/lineage/D3TokenTree";
 import { TokenGenealogyEngine } from "@/lib/simulation/tokenGenealogyEngine";
+import TokenLineageViewer from "./TokenLineageViewer";
 
 const TokenInspectorModal: React.FC = () => {
   const selectedToken = useSimulationStore(state => state.selectedToken);
@@ -39,31 +40,39 @@ const TokenInspectorModal: React.FC = () => {
   };
 
   const handleTokenClick = (tokenId: string) => {
+    console.log(`🔍 [TOKEN INSPECTOR] Navigating to token: ${tokenId}`);
+
     // Find the token in the global activity log and reconstruct it
     const tokenEvents = globalActivityLog.filter(
       log =>
         log.sourceTokenIds?.includes(tokenId) ||
-        log.details?.includes(tokenId) ||
-        (log.action === "CREATED" && log.details?.includes(tokenId)) ||
-        (log.action.includes("AGGREGATED_") && log.details?.includes(tokenId)),
+        log.details?.includes(`Token ${tokenId}`) ||
+        log.details?.includes(tokenId)
     );
 
     if (tokenEvents.length > 0) {
-      // Look for creation or aggregation event
-      const createEvent = tokenEvents.find(e => e.action === "CREATED" && e.details?.includes(tokenId));
-      const aggregationEvent = tokenEvents.find(e => e.action.includes("AGGREGATED_") && e.details?.includes(tokenId));
-      const sourceEvent = aggregationEvent || createEvent;
+      // Look for token creation events (token_emitted, processing, firing)
+      const createEvent = tokenEvents.find(e =>
+        (e.action === "token_emitted" ||
+         e.action === "processing" ||
+         e.action === "firing") &&
+        e.details?.includes(tokenId)
+      );
+
+      const sourceEvent = createEvent || tokenEvents[0];
 
       if (sourceEvent) {
         const reconstructedToken: Token = {
           id: tokenId,
-          value: sourceEvent.value,
+          value: sourceEvent.value !== undefined ? sourceEvent.value : 0,
           createdAt: sourceEvent.timestamp,
           originNodeId: sourceEvent.nodeId,
-          history: tokenEvents.filter(e => e.details?.includes(tokenId)),
+          history: tokenEvents,
         };
         setSelectedToken(reconstructedToken);
       }
+    } else {
+      console.warn(`🔍 [TOKEN INSPECTOR] No events found for token ${tokenId}`);
     }
   };
 
@@ -110,18 +119,14 @@ const TokenInspectorModal: React.FC = () => {
 
           <Separator />
 
-          {/* Token Lineage */}
-          {tokenLineage && (
-            <div>
-              <h3 className="font-semibold text-primary mb-3">Token Lineage</h3>
-              <D3TokenTree
-                lineage={tokenLineage}
-                onTokenClick={handleTokenClick}
-                nodesConfig={nodesConfig}
-                showCompleteHistory={true}
-              />
-            </div>
-          )}
+          {/* Token Lineage Viewer */}
+          <div>
+            <h3 className="font-semibold text-primary mb-3">Complete Token Genealogy</h3>
+            <TokenLineageViewer
+              token={selectedToken}
+              onTokenClick={handleTokenClick}
+            />
+          </div>
 
           <Separator />
 

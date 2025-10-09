@@ -691,8 +691,8 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
                     destNodeConfig.nodeId,
                     {
                       action: "accumulating",
-                      value: qState.inputBuffer.length + 1, // Show buffer size as value
-                      details: `Collecting tokens (buffer size: ${qState.inputBuffer.length + 1})`,
+                      value: token.value,
+                      details: `Added Token ${token.id} (${token.value}) to buffer`,
                     },
                     newTime,
                   );
@@ -1226,14 +1226,36 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
               // Enhanced source token summaries
               const enhancedSourceTokenSummaries = createEnhancedSourceTokenSummaries(tokensToAggregate);
 
+              // Get source token IDs for lineage
+              const sourceTokenIds = tokensToAggregate.map(t => t.id);
+
               // Simplified: Single processing event for the entire aggregation
               const consumedValues = tokensToAggregate.map(t => t.value).join(', ');
+
+              // Build formula string based on aggregation method
+              let formulaStr = '';
+              switch(qConfig.aggregation.method) {
+                case 'sum':
+                  formulaStr = `sum(${consumedValues}) = ${tokensToAggregate.map(t => t.value).join(' + ')} = ${newToken.value}`;
+                  break;
+                case 'average':
+                  const sum = tokensToAggregate.reduce((acc, t) => acc + Number(t.value), 0);
+                  formulaStr = `average(${consumedValues}) = ${sum} / ${tokensToAggregate.length} = ${newToken.value}`;
+                  break;
+                case 'multiply':
+                  formulaStr = `multiply(${consumedValues}) = ${tokensToAggregate.map(t => t.value).join(' × ')} = ${newToken.value}`;
+                  break;
+                default:
+                  formulaStr = `${qConfig.aggregation.method}(${consumedValues}) = ${newToken.value}`;
+              }
+
               _logNodeActivity(
                 qConfig.nodeId,
                 {
                   action: "processing",
                   value: newToken.value, // Show result value
-                  details: `${qConfig.aggregation.method}([${consumedValues}]) = ${newToken.value}`,
+                  details: `Token ${newToken.id} created: ${formulaStr}`,
+                  sourceTokenIds: sourceTokenIds,  // Track parent tokens
                 },
                 newTime,
               );
@@ -1316,7 +1338,8 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
             {
               action: "emitting",
               value: tokenToForward.value,
-              details: `Sending to ${destinationNames}`,
+              details: `Token ${tokenToForward.id} (${tokenToForward.value}) → ${destinationNames}`,
+              sourceTokenIds: [],  // This token has already been created, just forwarding
             },
             newTime,
           );
@@ -2098,13 +2121,17 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       nextPnInputBuffers[inputNodeId] = buffer;
     });
 
-    // Log firing event
+    // Log firing event with source token IDs for lineage
+    const consumedTokenIds = consumedTokensForThisFiring.map(t => t.id);
+    const consumedTokenValues = consumedTokensForThisFiring.map(t => `${t.id}(${t.value})`).join(', ');
+
     _logNodeActivity(
       pnConfig.nodeId,
       {
         action: "firing",
         value: consumedTokensForThisFiring.length,
-        details: `Firing with ${consumedTokensForThisFiring.length} inputs`,
+        details: `Firing with inputs: ${consumedTokenValues}`,
+        sourceTokenIds: consumedTokenIds,
       },
       newTime,
     );
@@ -2134,10 +2161,50 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       const result = evaluateFormula(formula, formulaContext);
       const outputValue = typeof result === 'object' && result !== null && 'value' in result ? result.value : result;
 
-      const newToken = _createToken(pnConfig.nodeId, outputValue, newTime);
+      // Pass consumed tokens for lineage tracking
+      const newToken = _createToken(pnConfig.nodeId, outputValue, newTime, consumedTokensForThisFiring);
 
       // Forward token to destination (reuse existing forwarding logic)
       const destNodeConfig = nodesConfig[output.destinationNodeId];
+
+      // Log token creation with transformation details
+      const destName = destNodeConfig?.displayName || output.destinationNodeId;
+
+      // Build detailed formula explanation
+      let formulaExplanation = formula;
+      // Check if it's a simple division or multiplication
+      if (formula.includes('/')) {
+        const parts = formula.split('/');
+        if (parts.length === 2) {
+          const inputPart = parts[0].trim();
+          const divisor = parts[1].trim();
+          const inputValue = formulaContext[inputPart] || formulaContext[inputPart + 'Value'];
+          if (inputValue !== undefined) {
+            formulaExplanation = `${inputValue} / ${divisor} = ${outputValue}`;
+          }
+        }
+      } else if (formula.includes('*')) {
+        const parts = formula.split('*');
+        if (parts.length === 2) {
+          const inputPart = parts[0].trim();
+          const multiplier = parts[1].trim();
+          const inputValue = formulaContext[inputPart] || formulaContext[inputPart + 'Value'];
+          if (inputValue !== undefined) {
+            formulaExplanation = `${inputValue} × ${multiplier} = ${outputValue}`;
+          }
+        }
+      }
+
+      _logNodeActivity(
+        pnConfig.nodeId,
+        {
+          action: "token_emitted",
+          value: outputValue,
+          details: `Token ${newToken.id} created from output ${output.outputId || 0} (${formulaExplanation}) → ${destName}`,
+          sourceTokenIds: consumedTokenIds,
+        },
+        newTime,
+      );
       if (destNodeConfig) {
         const destNodeState = get().nodeStates[destNodeConfig.nodeId];
 
@@ -2150,8 +2217,8 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
             destNodeConfig.nodeId,
             {
               action: "accumulating",
-              value: qState.inputBuffer.length + 1,
-              details: `Received token from ${pnConfig.displayName} (buffer size: ${qState.inputBuffer.length + 1})`,
+              value: newToken.value,
+              details: `Added Token ${newToken.id} (${newToken.value}) from ${pnConfig.displayName}`,
             },
             newTime,
           );

@@ -351,13 +351,18 @@ export class PledStorageService {
     }
   }
 
-  async listExecutions(): Promise<PledExecution[]> {
+  async listExecutions(templateId?: string): Promise<PledExecution[]> {
     try {
       const manifest = await this.getManifest();
       const executions: PledExecution[] = [];
 
+      // Filter by templateId if provided
+      const executionInfos = templateId
+        ? manifest.executions.filter(e => e.templateId === templateId)
+        : manifest.executions;
+
       // Load each execution from storage
-      for (const executionInfo of manifest.executions) {
+      for (const executionInfo of executionInfos) {
         try {
           const execution = await this.getExecution(executionInfo.id);
           if (execution) {
@@ -374,6 +379,76 @@ export class PledStorageService {
     } catch (error) {
       console.error('Error listing PLED executions:', error);
       throw new Error(`Failed to list executions: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async updateExecution(executionId: string, updates: Partial<PledExecution>): Promise<void> {
+    try {
+      const existingExecution = await this.getExecution(executionId);
+      if (!existingExecution) {
+        throw new Error(`Execution ${executionId} not found`);
+      }
+
+      const updatedExecution: PledExecution = {
+        ...existingExecution,
+        ...updates,
+        id: executionId, // Ensure ID doesn't change
+        templateId: existingExecution.templateId, // Ensure templateId doesn't change
+        startedAt: existingExecution.startedAt, // Preserve original start time
+        updatedAt: Date.now(),
+      };
+
+      // Save updated execution
+      const executionPath = `${this.EXECUTIONS_FOLDER}/${executionId}.json`;
+      const executionFile = bucket.file(executionPath);
+      await executionFile.save(JSON.stringify(updatedExecution, null, 2), {
+        contentType: 'application/json',
+        metadata: {
+          executionId,
+          templateId: updatedExecution.templateId,
+          updated: new Date(updatedExecution.updatedAt).toISOString()
+        }
+      });
+
+      // Update manifest if status changed
+      if (updates.status && updates.status !== existingExecution.status) {
+        const manifest = await this.getManifest();
+        const executionIndex = manifest.executions.findIndex(e => e.id === executionId);
+        if (executionIndex >= 0) {
+          manifest.executions[executionIndex].status = updates.status;
+          manifest.lastUpdated = Date.now();
+          await this.saveManifest(manifest);
+        }
+      }
+
+      console.log(`PLED execution updated in storage: ${executionId}`);
+    } catch (error) {
+      console.error('Error updating PLED execution:', error);
+      throw new Error(`Failed to update execution: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async deleteExecution(executionId: string): Promise<void> {
+    try {
+      // Delete execution file
+      const executionPath = `${this.EXECUTIONS_FOLDER}/${executionId}.json`;
+      const executionFile = bucket.file(executionPath);
+
+      const [exists] = await executionFile.exists();
+      if (exists) {
+        await executionFile.delete();
+      }
+
+      // Update manifest
+      const manifest = await this.getManifest();
+      manifest.executions = manifest.executions.filter(e => e.id !== executionId);
+      manifest.lastUpdated = Date.now();
+      await this.saveManifest(manifest);
+
+      console.log(`PLED execution deleted from storage: ${executionId}`);
+    } catch (error) {
+      console.error('Error deleting PLED execution:', error);
+      throw new Error(`Failed to delete execution: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
