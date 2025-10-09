@@ -210,24 +210,27 @@ const NODE_TEMPLATES: NodeTemplate[] = [
           interface: { type: "Any", requiredFields: [] }
         }
       ],
-      routes: [
-        {
-          condition: "input.data.currentState === 'processing'",
-          outputName: "output1",
-          action: {
-            type: "emit",
-            data: "input.data.context"
+      config: {
+        routes: [
+          {
+            condition: "input.data.currentState === 'idle'",
+            outputName: "output1",
+            action: {
+              type: "emit",
+              data: "input"
+            }
+          },
+          {
+            condition: "input.data.currentState === 'processing'",
+            outputName: "output2",
+            action: {
+              type: "emit",
+              data: "input"
+            }
           }
-        },
-        {
-          condition: "input.data.currentState === 'complete'",
-          outputName: "output2",
-          action: {
-            type: "emit",
-            data: "{ result: 'completed', context: input.data.context }"
-          }
-        }
-      ]
+        ],
+        defaultOutput: "output1"
+      }
     }
   },
   {

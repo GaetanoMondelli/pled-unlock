@@ -355,17 +355,19 @@ export type FSMNode = z.infer<typeof FSMNodeSchema>;
 // StateMultiplexer Node Schema
 export const StateMultiplexerNodeSchema = BaseNodeSchema.extend({
   type: z.literal("StateMultiplexer"),
+  inputs: z.array(InputV3Schema).default([]),  // V3 format but optional with default
+  outputs: z.array(OutputV3Schema).default([]), // V3 format but optional with default
   config: z.object({
     routes: z.array(z.object({
       condition: z.string(),
-      outputId: z.string()
-    })),
-    defaultRoute: z.object({
-      outputId: z.string()
-    }).optional()
-  }),
-  inputs: z.array(z.any()).optional(),
-  outputs: z.array(z.any()).optional()
+      outputName: z.string(),
+      action: z.object({
+        type: z.enum(['emit', 'log', 'custom']),
+        data: z.any()
+      })
+    })).default([]),
+    defaultOutput: z.string().optional()
+  })
 });
 export type StateMultiplexerNode = z.infer<typeof StateMultiplexerNodeSchema>;
 

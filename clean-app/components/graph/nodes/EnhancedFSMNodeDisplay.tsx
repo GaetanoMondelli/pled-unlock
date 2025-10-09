@@ -403,8 +403,9 @@ const EnhancedFSMNodeDisplay: React.FC<EnhancedFSMNodeDisplayProps> = ({ data, s
         <Handle
           type="source"
           position={Position.Right}
+          id="state_output"
           className="!bg-purple-500 !border-purple-600 !w-3 !h-3 !border-2"
-          title="Output"
+          title="State Output"
         />
       </div>
 

@@ -31,7 +31,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useSimulationStore } from "@/stores/simulationStore";
 import { useEventSourcing, setupEventSourcingIntegration } from "@/stores/eventSourcingStore";
-import { saveFSMTestTemplate } from "@/lib/templates/save-fsm-template";
+// Removed import - file deleted: import { saveFSMTestTemplate } from "@/lib/templates/save-fsm-template";
 import { AlertCircle, BookOpen, Edit, Pause, Play, RefreshCw, StepForward, Brain, Eye, EyeOff, Activity, Library, Undo2, Redo2, FileText, Archive, ScrollText, Group, Zap, ArrowUp, Code, RotateCcw, ChevronDown, Save, Loader2 } from "lucide-react";
 import { cn } from "~~/lib/utils";
 
@@ -104,6 +104,9 @@ export default function TemplateEditorPage() {
     }
   };
 
+  // Commented out - saveFSMTestTemplate file was deleted
+  // Use scripts/upload-fsm.js to upload FSM templates instead
+  /*
   const handleSaveFSMTestTemplate = async () => {
     try {
       const result = await saveFSMTestTemplate();
@@ -122,6 +125,7 @@ export default function TemplateEditorPage() {
       });
     }
   };
+  */
 
   const fetchDefaultScenarioContent = useCallback(async () => {
     try {
@@ -732,6 +736,7 @@ export default function TemplateEditorPage() {
                       Reload from External Events
                     </button>
                     <div className="border-t border-gray-200 my-1"></div>
+                    {/* Commented out - use scripts/upload-fsm.js instead
                     <button
                       onClick={handleSaveFSMTestTemplate}
                       className="w-full px-3 py-2 text-left text-xs text-purple-600 hover:bg-purple-50 flex items-center"
@@ -739,6 +744,7 @@ export default function TemplateEditorPage() {
                       <Save className="w-3 h-3 mr-2" />
                       Save FSM Test Template
                     </button>
+                    */}
                   </div>
                 </div>
               </div>

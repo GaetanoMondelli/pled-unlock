@@ -24,11 +24,16 @@ const StateMultiplexerDisplay: React.FC<StateMultiplexerDisplayProps> = ({ data,
 
   // Create StateMultiplexer instance
   const multiplexer = useMemo(() => {
-    if (config.type === "StateMultiplexer" && config.routes) {
-      return new StateMultiplexer(id, {
-        routes: config.routes,
-        defaultOutput: config.defaultOutput
-      });
+    if (config.type === "StateMultiplexer") {
+      // Check both config.config.routes (V3 format) and config.routes (legacy)
+      const routes = config.config?.routes || config.routes;
+      const defaultRoute = config.config?.defaultRoute || config.defaultOutput;
+      if (routes) {
+        return new StateMultiplexer(id, {
+          routes: routes,
+          defaultOutput: defaultRoute?.outputId || defaultRoute
+        });
+      }
     }
     return null;
   }, [id, config]);
@@ -48,7 +53,7 @@ const StateMultiplexerDisplay: React.FC<StateMultiplexerDisplayProps> = ({ data,
     return multiplexer.processStateContext(testStateContext);
   }, [multiplexer, testStateContext]);
 
-  const routes = config.routes || [];
+  const routes = config.config?.routes || config.routes || [];
   const outputs = config.outputs || [];
   const totalRoutes = routes.length;
   const activeRoutes = routeResults.matchedRoutes.length;
@@ -275,21 +280,25 @@ const StateMultiplexerDisplay: React.FC<StateMultiplexerDisplayProps> = ({ data,
       <Handle
         type="target"
         position={Position.Left}
+        id="input"
         className="!bg-green-500 !border-green-600 !w-3 !h-3 !border-2"
       />
 
       {/* Multiple output handles */}
-      {outputs.map((output: any, index: number) => (
-        <Handle
-          key={`output-${index}`}
-          type="source"
-          position={Position.Right}
-          id={output.name}
-          style={{ top: `${(index + 1) * (100 / (outputs.length + 1))}%` }}
-          className="!bg-green-500 !border-green-600 !w-3 !h-3 !border-2"
-          title={`Output: ${output.name}`}
-        />
-      ))}
+      {outputs.map((output: any, index: number) => {
+        const handleId = output.name || `output_${index}`;
+        return (
+          <Handle
+            key={handleId}
+            type="source"
+            position={Position.Right}
+            id={handleId}
+            style={{ top: `${(index + 1) * (100 / (outputs.length + 1))}%` }}
+            className="!bg-green-500 !border-green-600 !w-3 !h-3 !border-2"
+            title={`Output: ${output.name || `Output ${index + 1}`}`}
+          />
+        );
+      })}
       </div>
 
       {/* Multiplexer Configuration Modal */}

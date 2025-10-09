@@ -93,6 +93,17 @@ export function validateScenario(data: any): { scenario: Scenario | null; errors
           });
         }
         break;
+
+      case "FSMProcessNode":
+        // Validate FSMProcessNode inputs
+        if (node.inputs) {
+          node.inputs.forEach(input => {
+            if (input.nodeId && !nodeIds.has(input.nodeId)) {
+              errors.push(`FSMProcessNode "${node.nodeId}": input nodeId "${input.nodeId}" does not exist.`);
+            }
+          });
+        }
+        break;
     }
   });
 

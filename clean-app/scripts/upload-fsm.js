@@ -81,100 +81,144 @@ function createFSMTemplate() {
       ]
     },
 
-    // FSM Node - state machine
+    // FSMProcessNode - state machine with proper schema
     {
       nodeId: fsmId,
-      type: "FSM",
+      type: "FSMProcessNode",
       displayName: "State Machine",
       position: { x: 450, y: 200 },
-      config: {
+      inputs: [
+        {
+          name: "event",
+          nodeId: processorId,
+          sourceOutputName: "message",
+          interface: {
+            type: "string",
+            requiredFields: []
+          },
+          required: true
+        }
+      ],
+      fsm: {
+        states: ["idle", "processing", "complete"],
         initialState: "idle",
-        states: {
+        transitions: [
+          {
+            from: "idle",
+            to: "processing",
+            trigger: "token_received"
+          },
+          {
+            from: "processing",
+            to: "complete",
+            trigger: "processing_complete"
+          },
+          {
+            from: "complete",
+            to: "idle",
+            trigger: "reset"
+          }
+        ],
+        stateActions: {
           idle: {
-            on: {
-              token_received: {
-                target: "processing",
-                actions: [
-                  { type: "emit", target: "state_output", value: "processing" }
-                ]
-              }
-            }
+            onEntry: { "state": '"idle"' }
           },
           processing: {
-            on: {
-              processing_complete: {
-                target: "complete",
-                actions: [
-                  { type: "emit", target: "state_output", value: "complete" }
-                ]
-              }
-            }
+            onEntry: { "state": '"processing"' }
           },
           complete: {
-            on: {
-              reset: {
-                target: "idle",
-                actions: [
-                  { type: "emit", target: "state_output", value: "idle" }
-                ]
-              }
-            }
+            onEntry: { "state": '"complete"' }
           }
-        }
-      },
-      inputs: [
-        { nodeId: processorId, inputId: "message" }
-      ],
-      outputs: [
-        {
-          outputId: "state_output",
-          destinationNodeId: multiplexerId
-        }
-      ]
+        },
+        outputs: ["state"]
+      }
     },
 
-    // Multiplexer - routes based on FSM state
+    // StateMultiplexer - routes based on FSM state (V3 format)
     {
       nodeId: multiplexerId,
       type: "StateMultiplexer",
       displayName: "State Router",
       position: { x: 650, y: 200 },
-      config: {
-        routes: [
-          {
-            condition: 'value === "idle"',
-            outputId: "idle_output"
-          },
-          {
-            condition: 'value === "processing"',
-            outputId: "processing_output"
-          },
-          {
-            condition: 'value === "complete"',
-            outputId: "complete_output"
-          }
-        ],
-        defaultRoute: {
-          outputId: "default_output"
-        }
-      },
       inputs: [
-        { nodeId: fsmId, inputId: "state" }
+        {
+          name: "input",
+          nodeId: fsmId,
+          sourceOutputName: "state",
+          interface: {
+            type: "string",
+            requiredFields: []
+          },
+          required: true
+        }
       ],
       outputs: [
         {
-          outputId: "idle_output",
-          destinationNodeId: sinkIdleId
+          name: "idle_output",
+          destinationNodeId: sinkIdleId,
+          destinationInputName: "input",
+          interface: {
+            type: "string",
+            requiredFields: []
+          }
         },
         {
-          outputId: "processing_output",
-          destinationNodeId: sinkProcessingId
+          name: "processing_output",
+          destinationNodeId: sinkProcessingId,
+          destinationInputName: "input",
+          interface: {
+            type: "string",
+            requiredFields: []
+          }
         },
         {
-          outputId: "complete_output",
-          destinationNodeId: sinkCompleteId
+          name: "complete_output",
+          destinationNodeId: sinkCompleteId,
+          destinationInputName: "input",
+          interface: {
+            type: "string",
+            requiredFields: []
+          }
+        },
+        {
+          name: "default_output",
+          destinationNodeId: sinkIdleId,
+          destinationInputName: "input",
+          interface: {
+            type: "string",
+            requiredFields: []
+          }
         }
-      ]
+      ],
+      config: {
+        routes: [
+          {
+            condition: 'input.data.state === "idle"',
+            outputName: "idle_output",
+            action: {
+              type: "emit",
+              data: "input"
+            }
+          },
+          {
+            condition: 'input.data.state === "processing"',
+            outputName: "processing_output",
+            action: {
+              type: "emit",
+              data: "input"
+            }
+          },
+          {
+            condition: 'input.data.state === "complete"',
+            outputName: "complete_output",
+            action: {
+              type: "emit",
+              data: "input"
+            }
+          }
+        ],
+        defaultOutput: "default_output"
+      }
     },
 
     // Sink for idle state
@@ -183,8 +227,18 @@ function createFSMTemplate() {
       type: "Sink",
       displayName: "Idle State Sink",
       position: { x: 850, y: 100 },
-      capacity: 100,
-      inputs: []
+      inputs: [
+        {
+          name: "input",
+          nodeId: multiplexerId,
+          sourceOutputName: "idle_output",
+          interface: {
+            type: "any",
+            requiredFields: []
+          },
+          required: true
+        }
+      ]
     },
 
     // Sink for processing state
@@ -193,8 +247,18 @@ function createFSMTemplate() {
       type: "Sink",
       displayName: "Processing State Sink",
       position: { x: 850, y: 200 },
-      capacity: 100,
-      inputs: []
+      inputs: [
+        {
+          name: "input",
+          nodeId: multiplexerId,
+          sourceOutputName: "processing_output",
+          interface: {
+            type: "any",
+            requiredFields: []
+          },
+          required: true
+        }
+      ]
     },
 
     // Sink for complete state
@@ -203,8 +267,18 @@ function createFSMTemplate() {
       type: "Sink",
       displayName: "Complete State Sink",
       position: { x: 850, y: 300 },
-      capacity: 100,
-      inputs: []
+      inputs: [
+        {
+          name: "input",
+          nodeId: multiplexerId,
+          sourceOutputName: "complete_output",
+          interface: {
+            type: "any",
+            requiredFields: []
+          },
+          required: true
+        }
+      ]
     }
   ];
 

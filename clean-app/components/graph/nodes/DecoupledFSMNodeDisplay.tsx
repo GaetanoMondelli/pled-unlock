@@ -354,12 +354,16 @@ const DecoupledFSMNodeDisplay: React.FC<DecoupledFSMNodeDisplayProps> = ({ data,
       <Handle
         type="target"
         position={Position.Left}
+        id="input"
         className="!bg-blue-500 !border-blue-600 !w-3 !h-3 !border-2"
+        title="Input"
       />
       <Handle
         type="source"
         position={Position.Right}
+        id="state_output"
         className="!bg-blue-500 !border-blue-600 !w-3 !h-3 !border-2"
+        title="State Output"
       />
       </div>
 
