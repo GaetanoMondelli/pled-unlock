@@ -315,40 +315,62 @@ export const GroupNodeSchema = BaseNodeSchema.extend({
 });
 export type GroupNode = z.infer<typeof GroupNodeSchema>;
 
+// FSM Node Schema (simplified FSM)
+export const FSMNodeSchema = BaseNodeSchema.extend({
+  type: z.literal("FSM"),
+  config: z.object({
+    initialState: z.string(),
+    states: z.record(z.object({
+      on: z.record(z.union([
+        z.string(),
+        z.object({
+          target: z.string(),
+          actions: z.array(z.object({
+            type: z.string(),
+            target: z.string().optional(),
+            value: z.any().optional(),
+            formula: z.string().optional()
+          })).optional()
+        })
+      ])).optional(),
+      actions: z.object({
+        onEntry: z.array(z.object({
+          type: z.string(),
+          target: z.string().optional(),
+          value: z.any().optional()
+        })).optional(),
+        onExit: z.array(z.object({
+          type: z.string(),
+          target: z.string().optional(),
+          value: z.any().optional()
+        })).optional()
+      }).optional()
+    }))
+  }),
+  inputs: z.array(z.any()).optional(),
+  outputs: z.array(z.any()).optional()
+});
+export type FSMNode = z.infer<typeof FSMNodeSchema>;
+
 // StateMultiplexer Node Schema
 export const StateMultiplexerNodeSchema = BaseNodeSchema.extend({
   type: z.literal("StateMultiplexer"),
-  inputs: z.array(z.object({
-    name: z.string(),
-    interface: z.object({
-      type: z.string(),
-      requiredFields: z.array(z.string())
-    }),
-    required: z.boolean()
-  })),
-  outputs: z.array(z.object({
-    name: z.string(),
-    destinationNodeId: z.string(),
-    destinationInputName: z.string(),
-    interface: z.object({
-      type: z.string(),
-      requiredFields: z.array(z.string())
-    })
-  })),
-  routes: z.array(z.object({
-    condition: z.string(),
-    outputName: z.string(),
-    action: z.object({
-      type: z.string(),
-      data: z.any()
-    })
-  })),
-  defaultOutput: z.string().optional()
+  config: z.object({
+    routes: z.array(z.object({
+      condition: z.string(),
+      outputId: z.string()
+    })),
+    defaultRoute: z.object({
+      outputId: z.string()
+    }).optional()
+  }),
+  inputs: z.array(z.any()).optional(),
+  outputs: z.array(z.any()).optional()
 });
 export type StateMultiplexerNode = z.infer<typeof StateMultiplexerNodeSchema>;
 
 // Union type for all nodes
-export const AnyNodeSchema = z.union([DataSourceNodeSchema, QueueNodeSchema, ProcessNodeSchema, FSMProcessNodeSchema, EnhancedFSMProcessNodeSchema, SinkNodeSchema, ModuleNodeSchema, GroupNodeSchema, StateMultiplexerNodeSchema]);
+export const AnyNodeSchema = z.union([DataSourceNodeSchema, QueueNodeSchema, ProcessNodeSchema, FSMProcessNodeSchema, EnhancedFSMProcessNodeSchema, FSMNodeSchema, SinkNodeSchema, ModuleNodeSchema, GroupNodeSchema, StateMultiplexerNodeSchema]);
 export type AnyNode = z.infer<typeof AnyNodeSchema>;
 
 // Scenario Schema
@@ -445,6 +467,19 @@ export interface ModuleState extends NodeState {
   internalEventCounter: number;
 }
 
+export interface FSMState extends NodeState {
+  currentState: string;
+  variables: Record<string, any>;
+  inputBuffer: Token[];
+  outputBuffer: Token[];
+  stateHistory: Array<{
+    timestamp: number;
+    fromState: string;
+    toState: string;
+    event: string;
+  }>;
+}
+
 export interface StateMultiplexerState extends NodeState {
   // Input buffers for processing
   inputBuffers: Record<string, Token[]>;
@@ -455,7 +490,7 @@ export interface StateMultiplexerState extends NodeState {
   lastMatchedRoutes: string[];
 }
 
-export type AnyNodeState = DataSourceState | QueueState | ProcessNodeState | FSMProcessNodeState | EnhancedFSMProcessNodeState | SinkState | ModuleState | StateMultiplexerState;
+export type AnyNodeState = DataSourceState | QueueState | ProcessNodeState | FSMProcessNodeState | EnhancedFSMProcessNodeState | FSMState | SinkState | ModuleState | StateMultiplexerState;
 
 // For React Flow
 export interface RFNodeData {

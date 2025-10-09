@@ -56,13 +56,42 @@ export function validateScenario(data: any): { scenario: Scenario | null; errors
         // Sink nodes don't need additional validation beyond schema
         break;
 
+      case "FSM":
+        // Validate FSM outputs
+        if (node.outputs) {
+          node.outputs.forEach(output => {
+            if (output.destinationNodeId && !nodeIds.has(output.destinationNodeId)) {
+              errors.push(`FSM "${node.nodeId}": output destinationNodeId "${output.destinationNodeId}" does not exist.`);
+            }
+          });
+        }
+        // Validate FSM inputs
+        if (node.inputs) {
+          node.inputs.forEach(input => {
+            if (input.nodeId && !nodeIds.has(input.nodeId)) {
+              errors.push(`FSM "${node.nodeId}": input nodeId "${input.nodeId}" does not exist.`);
+            }
+          });
+        }
+        break;
+
       case "StateMultiplexer":
         // Validate outputs
-        node.outputs.forEach(output => {
-          if (output.destinationNodeId && !nodeIds.has(output.destinationNodeId)) {
-            errors.push(`StateMultiplexer "${node.nodeId}": output destinationNodeId "${output.destinationNodeId}" does not exist.`);
-          }
-        });
+        if (node.outputs) {
+          node.outputs.forEach(output => {
+            if (output.destinationNodeId && !nodeIds.has(output.destinationNodeId)) {
+              errors.push(`StateMultiplexer "${node.nodeId}": output destinationNodeId "${output.destinationNodeId}" does not exist.`);
+            }
+          });
+        }
+        // Validate inputs
+        if (node.inputs) {
+          node.inputs.forEach(input => {
+            if (input.nodeId && !nodeIds.has(input.nodeId)) {
+              errors.push(`StateMultiplexer "${node.nodeId}": input nodeId "${input.nodeId}" does not exist.`);
+            }
+          });
+        }
         break;
     }
   });
