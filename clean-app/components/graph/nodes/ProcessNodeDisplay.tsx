@@ -103,17 +103,28 @@ const ProcessNodeDisplay: React.FC<NodeProps<RFNodeData>> = ({ data, selected, i
         {data.error && <p className="mt-1 text-destructive text-xs">{data.error}</p>}
       </CardContent>
       {/* Input Handles */}
+      {/* Show existing named inputs */}
       {config.inputs.map((input, index) => (
         <Handle
           key={`input-${input.name}-${index}`}
           type="target"
           position={Position.Left}
-          id={`input-${input.name}`}
-          style={{ top: `${(index + 1) * (100 / (numInputs + 1))}%` }}
+          id={input.name}
+          style={{ top: `${(index + 1) * (100 / (numInputs + 2))}%` }}
           className="w-4 h-4 !bg-secondary hover:!bg-secondary/80 transition-all"
-          title={`Input ${index + 1} (${input.alias || input.name})`}
+          title={`Input: ${input.alias || input.name} (from ${input.nodeId})`}
         />
       ))}
+      {/* ALWAYS show a default "input" handle for adding NEW connections */}
+      <Handle
+        key="input-default"
+        type="target"
+        position={Position.Left}
+        id="input"
+        style={{ top: `${(numInputs + 1) * (100 / (numInputs + 2))}%` }}
+        className="w-4 h-4 !bg-green-500 hover:!bg-green-600 transition-all border-2 border-white"
+        title="➕ Connect here to add a new input"
+      />
       {/* Output Handles */}
       {config.outputs.map((output, index) => (
         <Handle
@@ -123,7 +134,7 @@ const ProcessNodeDisplay: React.FC<NodeProps<RFNodeData>> = ({ data, selected, i
           id={`output-${output.name}`}
           style={{ top: `${(index + 1) * (100 / (numOutputs + 1))}%` }}
           className="w-4 h-4 !bg-primary hover:!bg-primary/80 transition-all"
-          title={`Output ${output.name} → ${output.destinationNodeId}`}
+          title={`Output ${output.name} → ${output.destinationNodeId || 'not connected'}`}
         />
       ))}
     </Card>

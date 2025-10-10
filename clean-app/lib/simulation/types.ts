@@ -259,6 +259,7 @@ export type FSMDefinition = z.infer<typeof FSMDefinitionSchema>;
 export const FSMProcessNodeSchema = BaseNodeSchema.extend({
   type: z.literal("FSMProcessNode"),
   inputs: z.array(InputV3Schema),
+  outputs: z.array(OutputV3Schema).optional(), // CRITICAL: FSM can have outputs for state changes
   fsm: FSMDefinitionSchema, // Native FSL definition with dynamic outputs
   fsl: z.string().optional(), // Raw FSL string for display/editing
 });

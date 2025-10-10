@@ -342,6 +342,18 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
     }
 
     console.log('🔄 Loading scenario with data:', scenarioData);
+    
+    // Log FSM nodes in incoming scenario BEFORE validation
+    const fsmNodes = scenarioData?.nodes?.filter((n: any) => n.type === 'FSMProcessNode') || [];
+    fsmNodes.forEach((fsm: any) => {
+      console.log(`📥 [LOAD SCENARIO] FSM ${fsm.nodeId} incoming:`, {
+        hasOutputs: !!fsm.outputs,
+        outputsLength: fsm.outputs?.length || 0,
+        outputNames: fsm.outputs?.map((o: any) => o.name) || [],
+        fsmOutputs: fsm.fsm?.outputs || []
+      });
+    });
+    
     const { scenario: parsedScenario, errors } = validateScenario(scenarioData);
     console.log('🔍 Validation result - errors:', errors.length, 'parsed scenario:', !!parsedScenario);
     if (errors.length > 0) {
@@ -373,6 +385,137 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
     const nodesConfig: Record<string, AnyNode> = {};
     const initialNodeStates: Record<string, AnyNodeState> = {};
     const initialLogs: Record<string, HistoryEntry[]> = {};
+
+    // Pre-process nodes: ensure FSM nodes have outputs array initialized from fsm.outputs
+    parsedScenario.nodes = parsedScenario.nodes.map(node => {
+      if (node.type === 'FSMProcessNode' && (node as any).fsm?.outputs) {
+        const fsmOutputNames = (node as any).fsm.outputs;
+        
+        console.log(`🔍 [INIT FSM] Processing FSM ${node.nodeId}:`, {
+          fsmOutputs: fsmOutputNames,
+          hasNodeOutputs: !!node.outputs,
+          nodeOutputsLength: node.outputs?.length || 0,
+          nodeOutputNames: node.outputs?.map((o: any) => o.name) || []
+        });
+        
+        // If node already has outputs array, check if they match fsm.outputs
+        if (node.outputs && node.outputs.length > 0) {
+          const existingOutputNames = new Set(node.outputs.map((o: any) => o.name));
+          const allFsmOutputsPresent = fsmOutputNames.every((name: string) => existingOutputNames.has(name));
+          
+          if (allFsmOutputsPresent) {
+            // All fsm.outputs are in node.outputs - good!
+            console.log(`✅ [INIT FSM] FSM ${node.nodeId} outputs match fsm.outputs`);
+            return node;
+          }
+          
+          // Check if node.outputs has EXTRA outputs not in fsm.outputs
+          const extraOutputs = node.outputs.filter((o: any) => !fsmOutputNames.includes(o.name));
+          if (extraOutputs.length > 0) {
+            console.warn(`⚠️ [INIT FSM] FSM ${node.nodeId} has outputs not in fsm.outputs:`, extraOutputs.map((o: any) => o.name));
+            console.warn(`⚠️ [INIT FSM] Current fsm.outputs:`, fsmOutputNames);
+            
+            // Check if any extra outputs have connections
+            const connectedExtraOutputs = extraOutputs.filter((o: any) => 
+              o.destinationNodeId && o.destinationNodeId.trim() !== ''
+            );
+            
+            if (connectedExtraOutputs.length > 0) {
+              // CRITICAL FIX: If extra outputs have connections, UPDATE fsm.outputs to include them
+              console.warn(`🔧 [INIT FSM] FSM ${node.nodeId} has connected outputs not in fsm.outputs. Updating fsm.outputs to include:`, connectedExtraOutputs.map((o: any) => o.name));
+              
+              const updatedFsmOutputs = [...fsmOutputNames, ...connectedExtraOutputs.map((o: any) => o.name)];
+              
+              // Keep ALL outputs (both from fsm.outputs and connected extras)
+              const validOutputNames = new Set(node.outputs.map((o: any) => o.name));
+              const missingOutputs = fsmOutputNames.filter((name: string) => !validOutputNames.has(name));
+              
+              if (missingOutputs.length > 0) {
+                console.log(`➕ [INIT FSM] Adding missing fsm.outputs to FSM ${node.nodeId}:`, missingOutputs);
+                return {
+                  ...node,
+                  fsm: {
+                    ...(node as any).fsm,
+                    outputs: updatedFsmOutputs
+                  },
+                  outputs: [
+                    ...node.outputs,
+                    ...missingOutputs.map((outputName: string) => ({
+                      name: outputName,
+                      destinationNodeId: '',
+                      destinationInputName: '',
+                      interface: { type: 'StateContext', requiredFields: ['data.currentState', 'data.context'] }
+                    }))
+                  ]
+                };
+              }
+              
+              return {
+                ...node,
+                fsm: {
+                  ...(node as any).fsm,
+                  outputs: updatedFsmOutputs
+                }
+              };
+            } else {
+              // Extra outputs have no connections - remove them and keep only fsm.outputs
+              console.warn(`🗑️ [INIT FSM] Removing unconnected outputs not in fsm.outputs from FSM ${node.nodeId}:`, extraOutputs.map((o: any) => o.name));
+              
+              const validOutputs = node.outputs.filter((o: any) => fsmOutputNames.includes(o.name));
+              const validOutputNames = new Set(validOutputs.map((o: any) => o.name));
+              const missingOutputs = fsmOutputNames.filter((name: string) => !validOutputNames.has(name));
+              
+              if (missingOutputs.length > 0) {
+                console.log(`➕ [INIT FSM] Adding missing fsm.outputs to FSM ${node.nodeId}:`, missingOutputs);
+                return {
+                  ...node,
+                  outputs: [
+                    ...validOutputs,
+                    ...missingOutputs.map((outputName: string) => ({
+                      name: outputName,
+                      destinationNodeId: '',
+                      destinationInputName: '',
+                      interface: { type: 'StateContext', requiredFields: ['data.currentState', 'data.context'] }
+                    }))
+                  ]
+                };
+              }
+              
+              return { ...node, outputs: validOutputs };
+            }
+          }
+          
+          // Some fsm.outputs are missing from node.outputs
+          const missingOutputs = fsmOutputNames.filter((name: string) => !existingOutputNames.has(name));
+          console.log(`➕ [INIT FSM] Adding missing outputs to FSM ${node.nodeId}:`, missingOutputs);
+          return {
+            ...node,
+            outputs: [
+              ...node.outputs,
+              ...missingOutputs.map((outputName: string) => ({
+                name: outputName,
+                destinationNodeId: '',
+                destinationInputName: '',
+                interface: { type: 'StateContext', requiredFields: ['data.currentState', 'data.context'] }
+              }))
+            ]
+          };
+        } else {
+          // No outputs array, create from fsm.outputs
+          console.log(`🔧 [INIT FSM] Creating outputs array for FSM ${node.nodeId} from fsm.outputs:`, fsmOutputNames);
+          return {
+            ...node,
+            outputs: fsmOutputNames.map((outputName: string) => ({
+              name: outputName,
+              destinationNodeId: '',
+              destinationInputName: '',
+              interface: { type: 'StateContext', requiredFields: ['data.currentState', 'data.context'] }
+            }))
+          };
+        }
+      }
+      return node;
+    });
 
     parsedScenario.nodes.forEach(node => {
       nodesConfig[node.nodeId] = node;
@@ -408,6 +551,33 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
               transitionHistory: []
             }
           } as ProcessNodeState;
+          break;
+        case "FSMProcessNode":
+          const fsmNode = node as any; // FSMProcessNode type
+          const fsmInputBuffers: Record<string, Token[]> = {};
+          const initialState = fsmNode.fsm?.initialState || fsmNode.fsm?.states?.[0] || "idle";
+          initialNodeStates[node.nodeId] = {
+            inputBuffers: fsmInputBuffers,
+            fsmVariables: { ...fsmNode.fsm?.variables } || {},
+            currentFSMState: initialState,
+            lastTransitionTime: -1,
+            stateMachine: {
+              currentState: initialState,
+              transitionHistory: []
+            }
+          } as any; // FSMProcessNodeState;
+          break;
+        case "StateMultiplexer":
+          // StateMultiplexer nodes route inputs to outputs based on conditions
+          const multiplexerInputBuffers: Record<string, Token[]> = {};
+          initialNodeStates[node.nodeId] = {
+            inputBuffers: multiplexerInputBuffers,
+            lastProcessedTime: -1,
+            stateMachine: {
+              currentState: "multiplexer_idle",
+              transitionHistory: []
+            }
+          } as any;
           break;
         case "Sink":
           initialNodeStates[node.nodeId] = {
@@ -1533,11 +1703,17 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
 
   updateNodeConfigInStore: (nodeId, newConfigData) => {
     const currentState = get();
-    if (!currentState.scenario?.nodes) return false;
+    if (!currentState.scenario?.nodes) {
+      console.error('❌ [UPDATE NODE] No scenario or nodes found');
+      return false;
+    }
 
     // Find the node and update its configuration
     const nodeIndex = currentState.scenario.nodes.findIndex(node => node.nodeId === nodeId);
-    if (nodeIndex === -1) return false;
+    if (nodeIndex === -1) {
+      console.error('❌ [UPDATE NODE] Node not found:', nodeId);
+      return false;
+    }
 
     // Save snapshot for undo functionality
     currentState.saveSnapshot(`Update ${currentState.scenario.nodes[nodeIndex].displayName || nodeId} configuration`);
@@ -1547,17 +1723,27 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       if (!state.scenario?.nodes) return state;
 
       const updatedNodes = [...state.scenario.nodes];
-      updatedNodes[nodeIndex] = {
+      const updatedNode = {
         ...updatedNodes[nodeIndex],
         ...newConfigData
       };
+      updatedNodes[nodeIndex] = updatedNode;
+
+      // Also update nodesConfig map for consistency
+      const updatedNodesConfig = {
+        ...state.nodesConfig,
+        [nodeId]: updatedNode
+      };
+
+      console.log('✅ [UPDATE NODE] Updated node:', nodeId, 'New config:', updatedNode);
 
       return {
         ...state,
         scenario: {
           ...state.scenario,
           nodes: updatedNodes
-        }
+        },
+        nodesConfig: updatedNodesConfig
       };
     });
 

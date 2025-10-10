@@ -1,0 +1,290 @@
+{
+  "version": "3.0",
+  "nodes": [
+    {
+      "nodeId": "tqpi61ko0",
+      "displayName": "Number Generator",
+      "position": {
+        "x": 50,
+        "y": 200
+      },
+      "type": "DataSource",
+      "interval": 2,
+      "outputs": [
+        {
+          "name": "output",
+          "destinationNodeId": "or93uukvy",
+          "destinationInputName": "number",
+          "interface": {
+            "type": "number",
+            "requiredFields": []
+          }
+        }
+      ],
+      "generation": {
+        "type": "random",
+        "valueMin": 1,
+        "valueMax": 10
+      }
+    },
+    {
+      "nodeId": "or93uukvy",
+      "displayName": "Number to Message",
+      "position": {
+        "x": 250,
+        "y": 200
+      },
+      "type": "ProcessNode",
+      "inputs": [
+        {
+          "name": "number",
+          "nodeId": "tqpi61ko0",
+          "sourceOutputName": "output",
+          "interface": {
+            "type": "number",
+            "requiredFields": []
+          },
+          "alias": "num",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "message",
+          "destinationNodeId": "nvzyfy17m",
+          "destinationInputName": "event",
+          "interface": {
+            "type": "string",
+            "requiredFields": []
+          },
+          "transformation": {
+            "formula": "num <= 3 ? \"token_received\" : num <= 6 ? \"processing_complete\" : \"reset\"",
+            "fieldMapping": {}
+          }
+        }
+      ]
+    },
+    {
+      "nodeId": "nvzyfy17m",
+      "displayName": "State Machine",
+      "position": {
+        "x": 450,
+        "y": 200
+      },
+      "type": "FSMProcessNode",
+      "inputs": [
+        {
+          "name": "event",
+          "nodeId": "or93uukvy",
+          "sourceOutputName": "message",
+          "interface": {
+            "type": "string",
+            "requiredFields": []
+          },
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "state",
+          "destinationNodeId": "",
+          "destinationInputName": "",
+          "interface": {
+            "type": "StateContext",
+            "requiredFields": [
+              "data.currentState",
+              "data.context"
+            ]
+          }
+        }
+      ],
+      "fsm": {
+        "states": [
+          "idle",
+          "processing",
+          "complete"
+        ],
+        "initialState": "idle",
+        "transitions": [
+          {
+            "from": "idle",
+            "to": "processing",
+            "trigger": "token_received"
+          },
+          {
+            "from": "processing",
+            "to": "complete",
+            "trigger": "processing_complete"
+          },
+          {
+            "from": "complete",
+            "to": "idle",
+            "trigger": "reset"
+          }
+        ],
+        "stateActions": {
+          "idle": {
+            "onEntry": {
+              "state": "\"idle\""
+            }
+          },
+          "processing": {
+            "onEntry": {
+              "state": "\"processing\""
+            }
+          },
+          "complete": {
+            "onEntry": {
+              "state": "\"complete\""
+            }
+          }
+        },
+        "outputs": [
+          "state"
+        ]
+      }
+    },
+    {
+      "nodeId": "1gexcorvo",
+      "displayName": "Idle State Sink",
+      "position": {
+        "x": 1113.4847181147752,
+        "y": 93.69653784414413
+      },
+      "type": "Sink",
+      "inputs": [
+        {
+          "name": "input",
+          "nodeId": "StateMultiplexer_1760039800089",
+          "sourceOutputName": "output1",
+          "interface": {
+            "type": "any",
+            "requiredFields": []
+          },
+          "required": true
+        }
+      ]
+    },
+    {
+      "nodeId": "fna6nbrb8",
+      "displayName": "Processing State Sink",
+      "position": {
+        "x": 1153.8268759122525,
+        "y": 254.2097745403604
+      },
+      "type": "Sink",
+      "inputs": [
+        {
+          "name": "input",
+          "nodeId": "StateMultiplexer_1760039800089",
+          "sourceOutputName": "output2",
+          "interface": {
+            "type": "any",
+            "requiredFields": []
+          },
+          "required": true
+        }
+      ]
+    },
+    {
+      "nodeId": "4ef09adbb",
+      "displayName": "Complete State Sink",
+      "position": {
+        "x": 1166.9962056850566,
+        "y": 472.1487624866031
+      },
+      "type": "Sink",
+      "inputs": [
+        {
+          "name": "input",
+          "nodeId": "StateMultiplexer_1760039800089",
+          "sourceOutputName": "output3",
+          "interface": {
+            "type": "any",
+            "requiredFields": []
+          },
+          "required": true
+        }
+      ]
+    },
+    {
+      "nodeId": "StateMultiplexer_1760039800089",
+      "displayName": "State Router",
+      "position": {
+        "x": 706.176344024944,
+        "y": 182.9127058870817
+      },
+      "type": "StateMultiplexer",
+      "inputs": [
+        {
+          "name": "input",
+          "nodeId": "",
+          "sourceOutputName": "",
+          "interface": {
+            "type": "StateContext",
+            "requiredFields": []
+          },
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output1",
+          "destinationNodeId": "1gexcorvo",
+          "destinationInputName": "input",
+          "interface": {
+            "type": "Any",
+            "requiredFields": []
+          }
+        },
+        {
+          "name": "output2",
+          "destinationNodeId": "fna6nbrb8",
+          "destinationInputName": "input",
+          "interface": {
+            "type": "Any",
+            "requiredFields": []
+          }
+        },
+        {
+          "name": "output3",
+          "destinationNodeId": "4ef09adbb",
+          "destinationInputName": "input",
+          "interface": {
+            "type": "Any",
+            "requiredFields": []
+          }
+        }
+      ],
+      "config": {
+        "routes": [
+          {
+            "condition": "input.data.currentState === 'idle'",
+            "outputName": "output1",
+            "action": {
+              "type": "emit",
+              "data": "input"
+            }
+          },
+          {
+            "condition": "input.data.currentState === 'processing'",
+            "outputName": "output2",
+            "action": {
+              "type": "emit",
+              "data": "input"
+            }
+          },
+          {
+            "condition": "input.data.currentState === 'complete'",
+            "outputName": "output3",
+            "action": {
+              "type": "emit",
+              "data": "input"
+            }
+          }
+        ],
+        "defaultOutput": "output1"
+      }
+    }
+  ]
+}

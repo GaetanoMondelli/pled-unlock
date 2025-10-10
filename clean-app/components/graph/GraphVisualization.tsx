@@ -9,7 +9,13 @@ import DecoupledFSMNodeDisplay from "./nodes/DecoupledFSMNodeDisplay";
 import StateMultiplexerDisplay from "./nodes/StateMultiplexerDisplay";
 import ModuleNodeDisplay from "./nodes/ModuleNodeDisplay";
 import GroupNodeDisplay from "./nodes/GroupNodeDisplay";
-import { type AnyNode, type RFEdgeData, type RFNodeData } from "@/lib/simulation/types";
+import {
+  type AnyNode,
+  type RFEdgeData,
+  type RFNodeData,
+  type AnyNodeState,
+  type StateMachineInfo,
+} from "@/lib/simulation/types";
 import { useSimulationStore } from "@/stores/simulationStore";
 import { cn } from "@/lib/utils";
 import ReactFlow, {
@@ -44,6 +50,18 @@ const nodeTypes = {
 
 const edgeTypes = {
   default: DeletableEdge,
+};
+
+const hasStateMachine = (
+  state?: AnyNodeState,
+): state is AnyNodeState & { stateMachine: StateMachineInfo } => {
+  return Boolean(state && "stateMachine" in state && state.stateMachine);
+};
+
+const getStateDisplayName = (state?: string) => {
+  if (!state) return undefined;
+  const [, ...rest] = state.split("_");
+  return rest.length > 0 ? rest.join("_") : state;
 };
 
 const GraphVisualization: React.FC = () => {
@@ -201,23 +219,62 @@ const GraphVisualization: React.FC = () => {
       saveSnapshot('Delete edges');
       
       const deletedEdgeIds = edgeDeleteChanges.map(change => change.id);
+      console.log('🗑️ [DELETE EDGES] Deleting edges:', deletedEdgeIds);
+      
+      // Parse edge IDs to get connection info: e-{sourceId}-{outputName}-{targetId}
+      const deletedConnections = deletedEdgeIds.map(edgeId => {
+        const parts = edgeId.split('-');
+        if (parts.length >= 4) {
+          return {
+            sourceId: parts[1],
+            outputName: parts[2],
+            targetId: parts.slice(3).join('-') // Handle IDs with dashes
+          };
+        }
+        return null;
+      }).filter(Boolean);
       
       const updatedNodes = scenario.nodes.map(node => {
+        let updatedNode = { ...node };
+        
+        // Update source nodes: clear destinationNodeId in outputs
         if (node.outputs) {
-          // Check if any of this node's edges were deleted
           const updatedOutputs = node.outputs.map((output) => {
             const expectedEdgeId = `e-${node.nodeId}-${output.name}-${output.destinationNodeId}`;
             if (deletedEdgeIds.includes(expectedEdgeId)) {
+              console.log(`🗑️ Clearing output ${output.name} on node ${node.nodeId}`);
               return { ...output, destinationNodeId: '' };
             }
             return output;
           });
-          return { ...node, outputs: updatedOutputs };
+          updatedNode = { ...updatedNode, outputs: updatedOutputs };
         }
-        return node;
+        
+        // Update target nodes: remove inputs that reference deleted connections
+        if (node.inputs && node.inputs.length > 0) {
+          const updatedInputs = node.inputs.filter(input => {
+            // Check if this input is part of a deleted connection
+            const isDeleted = deletedConnections.some(conn => 
+              conn && 
+              conn.sourceId === input.nodeId && 
+              conn.targetId === node.nodeId &&
+              conn.outputName === input.sourceOutputName
+            );
+            
+            if (isDeleted) {
+              console.log(`🗑️ Removing input ${input.name} from node ${node.nodeId} (was from ${input.nodeId})`);
+            }
+            
+            return !isDeleted;
+          });
+          updatedNode = { ...updatedNode, inputs: updatedInputs };
+        }
+        
+        return updatedNode;
       });
       
       const updatedScenario = { ...scenario, nodes: updatedNodes };
+      console.log('🗑️ [DELETE EDGES] Updated scenario');
       loadScenario(updatedScenario);
     } else {
       // Only apply direct visual changes if we didn't update the scenario
@@ -229,18 +286,115 @@ const GraphVisualization: React.FC = () => {
     (params: Connection) => {
       if (!params.source || !params.target || !scenario) return;
 
+      const sourceNode = scenario.nodes.find(n => n.nodeId === params.source);
+      const targetNode = scenario.nodes.find(n => n.nodeId === params.target);
+      
+      console.log('🔗 [CONNECT] Attempting connection:', {
+        source: params.source,
+        sourceType: sourceNode?.type,
+        sourceHandle: params.sourceHandle,
+        sourceOutputs: sourceNode?.outputs?.map(o => o.name),
+        sourceFsmOutputs: (sourceNode as any)?.fsm?.outputs,
+        target: params.target,
+        targetType: targetNode?.type,
+        targetHandle: params.targetHandle,
+        targetInputs: targetNode?.inputs?.map(i => i.name),
+      });
+
+      // Validate that source and target nodes exist
+      if (!sourceNode || !targetNode) {
+        console.error('❌ [CONNECT] Source or target node not found!');
+        return;
+      }
+      
+      // CRITICAL: Validate source handle exists
+      if (!params.sourceHandle) {
+        console.error('❌ [CONNECT] No sourceHandle provided!', params);
+        return;
+      }
+
       // Save snapshot before creating connection
       saveSnapshot('Create connection');
 
       // Update the scenario JSON to reflect the new connection
       const updatedNodes = scenario.nodes.map(node => {
         if (node.nodeId === params.source) {
-          // Handle nodes with outputs array (V3 format)
-          if (node.outputs) {
-            // Use sourceHandle directly as it now matches the output name
-            const outputName = params.sourceHandle || 'output';
+          // Get the source handle name (this is what the user connected from)
+          const sourceHandleName = params.sourceHandle || 'output';
+          
+          // Special handling for FSMProcessNode - ensure it has the required output structure
+          if (node.type === 'FSMProcessNode') {
+            // CRITICAL: sourceHandleName is the ACTUAL handle ID from the FSM display
+            // FSM displays use output names from fsm.outputs as handle IDs
+            // So sourceHandleName IS the correct output name to use
+            const outputName = sourceHandleName || 'state';
+            
+            console.log('🔗 [FSM CONNECT] Connecting FSM output:', {
+              handleName: sourceHandleName,
+              outputName,
+              fsmOutputs: (node as any).fsm?.outputs,
+              existingOutputs: node.outputs?.map(o => o.name)
+            });
+            
+            // Check if node already has outputs array
+            if (node.outputs && node.outputs.length > 0) {
+              // Check if this specific output already exists
+              const existingOutputIndex = node.outputs.findIndex(o => o.name === outputName);
+              
+              if (existingOutputIndex !== -1) {
+                // Update existing output
+                const updatedOutputs = node.outputs.map(output => {
+                  if (output.name === outputName) {
+                    console.log('🔄 Updating existing FSM output:', outputName);
+                    return {
+                      ...output,
+                      destinationNodeId: params.target,
+                      destinationInputName: params.targetHandle || 'input'
+                    };
+                  }
+                  return output;
+                });
+                return { ...node, outputs: updatedOutputs };
+              } else {
+                // Add new output to existing array
+                console.log('➕ Adding new FSM output:', outputName);
+                return {
+                  ...node,
+                  outputs: [...node.outputs, {
+                    name: outputName,
+                    destinationNodeId: params.target,
+                    destinationInputName: params.targetHandle || 'input',
+                    interface: { type: 'StateContext', requiredFields: ['data.currentState', 'data.context'] }
+                  }]
+                };
+              }
+            } else {
+              // Create new outputs array
+              console.log('🆕 Creating new FSM outputs array with:', outputName);
+              return {
+                ...node,
+                outputs: [{
+                  name: outputName,
+                  destinationNodeId: params.target,
+                  destinationInputName: params.targetHandle || 'input',
+                  interface: { type: 'StateContext', requiredFields: ['data.currentState', 'data.context'] }
+                }]
+              };
+            }
+          }
+          
+          // Handle nodes with outputs array (V3 format) - for other node types
+          if (node.outputs && node.outputs.length > 0) {
+            // Find the matching output by name
+            // For ProcessNode, handle ID is "output-{name}" so we need to strip the prefix
+            // For other nodes, handle ID is the output name directly
+            let matchingOutputName = sourceHandleName;
+            if (node.type === 'ProcessNode' && sourceHandleName.startsWith('output-')) {
+              matchingOutputName = sourceHandleName.replace('output-', '');
+            }
+            
             const updatedOutputs = node.outputs.map(output => {
-              if (output.name === outputName) {
+              if (output.name === matchingOutputName) {
                 return {
                   ...output,
                   destinationNodeId: params.target,
@@ -251,44 +405,63 @@ const GraphVisualization: React.FC = () => {
             });
             return { ...node, outputs: updatedOutputs };
           }
-          // Handle FSM nodes that might not have outputs defined yet
-          else if (node.type === 'FSMProcessNode') {
-            // Add outputs array if missing
-            return {
-              ...node,
-              outputs: [{
-                name: 'state_output',
-                destinationNodeId: params.target,
-                destinationInputName: params.targetHandle || 'input',
-                interface: { type: 'StateContext', requiredFields: ['data.currentState', 'data.context'] }
-              }]
-            };
-          }
         }
 
         // Also update the target node's inputs if needed
-        if (node.nodeId === params.target && node.inputs) {
-          const inputName = params.targetHandle || 'input';
-          const sourceOutputName = params.sourceHandle || 'output';
+        if (node.nodeId === params.target) {
+          let inputName = params.targetHandle || 'input';
+          let sourceOutputName = params.sourceHandle || 'output';
+          
+          // Normalize source output name based on source node type
+          const sourceNode = scenario.nodes.find(n => n.nodeId === params.source);
+          if (sourceNode?.type === 'ProcessNode' && sourceOutputName.startsWith('output-')) {
+            sourceOutputName = sourceOutputName.replace('output-', '');
+          }
 
-          // Check if this input already exists
-          const existingInput = node.inputs.find(input => input.name === inputName);
-          if (!existingInput) {
-            // Add new input connection
-            return {
-              ...node,
-              inputs: [...node.inputs, {
-                name: inputName,
-                nodeId: params.source,
-                sourceOutputName: sourceOutputName,
-                interface: { type: 'Any', requiredFields: [] },
-                required: false
-              }]
-            };
-          } else {
-            // Update existing input connection
-            const updatedInputs = node.inputs.map(input => {
-              if (input.name === inputName) {
+          // Initialize inputs array if it doesn't exist
+          const currentInputs = node.inputs || [];
+          
+          // Check if this node type supports multiple inputs
+          // Single-input nodes: Sink, Queue, StateMultiplexer (all have single "input" handle)
+          // FSMProcessNode has single "event" handle
+          // Multi-input nodes: ProcessNode (has dynamic "input" handle that creates new inputs)
+          const singleInputNodeTypes = ['Sink', 'Queue', 'StateMultiplexer', 'FSMProcessNode'];
+          const isSingleInputNode = singleInputNodeTypes.includes(node.type);
+          const isMultiInputNode = node.type === 'ProcessNode';
+          
+          console.log(`🔗 [INPUT HANDLING] Target: ${node.type}, handle: ${inputName}, existingInputs: ${currentInputs.length}`, {
+            isSingleInputNode,
+            isMultiInputNode,
+            currentInputNames: currentInputs.map(i => i.name)
+          });
+          
+          // For multi-input nodes (ProcessNode), generate unique input names when connecting to default "input" handle
+          if (isMultiInputNode && inputName === 'input' && currentInputs.length > 0) {
+            // Find next available input name: input_1, input_2, etc.
+            let counter = 1;
+            while (currentInputs.some(inp => inp.name === `input_${counter}`)) {
+              counter++;
+            }
+            inputName = `input_${counter}`;
+            console.log(`🆕 [MULTI-INPUT] Generated new input name: ${inputName} for ProcessNode`);
+          }
+          
+          // For single-input nodes, the input name stays the same (they only support ONE connection)
+          // We'll replace the existing input below if one exists
+          if (isSingleInputNode) {
+            console.log(`🔄 [SINGLE-INPUT] ${node.type} supports only one input connection via handle "${inputName}"`);
+          }
+          
+          // Check if this EXACT input connection already exists (same source and input name)
+          const existingInputIndex = currentInputs.findIndex(input => 
+            input.name === inputName && input.nodeId === params.source
+          );
+          
+          if (existingInputIndex !== -1) {
+            // Input already exists with same source - just update it (shouldn't change but for safety)
+            console.log(`✏️ Updating existing input ${inputName} on ${node.nodeId} from ${params.source}`);
+            const updatedInputs = currentInputs.map((input, idx) => {
+              if (idx === existingInputIndex) {
                 return {
                   ...input,
                   nodeId: params.source,
@@ -299,12 +472,69 @@ const GraphVisualization: React.FC = () => {
             });
             return { ...node, inputs: updatedInputs };
           }
+          
+          // Check if there's an input with same name but different source
+          const inputWithSameNameIndex = currentInputs.findIndex(input => input.name === inputName);
+          
+          if (inputWithSameNameIndex !== -1) {
+            // An input with this name exists but from a different source
+            // This could mean:
+            // 1. User is trying to replace the connection (if old connection still exists)
+            // 2. User deleted the old connection and wants to reuse the handle
+            
+            const existingInput = currentInputs[inputWithSameNameIndex];
+            
+            // Check if the existing input's source still has a connection to it
+            const oldSourceNode = scenario.nodes.find(n => n.nodeId === existingInput.nodeId);
+            const oldSourceStillConnected = oldSourceNode?.outputs?.some(out => 
+              out.destinationNodeId === node.nodeId && 
+              out.destinationInputName === inputName
+            );
+            
+            if (oldSourceStillConnected) {
+              // Old connection exists, user wants to replace it
+              console.log(`🔄 Replacing input ${inputName} on ${node.nodeId} from ${existingInput.nodeId} to ${params.source}`);
+            } else {
+              // Old connection was deleted, reusing the handle
+              console.log(`♻️ Reusing input ${inputName} on ${node.nodeId} for new connection from ${params.source}`);
+            }
+            
+            const updatedInputs = [...currentInputs];
+            updatedInputs[inputWithSameNameIndex] = {
+              name: inputName,
+              nodeId: params.source,
+              sourceOutputName: sourceOutputName,
+              interface: { type: 'Any', requiredFields: [] },
+              required: false
+            };
+            return { ...node, inputs: updatedInputs };
+          }
+          
+          // No existing input with this name - add new one
+          console.log(`➕ Adding new input ${inputName} on ${node.nodeId} from ${params.source}`);
+          return {
+            ...node,
+            inputs: [...currentInputs, {
+              name: inputName,
+              nodeId: params.source,
+              sourceOutputName: sourceOutputName,
+              interface: { type: 'Any', requiredFields: [] },
+              required: false
+            }]
+          };
         }
 
         return node;
       });
 
       const updatedScenario = { ...scenario, nodes: updatedNodes };
+      
+      // Log the updated nodes for debugging
+      const sourceNodeAfter = updatedNodes.find(n => n.nodeId === params.source);
+      const targetNodeAfter = updatedNodes.find(n => n.nodeId === params.target);
+      console.log('🔗 [CONNECT] After update - Source outputs:', sourceNodeAfter?.outputs);
+      console.log('🔗 [CONNECT] After update - Target inputs:', targetNodeAfter?.inputs);
+      
       loadScenario(updatedScenario);
     },
     [scenario, saveSnapshot, loadScenario],
@@ -425,32 +655,72 @@ const GraphVisualization: React.FC = () => {
       } else if (node.outputs) {
         // Handle regular node edges
         node.outputs.forEach((output, index) => {
-          if (output.destinationNodeId &&
-              output.destinationNodeId.trim() !== "" &&
-              visibleNodeIds.has(output.destinationNodeId)) {
+          const hasDestination = output.destinationNodeId && output.destinationNodeId.trim() !== "";
+          const isVisible = hasDestination && visibleNodeIds.has(output.destinationNodeId);
+          
+          console.log(`🔍 [EDGE CHECK] Checking output from ${node.nodeId} (${node.type}):`, {
+            outputName: output.name,
+            destinationNodeId: output.destinationNodeId,
+            destinationInputName: output.destinationInputName,
+            hasDestination,
+            isVisible
+          });
+          
+          // CRITICAL FIX: Must check destinationNodeId exists AND is not empty string
+          if (hasDestination && isVisible) {
             // Different nodes have different handle ID patterns
+            // IMPORTANT: Handle IDs must match what's defined in the node display components
             let sourceHandle: string | undefined;
             if (node.type === "ProcessNode") {
+              // ProcessNode uses "output-{name}" pattern
               sourceHandle = `output-${output.name}`;
-            } else if (node.type === "FSMProcessNode" || node.type === "StateMultiplexer") {
-              // These nodes use output names directly as handle IDs
+            } else if (node.type === "FSMProcessNode") {
+              // FSMProcessNode uses the output name directly (e.g., "state_output")
+              sourceHandle = output.name;
+            } else if (node.type === "StateMultiplexer") {
+              // StateMultiplexer uses output names directly
+              sourceHandle = output.name;
+            } else if (node.type === "DataSource") {
+              // DataSource uses "output" as the handle ID
+              sourceHandle = 'output';
+            } else {
+              // Default: use output name
               sourceHandle = output.name;
             }
 
-            // Get target handle if specified
+            // Get target handle - look up the input definition
             const targetNode = scenario.nodes.find(n => n.nodeId === output.destinationNodeId);
             let targetHandle: string | undefined;
-            if (targetNode && targetNode.inputs) {
+            if (targetNode && targetNode.inputs && targetNode.inputs.length > 0) {
+              // Find matching input by checking nodeId and sourceOutputName
               const targetInput = targetNode.inputs.find(input =>
                 input.nodeId === node.nodeId && input.sourceOutputName === output.name
               );
               if (targetInput) {
                 targetHandle = targetInput.name;
+                console.log(`✅ [EDGE CREATE] Found target input: ${targetHandle} for edge ${node.nodeId} → ${output.destinationNodeId}`);
+              } else {
+                // Fallback: use destinationInputName from output
+                targetHandle = output.destinationInputName || 'input';
+                console.log(`⚠️ [EDGE CREATE] No matching input found (inputs: ${targetNode.inputs.map(i => `${i.name}[from:${i.nodeId},out:${i.sourceOutputName}]`).join(', ')}), using destinationInputName: ${targetHandle}`);
               }
+            } else {
+              // No inputs defined, use destinationInputName or default
+              targetHandle = output.destinationInputName || 'input';
+              console.log(`⚠️ [EDGE CREATE] Target node has no inputs, using default: ${targetHandle}`);
             }
 
+            const edgeId = `e-${node.nodeId}-${output.name}-${output.destinationNodeId}`;
+            console.log(`➕ [EDGE CREATE] Creating edge: ${edgeId}`, {
+              sourceHandle,
+              targetHandle,
+              sourceType: node.type,
+              targetType: targetNode?.type,
+              output
+            });
+
             initialEdges.push({
-              id: `e-${node.nodeId}-${output.name}-${output.destinationNodeId}`,
+              id: edgeId,
               source: node.nodeId,
               sourceHandle,
               target: output.destinationNodeId,
@@ -519,6 +789,7 @@ const GraphVisualization: React.FC = () => {
       prevNodes.map(node => {
         const isActive = activeNodes.has(node.id);
         const nodeState = nodeStates[node.id];
+        const stateMachineInfo = hasStateMachine(nodeState) ? nodeState.stateMachine : undefined;
         const recentLogs = nodeActivityLogs[node.id]?.filter(log => currentTime - log.timestamp <= 2) || [];
         const latestLog = recentLogs[recentLogs.length - 1];
 
@@ -577,11 +848,13 @@ const GraphVisualization: React.FC = () => {
             details,
             error: latestLog?.action === "FORMULA_ERROR" ? latestLog.details : undefined,
             // Add state machine information
-            stateMachine: nodeState?.stateMachine ? {
-              currentState: nodeState.stateMachine.currentState,
-              stateDisplayName: nodeState.stateMachine.currentState.split('_')[1], // e.g., "queue_idle" -> "idle"
-              transitionCount: nodeState.stateMachine.transitionHistory?.length || 0,
-            } : undefined,
+            stateMachine: stateMachineInfo
+              ? {
+                  currentState: stateMachineInfo.currentState,
+                  stateDisplayName: getStateDisplayName(stateMachineInfo.currentState),
+                  transitionCount: stateMachineInfo.transitionHistory?.length || 0,
+                }
+              : undefined,
             // Add full node state for FSM nodes
             nodeState: node.data.config.type === "FSMProcessNode" ? nodeState : undefined,
           },

@@ -585,7 +585,8 @@ const ConfigSection: React.FC<{
   saveSnapshot: (description: string) => void;
   loadScenario: (scenario: any) => void;
   toast: any;
-}> = ({ nodeConfig, showJson, onToggleJson, editedConfigText, onConfigTextChange, onSaveConfig, hasUnsavedChanges, onResetConfig, scenario, saveSnapshot, loadScenario, toast }) => {
+  updateNodeConfigInStore: (nodeId: string, newConfigData: any) => boolean;
+}> = ({ nodeConfig, showJson, onToggleJson, editedConfigText, onConfigTextChange, onSaveConfig, hasUnsavedChanges, onResetConfig, scenario, saveSnapshot, loadScenario, toast, updateNodeConfigInStore }) => {
   const [expandedFormulas, setExpandedFormulas] = useState(new Set<number>());
 
   // Clean config (remove position and other UI stuff)
@@ -1949,6 +1950,7 @@ const NodeInspectorModal: React.FC = () => {
                   saveSnapshot={saveSnapshot}
                   loadScenario={loadScenario}
                   toast={toast}
+                  updateNodeConfigInStore={updateNodeConfigInStore}
                 />
                 <StateSection
                   nodeState={nodeState}

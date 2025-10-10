@@ -31,7 +31,10 @@ const FSMProcessNodeDisplay: React.FC<FSMProcessNodeDisplayProps> = ({ data, sel
   const inputBuffers = fsmState?.inputBuffers || {};
 
   // Count total tokens in input buffers
-  const totalInputTokens = Object.values(inputBuffers).reduce((sum: number, buffer: any[]) => sum + buffer.length, 0);
+  const totalInputTokens = Object.values(inputBuffers).reduce<number>((sum, buffer) => {
+    if (Array.isArray(buffer)) return sum + buffer.length;
+    return sum;
+  }, 0);
 
   const totalStates = fsmDefinition?.states?.length || 0;
 
@@ -229,16 +232,43 @@ const FSMProcessNodeDisplay: React.FC<FSMProcessNodeDisplayProps> = ({ data, sel
       )}
 
       {/* Connection Handles */}
+      {/* Input Handle */}
       <Handle
         type="target"
         position={Position.Left}
+        id="event"
         className="!bg-orange-500 !border-orange-600 !w-3 !h-3 !border-2"
+        title="Event input"
       />
-      <Handle
-        type="source"
-        position={Position.Right}
-        className="!bg-orange-500 !border-orange-600 !w-3 !h-3 !border-2"
-      />
+      
+      {/* Output Handles - one for each FSM output */}
+      {(() => {
+        if (fsmDefinition?.outputs && fsmDefinition.outputs.length > 0) {
+          console.log(`🎯 [FSM DISPLAY] Rendering ${fsmDefinition.outputs.length} output handles for FSM ${id}:`, fsmDefinition.outputs);
+          return fsmDefinition.outputs.map((outputName: string, index: number) => (
+            <Handle
+              key={outputName}
+              type="source"
+              position={Position.Right}
+              id={outputName}
+              style={{ top: `${(index + 1) * (100 / (fsmDefinition.outputs.length + 1))}%` }}
+              className="!bg-orange-500 !border-orange-600 !w-3 !h-3 !border-2"
+              title={`Output: ${outputName}`}
+            />
+          ));
+        } else {
+          console.warn(`⚠️ [FSM DISPLAY] FSM ${id} has no fsm.outputs defined! Using fallback handle "state_output". fsmDefinition:`, fsmDefinition);
+          return (
+            <Handle
+              type="source"
+              position={Position.Right}
+              id="state_output"
+              className="!bg-orange-500 !border-orange-600 !w-3 !h-3 !border-2"
+              title="State output (fallback)"
+            />
+          );
+        }
+      })()}
       </div>
 
       {/* FSM Configuration Modal */}

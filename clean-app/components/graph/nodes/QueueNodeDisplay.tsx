@@ -98,7 +98,8 @@ const QueueNodeDisplay: React.FC<NodeProps<RFNodeData>> = ({ data, selected, id 
       </CardContent>
       <Handle 
         type="target" 
-        position={Position.Left} 
+        position={Position.Left}
+        id="input" 
         className="w-4 h-4 !bg-secondary hover:!bg-secondary/80 transition-all"
         title="Input"
       />
