@@ -10,7 +10,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import type { HistoryEntry, Token } from "@/lib/simulation/types";
 import { useSimulationStore } from "@/stores/simulationStore";
 import { ActivityColors } from "@/lib/simulation/activityMessages";

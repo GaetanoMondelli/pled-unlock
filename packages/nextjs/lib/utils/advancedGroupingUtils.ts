@@ -233,8 +233,8 @@ function getTagColor(tagName: string): string {
 export function generateGroupedScenario(originalScenario: Scenario): Scenario {
   const allGroups = createAutomaticGroups(originalScenario);
 
-  // Filter groups based on enabledTagGroups if specified
-  const enabledTags = originalScenario.groups?.enabledTagGroups || [];
+  // Filter groups based on activeFilters if specified
+  const enabledTags = originalScenario.groups?.activeFilters || [];
   const groups = enabledTags.length > 0
     ? allGroups.filter(g => enabledTags.includes(g.tagName))
     : allGroups;
@@ -246,8 +246,12 @@ export function generateGroupedScenario(originalScenario: Scenario): Scenario {
   // Get stored group positions from scenario
   const storedGroupPositions = originalScenario.groups?.groupPositions || {};
 
-  // Create group nodes with stored positions
-  const groupNodes = groups.map(group => createGroupNodeFromInfo(group, storedGroupPositions));
+  // Create group nodes with stored positions (ensure x and y are defined)
+  const normalizedPositions: Record<string, { x: number; y: number }> = {};
+  Object.entries(storedGroupPositions).forEach(([key, pos]) => {
+    normalizedPositions[key] = { x: pos?.x ?? 0, y: pos?.y ?? 0 };
+  });
+  const groupNodes = groups.map(group => createGroupNodeFromInfo(group, normalizedPositions));
 
   // Filter out grouped nodes from the original nodes (when in grouped view)
   const groupedNodeIds = new Set<string>();
@@ -313,7 +317,7 @@ export function generateGroupedScenario(originalScenario: Scenario): Scenario {
     groups: {
       ...originalScenario.groups,
       visualMode: "grouped",
-      groupedNodeIds: Array.from(groupedNodeIds), // Track which nodes are grouped
+      activeFilters: Array.from(new Set(groups.map(g => g.tagName))), // Track active group tags
     },
   };
 }

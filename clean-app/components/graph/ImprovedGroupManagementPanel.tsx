@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSimulationStore } from "@/stores/simulationStore";
-import { toast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import {
   createAutomaticGroups,
   generateGroupedScenario,
@@ -35,6 +35,7 @@ const ImprovedGroupManagementPanel: React.FC<ImprovedGroupManagementPanelProps> 
   className,
   onNavigateToGroup,
 }) => {
+  const { toast } = useToast();
   const scenario = useSimulationStore(state => state.scenario);
   const loadScenario = useSimulationStore(state => state.loadScenario);
   const saveSnapshot = useSimulationStore(state => state.saveSnapshot);
@@ -49,7 +50,7 @@ const ImprovedGroupManagementPanel: React.FC<ImprovedGroupManagementPanelProps> 
   const [isGroupingEnabled, setIsGroupingEnabled] = useState(false);
   // Initialize enabled tag groups from scenario
   const [enabledTagGroups, setEnabledTagGroups] = useState<Set<string>>(() => {
-    const savedEnabledTags = scenario?.groups?.enabledTagGroups || [];
+    const savedEnabledTags = scenario?.groups?.activeFilters || [];
     return new Set(savedEnabledTags);
   });
 
@@ -95,14 +96,14 @@ const ImprovedGroupManagementPanel: React.FC<ImprovedGroupManagementPanelProps> 
   useEffect(() => {
     console.log("🔄 Scenario changed, checking grouping state:", scenario?.groups);
 
-    if (scenario?.groups?.enabledTagGroups && scenario.groups.enabledTagGroups.length > 0) {
-      const savedTags = new Set(scenario.groups.enabledTagGroups);
+    if (scenario?.groups?.activeFilters && scenario.groups.activeFilters.length > 0) {
+      const savedTags = new Set<string>(scenario.groups.activeFilters);
       console.log("📋 Found saved enabled tag groups:", Array.from(savedTags));
       setEnabledTagGroups(savedTags);
       setIsGroupingEnabled(true);
     } else if (scenario?.groups?.visualMode === "grouped") {
-      // Check if we're in grouped mode but no enabledTagGroups - infer from active groups
-      console.log("📋 In grouped mode but no enabledTagGroups, inferring from scenario");
+      // Check if we're in grouped mode but no activeFilters - infer from active groups
+      console.log("📋 In grouped mode but no activeFilters, inferring from scenario");
       const groupNodes = scenario.nodes.filter(n => n.type === "Group");
       if (groupNodes.length > 0) {
         const inferredTags = groupNodes.map(g => g.nodeId.replace('group_', ''));
@@ -240,7 +241,6 @@ const ImprovedGroupManagementPanel: React.FC<ImprovedGroupManagementPanelProps> 
             ...scenario.groups,
             visualMode: "all" as const,
             activeFilters: [],
-            enabledTagGroups: [],
           },
         });
       }
@@ -250,7 +250,7 @@ const ImprovedGroupManagementPanel: React.FC<ImprovedGroupManagementPanelProps> 
         ...scenario,
         groups: {
           ...scenario.groups,
-          enabledTagGroups: Array.from(newEnabledTags),
+          activeFilters: Array.from(newEnabledTags),
         },
       };
 
@@ -262,7 +262,6 @@ const ImprovedGroupManagementPanel: React.FC<ImprovedGroupManagementPanelProps> 
         ...updatedScenario.groups,
         visualMode: "grouped" as const,
         activeFilters: Array.from(newEnabledTags),
-        enabledTagGroups: Array.from(newEnabledTags),
       };
     } else {
       // Restore the original ungrouped scenario with all nodes and connections
@@ -274,7 +273,6 @@ const ImprovedGroupManagementPanel: React.FC<ImprovedGroupManagementPanelProps> 
             ...originalScenario.groups,
             visualMode: "all" as const,
             activeFilters: [],
-            enabledTagGroups: [],
           },
         };
         setOriginalScenario(null); // Clear stored scenario
@@ -288,7 +286,6 @@ const ImprovedGroupManagementPanel: React.FC<ImprovedGroupManagementPanelProps> 
             ...scenario.groups,
             visualMode: "all" as const,
             activeFilters: [],
-            enabledTagGroups: [],
           },
         };
       }
