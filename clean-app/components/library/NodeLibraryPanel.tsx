@@ -146,10 +146,10 @@ const NODE_TEMPLATES: NodeTemplate[] = [
       ],
       outputs: [
         {
-          name: "state_output",
+          name: "state",
           destinationNodeId: "",
-          destinationInputName: "input",
-          interface: { type: "StateContext", requiredFields: ["data.currentState", "data.context"] }
+          destinationInputName: "",
+          interface: { type: "SimpleValue", requiredFields: ["data.value"] }
         }
       ],
       fsm: {
@@ -173,8 +173,7 @@ const NODE_TEMPLATES: NodeTemplate[] = [
           }
         ],
         variables: {},
-        stateActions: {},
-        outputs: ["state_output"]
+        stateActions: {}
       },
       fsl: "state idle {\n  on token_received -> processing\n}\nstate processing {\n  on processing_complete -> complete\n}\nstate complete {\n  on reset -> idle\n}"
     }

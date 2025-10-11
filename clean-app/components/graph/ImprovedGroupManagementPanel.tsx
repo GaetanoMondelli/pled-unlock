@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSimulationStore } from "@/stores/simulationStore";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/hooks/use-toast";
 import {
   createAutomaticGroups,
   generateGroupedScenario,
@@ -44,7 +44,6 @@ const ImprovedGroupManagementPanel: React.FC<ImprovedGroupManagementPanelProps> 
   // Store the original ungrouped scenario to restore when ungrouping
   const [originalScenario, setOriginalScenario] = useState<any>(null);
 
-  const { toast } = useToast();
   const [newTagName, setNewTagName] = useState("");
   const [isCreateTagOpen, setIsCreateTagOpen] = useState(false);
   const [isGroupingEnabled, setIsGroupingEnabled] = useState(false);

@@ -2154,7 +2154,7 @@ const NodeInspectorModal: React.FC = () => {
                     <div className="flex justify-center bg-muted/20 border rounded-lg p-2 mb-3">
                       <NodeStateMachineDiagram
                         nodeConfig={nodeConfig}
-                        stateMachineInfo={nodeState?.stateMachine}
+                        stateMachineInfo={(nodeState as any)?.stateMachine}
                         width={600}
                         height={nodeConfig.type === 'FSMProcessNode' ? 300 : 200}
                         overrideActiveState={selectedEventState}
@@ -2171,7 +2171,7 @@ const NodeInspectorModal: React.FC = () => {
                   <h4 className="font-medium text-sm mb-2 flex-shrink-0 text-muted-foreground">Click events to see state changes</h4>
                   <NodeActivityLogWithStateTransitions
                     nodeId={selectedNodeId}
-                    stateMachineInfo={nodeState?.stateMachine}
+                    stateMachineInfo={(nodeState as any)?.stateMachine}
                     onEventClick={(event, stateAtTime) => {
                       // Handle event click to show state at that time
                       console.log('Event clicked:', event, 'State at time:', stateAtTime);

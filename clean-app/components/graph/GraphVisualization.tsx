@@ -5,7 +5,7 @@ import DataSourceNodeDisplay from "./nodes/DataSourceNodeDisplay";
 import ProcessNodeDisplay from "./nodes/ProcessNodeDisplay";
 import QueueNodeDisplay from "./nodes/QueueNodeDisplay";
 import SinkNodeDisplay from "./nodes/SinkNodeDisplay";
-import DecoupledFSMNodeDisplay from "./nodes/DecoupledFSMNodeDisplay";
+import FSMNodeDisplay from "./nodes/FSMNodeDisplay";
 import StateMultiplexerDisplay from "./nodes/StateMultiplexerDisplay";
 import ModuleNodeDisplay from "./nodes/ModuleNodeDisplay";
 import GroupNodeDisplay from "./nodes/GroupNodeDisplay";
@@ -41,7 +41,7 @@ const nodeTypes = {
   DataSource: DataSourceNodeDisplay,
   Queue: QueueNodeDisplay,
   ProcessNode: ProcessNodeDisplay,
-  FSMProcessNode: DecoupledFSMNodeDisplay,
+  FSMProcessNode: FSMNodeDisplay,
   StateMultiplexer: StateMultiplexerDisplay,
   Sink: SinkNodeDisplay,
   Module: ModuleNodeDisplay,
@@ -188,23 +188,38 @@ const GraphVisualization: React.FC = () => {
 
       // Clean up references in remaining nodes
       const cleanedNodes = updatedNodes.map(node => {
+        let cleanedNode = { ...node };
+        
         if (node.outputs) {
           // Clean up outputs that reference deleted nodes
-          const cleanedOutputs = node.outputs.map(output =>
-            deletedNodeIds.includes(output.destinationNodeId)
-              ? { ...output, destinationNodeId: '' }
-              : output
-          );
-          return { ...node, outputs: cleanedOutputs };
+          const cleanedOutputs = node.outputs.map(output => {
+            if (deletedNodeIds.includes(output.destinationNodeId)) {
+              console.log(`🧹 [CLEANUP] Clearing output from ${node.nodeId} (${node.displayName}) that referenced deleted node ${output.destinationNodeId}`);
+              return { ...output, destinationNodeId: '', destinationInputName: '' };
+            }
+            return output;
+          });
+          cleanedNode = { ...cleanedNode, outputs: cleanedOutputs };
         }
+        
         if (node.inputs) {
           // Clean up inputs that reference deleted nodes
-          const cleanedInputs = node.inputs.filter(input => input.nodeId && !deletedNodeIds.includes(input.nodeId));
-          return { ...node, inputs: cleanedInputs };
+          const cleanedInputs = node.inputs.filter(input => {
+            const shouldKeep = !input.nodeId || !deletedNodeIds.includes(input.nodeId);
+            if (!shouldKeep) {
+              console.log(`🧹 [CLEANUP] Removing input from ${node.nodeId} (${node.displayName}) that referenced deleted node ${input.nodeId}`);
+            }
+            return shouldKeep;
+          });
+          cleanedNode = { ...cleanedNode, inputs: cleanedInputs };
         }
-        return node;
+        
+        return cleanedNode;
       });
 
+      console.log(`💥 [NODE DELETION] Deleted nodes:`, deletedNodeIds);
+      console.log(`🔧 [NODE DELETION] Cleaned scenario has ${cleanedNodes.length} nodes`);
+      
       const updatedScenario = { ...scenario, nodes: cleanedNodes };
       console.log(`💥 [LOAD SCENARIO] From onNodesChange - node deletion, current time: ${currentTime}`);
       loadScenario(updatedScenario);
@@ -862,6 +877,20 @@ const GraphVisualization: React.FC = () => {
       }),
     );
   }, [activeNodes, nodeStates, nodeActivityLogs, currentTime]);
+  
+  // DEBUG: Log FSM state updates
+  useEffect(() => {
+    Object.entries(nodeStates).forEach(([nodeId, state]) => {
+      const nodeConfig = nodesConfig[nodeId];
+      if (nodeConfig?.type === 'FSMProcessNode') {
+        console.log(`🔍 [GRAPH VIZ] FSM ${nodeId} state update:`, {
+          currentFSMState: (state as any)?.currentFSMState,
+          inputBuffers: Object.keys((state as any)?.inputBuffers || {}),
+          messageCount: Object.values((state as any)?.inputBuffers || {}).reduce((sum: number, buf: any) => sum + (buf?.length || 0), 0)
+        });
+      }
+    });
+  }, [nodeStates]);
 
   // Update edge animations
   useEffect(() => {

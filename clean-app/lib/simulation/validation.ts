@@ -3,9 +3,11 @@ import { type AnyNode, type Scenario, ScenarioSchema } from "./types";
 export function validateScenario(data: any): { scenario: Scenario | null; errors: string[] } {
   const result = ScenarioSchema.safeParse(data);
   if (!result.success) {
+    // Log detailed error for debugging
+    console.error('🔍 [VALIDATION] Zod parse failed:', JSON.stringify(result.error.issues, null, 2));
     return {
       scenario: null,
-      errors: result.error.issues.map((e: any) => `${e.path.join(".")}: ${e.message}`),
+      errors: result.error.issues.map((e: any) => `${e.path.join(".")}: ${e.message} (received: ${JSON.stringify(e.received)})`),
     };
   }
 

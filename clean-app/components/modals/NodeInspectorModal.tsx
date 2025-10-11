@@ -935,6 +935,9 @@ const NodeActivityLogWithStateTransitions: React.FC<{
     onEventClick?.(log, stateAtEventTime);
   };
 
+  // Check if this is a StateMultiplexer
+  const isMultiplexer = nodeConfig?.type === 'StateMultiplexer';
+
   return (
     <div className="border rounded-md">
       <div className="bg-muted/50 px-2 py-1 text-xs font-medium border-b">
@@ -942,8 +945,17 @@ const NodeActivityLogWithStateTransitions: React.FC<{
           <div className="w-12 flex-shrink-0">Time</div>
           <div className="w-28 flex-shrink-0">Event</div>
           <div className="w-10 flex-shrink-0">Val</div>
-          <div className="w-24 flex-shrink-0">State</div>
-          <div className="w-16 flex-shrink-0">Buf/Out</div>
+          {isMultiplexer ? (
+            <>
+              <div className="w-24 flex-shrink-0">Output</div>
+              <div className="w-24 flex-shrink-0">Condition</div>
+            </>
+          ) : (
+            <>
+              <div className="w-24 flex-shrink-0">State</div>
+              <div className="w-16 flex-shrink-0">Buf/Out</div>
+            </>
+          )}
           <div className="flex-1 min-w-0">Details</div>
           <div className="w-4 flex-shrink-0"></div>
         </div>
@@ -983,14 +995,31 @@ const NodeActivityLogWithStateTransitions: React.FC<{
                     <div className="w-10 flex-shrink-0 font-mono text-right text-xs">
                       {log.value !== undefined ? String(log.value) : "-"}
                     </div>
-                    <div className="w-24 flex-shrink-0">
-                      <span className="px-1 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 block truncate" title={`State: ${log.state}`}>
-                        {log.state?.split('_')[1] || log.state}
-                      </span>
-                    </div>
-                    <div className="w-16 flex-shrink-0 text-xs text-gray-600 font-mono">
-                      {log.bufferSize || 0}/{log.outputBufferSize || 0}
-                    </div>
+                    {isMultiplexer ? (
+                      <>
+                        <div className="w-24 flex-shrink-0">
+                          <span className="px-1 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 block truncate" title={`Output: ${(log as any).multiplexerOutput || 'N/A'}`}>
+                            {(log as any).multiplexerOutput || "-"}
+                          </span>
+                        </div>
+                        <div className="w-24 flex-shrink-0">
+                          <span className="px-1 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 block truncate" title={`Condition: ${(log as any).multiplexerCondition || 'N/A'}`}>
+                            {(log as any).multiplexerCondition === 'default' ? '🔀 default' : (log as any).multiplexerCondition || "-"}
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="w-24 flex-shrink-0">
+                          <span className="px-1 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 block truncate" title={`State: ${log.state}`}>
+                            {log.state?.split('_')[1] || log.state}
+                          </span>
+                        </div>
+                        <div className="w-16 flex-shrink-0 text-xs text-gray-600 font-mono">
+                          {log.bufferSize || 0}/{log.outputBufferSize || 0}
+                        </div>
+                      </>
+                    )}
                     <div className="flex-1 min-w-0 text-muted-foreground text-xs truncate">
                       {log.details || "-"}
                     </div>

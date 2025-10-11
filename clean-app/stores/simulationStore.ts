@@ -807,6 +807,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
 
           const value =
             Math.floor(Math.random() * (nodeConfig.generation.valueMax - nodeConfig.generation.valueMin + 1)) + nodeConfig.generation.valueMin;
+          console.log(`🎲 [DATASOURCE ${nodeConfig.nodeId}] Generated random value: ${value} (range: ${nodeConfig.generation.valueMin}-${nodeConfig.generation.valueMax})`);
           const token = _createToken(nodeConfig.nodeId, value, newTime);
 
           // Transition to emitting state
@@ -831,6 +832,8 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
 
             if (destNodeConfig) {
               const destNodeState = get().nodeStates[destNodeConfig.nodeId];
+              
+              console.log(`🚀 [TOKEN FORWARD] Token ${token.id} (${token.value}) → ${destNodeConfig.type} (${destNodeConfig.nodeId}/${destNodeConfig.displayName})`);
 
               if (destNodeConfig.type === "Queue") {
                 const qState = destNodeState as QueueState;
@@ -888,34 +891,77 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
 
                 // Check if ProcessNode can fire now that it received a token
                 const updatedPnState = get().nodeStates[destNodeConfig.nodeId] as ProcessNodeState;
-                _tryFireProcessNode(destNodeConfig, updatedPnState, newTime);
+                get()._tryFireProcessNode(destNodeConfig, updatedPnState, newTime);
               } else if (destNodeConfig.type === "FSMProcessNode") {
                 // Handle FSM token reception - add to input buffer and check transitions
                 const fsmState = destNodeState as any; // FSMProcessNodeState
                 const currentFSMState = fsmState.currentFSMState || 'idle';
 
+                // CRITICAL FIX: Find which input this token is for
+                const targetInput = destNodeConfig.inputs?.find((inp: any) => 
+                  inp.nodeId === nodeConfig.nodeId && inp.sourceOutputName === output.name
+                );
+                const bufferKey = targetInput?.name || 'input'; // Use actual input name
+                
+                console.log(`🔍 [FSM ${destNodeConfig.nodeId}] Token routing:`, {
+                  sourceNode: nodeConfig.nodeId,
+                  sourceOutput: output.name,
+                  targetInput: bufferKey,
+                  allInputs: destNodeConfig.inputs?.map((i: any) => ({ name: i.name, from: i.nodeId }))
+                });
+
                 // Add token to input buffer
                 const inputBuffers = fsmState.inputBuffers || {};
-                const bufferKey = 'input'; // Use default input name
                 inputBuffers[bufferKey] = [...(inputBuffers[bufferKey] || []), token];
                 _updateNodeState(destNodeConfig.nodeId, { inputBuffers });
 
+                // Extract message value from token
+                const messageValue = typeof token.value === 'string' ? token.value : JSON.stringify(token.value);
+                
+                console.log(`📨 [FSM ${destNodeConfig.nodeId}] Received message: "${messageValue}" from ${nodeConfig.displayName} | Token: ${token.id} | Current State: ${currentFSMState}`);
+                
                 _logNodeActivity(
                   destNodeConfig.nodeId,
                   {
-                    action: "token_received",
-                    value: token.value,
-                    details: `Token received from ${nodeConfig.displayName}`,
+                    action: "message_received",
+                    value: messageValue,
+                    details: `Message: "${messageValue}" | From: ${nodeConfig.displayName} | State: ${currentFSMState} | Token: ${token.id}`,
                   },
                   newTime,
                 );
 
-                // Check for token_received transitions
+                // Check for token_received transitions (generic trigger)
                 const tokenReceivedTransitions = destNodeConfig.fsm?.transitions?.filter((t: any) =>
                   t.trigger === 'token_received' && t.from === currentFSMState
                 ) || [];
 
+                if (tokenReceivedTransitions.length > 0) {
+                  console.log(`🎯 [FSM ${destNodeConfig.nodeId}] Found ${tokenReceivedTransitions.length} token_received transitions from state "${currentFSMState}"`);
+                }
+
                 tokenReceivedTransitions.forEach((transition: any) => {
+                  get()._executeFSMTransition(destNodeConfig, fsmState, transition, newTime);
+                });
+                
+                // Check for message-specific transitions (e.g., trigger = "processing_complete")
+                const messageTransitions = destNodeConfig.fsm?.transitions?.filter((t: any) =>
+                  t.trigger === messageValue && t.from === currentFSMState
+                ) || [];
+                
+                if (messageTransitions.length > 0) {
+                  console.log(`🎯 [FSM ${destNodeConfig.nodeId}] Found ${messageTransitions.length} transitions for message "${messageValue}" from state "${currentFSMState}"`);
+                  _logNodeActivity(
+                    destNodeConfig.nodeId,
+                    {
+                      action: "message_matched",
+                      value: messageValue,
+                      details: `Message "${messageValue}" matched ${messageTransitions.length} transition(s) from state "${currentFSMState}"`,
+                    },
+                    newTime,
+                  );
+                }
+
+                messageTransitions.forEach((transition: any) => {
                   get()._executeFSMTransition(destNodeConfig, fsmState, transition, newTime);
                 });
 
@@ -1301,6 +1347,191 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
             value: tokensToProcess.length,
             details: `Processed ${tokensToProcess.length} tokens`,
           }, newTime);
+        }
+      }
+    });
+
+    // Process StateMultiplexer nodes - route tokens based on conditions
+    Object.values(nodesConfig).forEach(nodeConfig => {
+      if (nodeConfig.type === "StateMultiplexer") {
+        const multiplexerConfig = nodeConfig as any;
+        const multiplexerState = get().nodeStates[multiplexerConfig.nodeId] as any;
+        
+        // Check if there are tokens in any input buffer
+        const allInputTokens: { inputName: string; token: Token }[] = [];
+        Object.entries(multiplexerState.inputBuffers || {}).forEach(([inputName, tokens]) => {
+          (tokens as Token[]).forEach(token => {
+            allInputTokens.push({ inputName, token });
+          });
+        });
+
+        if (allInputTokens.length > 0) {
+          allInputTokens.forEach(({ inputName, token }) => {
+            // Evaluate route conditions
+            // CRITICAL: Flatten the context so expr-eval can access properties
+            const formulaContext = {
+              input: {
+                value: token.value,
+                id: token.id,
+                originNodeId: token.originNodeId,
+                createdAt: token.createdAt,
+              },
+              [inputName]: {
+                value: token.value,
+                id: token.id,
+              },
+              // Also add direct access to token value for simpler conditions
+              tokenValue: token.value,
+            };
+
+            console.log(`🔍 [Multiplexer ${multiplexerConfig.nodeId}] Evaluating token:`, {
+              tokenId: token.id,
+              tokenValue: token.value,
+              tokenType: typeof token.value,
+              formulaContext: formulaContext,
+              availableRoutes: multiplexerConfig.config?.routes?.length || 0
+            });
+
+            let routeMatched = false;
+            const routes = multiplexerConfig.config?.routes || [];
+            
+            for (const route of routes) {
+              if (route.condition) {
+                const evalResult = evaluateFormula(route.condition, formulaContext);
+                console.warn(`🎯 Condition "${route.condition}" → Result:`, evalResult, `| Context input.value:`, formulaContext.input.value);
+                const conditionResult = evalResult.value;
+                const error = evalResult.error;
+                
+                if (!error && conditionResult) {
+                  // Route matched! Emit to this output
+                  const outputConfig = multiplexerConfig.outputs?.find((out: any) => out.name === route.outputName);
+                  
+                  if (outputConfig) {
+                    console.log(`✅ [Multiplexer] "${route.condition}" matched → ${route.outputName}`);
+                    
+                    // Create new token or forward existing one based on action
+                    let emittedToken = token;
+                    if (route.action?.type === 'emit' && route.action.data !== 'input') {
+                      // Transform the data
+                      const { value: transformedValue } = evaluateFormula(route.action.data, formulaContext);
+                      emittedToken = _createToken(multiplexerConfig.nodeId, transformedValue, newTime, [token]);
+                    }
+
+                    // Route to destination
+                    const destNodeConfig = nodesConfig[outputConfig.destinationNodeId];
+                    if (destNodeConfig) {
+                      const destNodeState = get().nodeStates[destNodeConfig.nodeId];
+                      
+                      // Add token to destination's input buffer
+                      const destInputBuffers = (destNodeState as any).inputBuffers || {};
+                      const destBufferKey = outputConfig.destinationInputName || 'input';
+                      destInputBuffers[destBufferKey] = [...(destInputBuffers[destBufferKey] || []), emittedToken];
+                      _updateNodeState(destNodeConfig.nodeId, { inputBuffers: destInputBuffers });
+
+                      _logNodeActivity(multiplexerConfig.nodeId, {
+                        action: "token_routed",
+                        value: emittedToken.value,
+                        details: `Token ${emittedToken.id} routed to ${destNodeConfig.displayName} via ${route.outputName} (condition: ${route.condition})`,
+                        multiplexerOutput: route.outputName,
+                        multiplexerCondition: route.condition,
+                        multiplexerDestination: destNodeConfig.displayName,
+                      } as any, newTime);
+
+                      _logNodeActivity(destNodeConfig.nodeId, {
+                        action: "token_received",
+                        value: emittedToken.value,
+                        details: `Token ${emittedToken.id} from Multiplexer ${multiplexerConfig.displayName}`,
+                      }, newTime);
+
+                      // Handle Sink destination
+                      if (destNodeConfig.type === "Sink") {
+                        get()._transitionNodeState(destNodeConfig.nodeId, 'sink_processing', newTime, 'token_received');
+                        const sinkState = destNodeState as any;
+                        const updatedConsumedTokens = [...(sinkState.consumedTokens || []), emittedToken].slice(-50);
+                        _updateNodeState(destNodeConfig.nodeId, {
+                          consumedTokenCount: (sinkState.consumedTokenCount || 0) + 1,
+                          lastConsumedTime: newTime,
+                          consumedTokens: updatedConsumedTokens,
+                        });
+
+                        _logNodeActivity(destNodeConfig.nodeId, {
+                          action: "token_consumed",
+                          value: emittedToken.value,
+                          details: `Token ${emittedToken.id} consumed`,
+                        }, newTime);
+
+                        get()._transitionNodeState(destNodeConfig.nodeId, 'sink_idle', newTime, 'consumption_complete');
+                      }
+                    }
+
+                    routeMatched = true;
+                    break; // Only take first matching route
+                  }
+                }
+              }
+            }
+
+            // If no route matched, use default output
+            if (!routeMatched && multiplexerConfig.config?.defaultOutput) {
+              const defaultOutputConfig = multiplexerConfig.outputs?.find((out: any) => 
+                out.name === multiplexerConfig.config.defaultOutput
+              );
+              
+              if (defaultOutputConfig) {
+                console.log(`⚠️ [Multiplexer] No match, using default: ${multiplexerConfig.config.defaultOutput}`);
+                
+                const destNodeConfig = nodesConfig[defaultOutputConfig.destinationNodeId];
+                if (destNodeConfig) {
+                  const destNodeState = get().nodeStates[destNodeConfig.nodeId];
+                  const destInputBuffers = (destNodeState as any).inputBuffers || {};
+                  const destBufferKey = defaultOutputConfig.destinationInputName || 'input';
+                  destInputBuffers[destBufferKey] = [...(destInputBuffers[destBufferKey] || []), token];
+                  _updateNodeState(destNodeConfig.nodeId, { inputBuffers: destInputBuffers });
+
+                  _logNodeActivity(multiplexerConfig.nodeId, {
+                    action: "token_routed",
+                    value: token.value,
+                    details: `Token ${token.id} routed to ${destNodeConfig.displayName} via default output`,
+                    multiplexerOutput: multiplexerConfig.config.defaultOutput,
+                    multiplexerCondition: "default",
+                    multiplexerDestination: destNodeConfig.displayName,
+                  } as any, newTime);
+
+                  _logNodeActivity(destNodeConfig.nodeId, {
+                    action: "token_received",
+                    value: token.value,
+                    details: `Token ${token.id} from Multiplexer ${multiplexerConfig.displayName} (default output)`,
+                  }, newTime);
+
+                  // Handle Sink destination
+                  if (destNodeConfig.type === "Sink") {
+                    get()._transitionNodeState(destNodeConfig.nodeId, 'sink_processing', newTime, 'token_received');
+                    const sinkState = destNodeState as any;
+                    const updatedConsumedTokens = [...(sinkState.consumedTokens || []), token].slice(-50);
+                    _updateNodeState(destNodeConfig.nodeId, {
+                      consumedTokenCount: (sinkState.consumedTokenCount || 0) + 1,
+                      lastConsumedTime: newTime,
+                      consumedTokens: updatedConsumedTokens,
+                    });
+
+                    _logNodeActivity(destNodeConfig.nodeId, {
+                      action: "token_consumed",
+                      value: token.value,
+                      details: `Token ${token.id} consumed`,
+                    }, newTime);
+
+                    get()._transitionNodeState(destNodeConfig.nodeId, 'sink_idle', newTime, 'consumption_complete');
+                  }
+                }
+              }
+            }
+          });
+
+          // Clear input buffers after processing
+          _updateNodeState(multiplexerConfig.nodeId, {
+            inputBuffers: {},
+            lastProcessedTime: newTime,
+          });
         }
       }
     });
@@ -2168,10 +2399,21 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
 
     // GET CURRENT FSM STATE - SINGLE SOURCE OF TRUTH
     const currentState = get().nodeStates[nodeIdForLog];
-    const currentFSMState = currentState?.stateMachine?.currentState || 'unknown';
+    const nodeConfig = get().nodesConfig[nodeIdForLog];
+    
+    // CRITICAL: FSMProcessNode stores state differently than other nodes
+    let currentFSMState = 'unknown';
+    if (nodeConfig?.type === 'FSMProcessNode') {
+      // FSMProcessNode stores state directly as currentFSMState
+      currentFSMState = (currentState as any)?.currentFSMState || 'idle';
+    } else {
+      // Other nodes use stateMachine.currentState
+      currentFSMState = currentState?.stateMachine?.currentState || 'unknown';
+    }
 
     // Get buffer sizes for context
-    const bufferSize = (currentState as any)?.inputBuffer?.length || 0;
+    const bufferSize = (currentState as any)?.inputBuffer?.length || 
+                       Object.values((currentState as any)?.inputBuffers || {}).reduce((sum: number, buf: any) => sum + (buf?.length || 0), 0) || 0;
     const outputBufferSize = (currentState as any)?.outputBuffer?.length || 0;
 
     const newEntry: HistoryEntry = {
@@ -2195,6 +2437,9 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       aggregationDetails: (logCoreDetails as any).aggregationDetails,
       transformationDetails: (logCoreDetails as any).transformationDetails,
       lineageMetadata: (logCoreDetails as any).lineageMetadata,
+      
+      // CRITICAL: Preserve custom fields (e.g., multiplexer routing info)
+      ...(logCoreDetails as any),
     };
 
     set(state => {
@@ -2297,14 +2542,19 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
     const consumedTokensForThisFiring: Token[] = [];
     const nextPnInputBuffers = JSON.parse(JSON.stringify(pnState.inputBuffers));
 
-    // Consume input tokens
-    Object.entries(inputsDataForFormula).forEach(([inputNodeId, tokenToConsume]) => {
+    // Consume input tokens - CRITICAL: use actual source node ID, not alias!
+    Object.entries(inputsDataForFormula).forEach(([aliasKey, tokenToConsume]) => {
       consumedTokensForThisFiring.push(tokenToConsume);
 
-      // Remove token from input buffer
-      const buffer = (nextPnInputBuffers[inputNodeId] as Token[]) || [];
-      buffer.shift();
-      nextPnInputBuffers[inputNodeId] = buffer;
+      // Get the actual source node ID from our alias mapping
+      const actualSourceNodeId = aliasToSourceNodeId[aliasKey];
+      if (actualSourceNodeId) {
+        // Remove token from input buffer using the ACTUAL node ID
+        const buffer = (nextPnInputBuffers[actualSourceNodeId] as Token[]) || [];
+        buffer.shift();
+        nextPnInputBuffers[actualSourceNodeId] = buffer;
+        console.log(`🗑️ [PROCESSNODE ${pnConfig.nodeId}] Consumed token ${tokenToConsume.id} from buffer "${actualSourceNodeId}" (alias: "${aliasKey}")`);
+      }
     });
 
     // Log firing event with source token IDs for lineage
@@ -2337,9 +2587,25 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
             transformedValue: token.value
           }
         };
+        // Add direct value access for convenience
         formulaContext[aliasKey + 'Value'] = token.value;
+        // CRITICAL: Add shorthand variable names for common patterns
+        // If input is "number", also make it available as "num"
+        if (aliasKey === 'number') {
+          formulaContext['num'] = token.value;
+        }
+        // For any input, add direct value without the node name prefix
+        // This makes formulas like "num <= 3" work when input is "number"
+        const shortName = aliasKey.substring(0, 3); // First 3 chars
+        if (shortName && !formulaContext[shortName]) {
+          formulaContext[shortName] = token.value;
+        }
+        // CRITICAL FIX: Also add the raw value directly to avoid object references
+        formulaContext[aliasKey] = token.value;
       }
     });
+    
+    console.log('🔍 [FORMULA CONTEXT]', formulaContext);
 
     // Generate outputs (simplified - no individual emitting events)
     pnConfig.outputs.forEach((output: any) => {
@@ -2380,13 +2646,19 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
           }
         }
       }
+      
+      // For complex formulas (like ternary), show result prominently
+      const outputValueStr = typeof outputValue === 'string' ? `"${outputValue}"` : outputValue;
+      const detailsText = formula.length > 50 
+        ? `Token ${newToken.id} → ${destName} | Output: ${outputValueStr} | Formula: ${formula.substring(0, 40)}...`
+        : `Token ${newToken.id} → ${destName} | Output: ${outputValueStr} | ${formulaExplanation}`;
 
       _logNodeActivity(
         pnConfig.nodeId,
         {
           action: "token_emitted",
           value: outputValue,
-          details: `Token ${newToken.id} created from output ${output.outputId || 0} (${formulaExplanation}) → ${destName}`,
+          details: detailsText,
           sourceTokenIds: consumedTokenIds,
         },
         newTime,
@@ -2428,6 +2700,62 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
           // Recursively try to fire the destination ProcessNode
           const updatedDestPnState = get().nodeStates[destNodeConfig.nodeId] as ProcessNodeState;
           get()._tryFireProcessNode(destNodeConfig, updatedDestPnState, newTime);
+        } else if (destNodeConfig.type === "FSMProcessNode") {
+          // CRITICAL: Handle FSM token reception from ProcessNode
+          const fsmState = destNodeState as any;
+          const currentFSMState = fsmState.currentFSMState || 'idle';
+
+          // Find which input this token is for
+          const targetInput = destNodeConfig.inputs?.find((inp: any) => 
+            inp.nodeId === pnConfig.nodeId && inp.sourceOutputName === output.name
+          );
+          const bufferKey = targetInput?.name || 'input';
+          
+          console.log(`🎯 [FSM ${destNodeConfig.nodeId}] Token from ProcessNode:`, {
+            sourceNode: pnConfig.nodeId,
+            sourceOutput: output.name,
+            targetInput: bufferKey,
+            tokenValue: newToken.value,
+            tokenId: newToken.id
+          });
+
+          // Add token to input buffer
+          const inputBuffers = fsmState.inputBuffers || {};
+          inputBuffers[bufferKey] = [...(inputBuffers[bufferKey] || []), newToken];
+          _updateNodeState(destNodeConfig.nodeId, { inputBuffers });
+
+          // Extract message value from token
+          const messageValue = typeof newToken.value === 'string' ? newToken.value : JSON.stringify(newToken.value);
+          
+          console.log(`📨 [FSM ${destNodeConfig.nodeId}] Received message: "${messageValue}" from ${pnConfig.displayName} | Token: ${newToken.id} | State: ${currentFSMState}`);
+          
+          // ALWAYS log message reception (for auditing/debugging)
+          _logNodeActivity(
+            destNodeConfig.nodeId,
+            {
+              action: "message_received",
+              value: messageValue,
+              details: `Message: "${messageValue}" | From: ${pnConfig.displayName} | State: ${currentFSMState} | Token: ${newToken.id}`,
+            },
+            newTime,
+          );
+          
+          // Check for valid transitions from current state
+          const validTransitions = destNodeConfig.fsm?.transitions?.filter((t: any) =>
+            t.trigger === messageValue && t.from === currentFSMState
+          ) || [];
+
+          if (validTransitions.length > 0) {
+            // Message triggers a valid transition - EXECUTE IT
+            console.log(`🎯 [FSM ${destNodeConfig.nodeId}] Found ${validTransitions.length} valid transition(s) for message "${messageValue}" from state "${currentFSMState}"`);
+
+            validTransitions.forEach((transition: any) => {
+              get()._executeFSMTransition(destNodeConfig, fsmState, transition, newTime);
+            });
+          } else {
+            // No valid transition - message logged but state unchanged
+            console.log(`⚠️ [FSM ${destNodeConfig.nodeId}] Message "${messageValue}" has no valid transition from state "${currentFSMState}" - state unchanged`);
+          }
         } else if (destNodeConfig.type === "EnhancedFSMProcessNode") {
           // Handle Enhanced FSM token reception from ProcessNode
           const enhancedFsmState = destNodeState as any;
@@ -2500,8 +2828,13 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
     );
 
     // Execute onExit actions for current state
-    const currentStateObj = fsmConfig.fsm?.states?.find((s: any) => s.name === fsmState.currentFSMState);
-    if (currentStateObj?.onExit) {
+    // States can be strings ("idle") or objects ({name: "processing", onEntry: [...]})
+    const currentStateObj = fsmConfig.fsm?.states?.find((s: any) => {
+      if (typeof s === 'string') return s === fsmState.currentFSMState;
+      if (typeof s === 'object' && s.name) return s.name === fsmState.currentFSMState;
+      return false;
+    });
+    if (typeof currentStateObj === 'object' && currentStateObj?.onExit) {
       currentStateObj.onExit.forEach((action: any) => {
         get()._executeFSMAction(fsmConfig, fsmState, action, newTime);
       });
@@ -2512,13 +2845,40 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       currentFSMState: transition.to,
       lastTransitionTime: newTime,
     });
+    
+    console.log(`🔄 [FSM ${fsmConfig.nodeId}] State updated: ${transition.from} → ${transition.to}`);
 
     // Update state machine tracking
     _transitionNodeState(fsmConfig.nodeId, transition.to, newTime, transition.trigger);
 
+    // CRITICAL: Automatically emit current state to "state" output (if it exists)
+    // This allows downstream nodes (like Multiplexer) to react to state changes
+    const stateOutput = fsmConfig.outputs?.find((out: any) => out.name === 'state');
+    if (stateOutput) {
+      const stateToken = get()._createToken(fsmConfig.nodeId, transition.to, newTime);
+      console.log(`📤 [FSM ${fsmConfig.nodeId}] Auto-emitting state "${transition.to}" to output "state"`);
+      get()._routeFSMToken(fsmConfig, stateOutput, stateToken, newTime);
+      
+      _logNodeActivity(
+        fsmConfig.nodeId,
+        {
+          action: "state_emitted",
+          value: transition.to,
+          details: `Emitted state "${transition.to}" after transition`,
+        },
+        newTime,
+      );
+    }
+
     // Execute onEntry actions for new state
-    const newStateObj = fsmConfig.fsm?.states?.find((s: any) => s.name === transition.to);
-    if (newStateObj?.onEntry) {
+    // States can be strings ("idle") or objects ({name: "processing", onEntry: [...]})
+    const newStateObj = fsmConfig.fsm?.states?.find((s: any) => {
+      if (typeof s === 'string') return s === transition.to;
+      if (typeof s === 'object' && s.name) return s.name === transition.to;
+      return false;
+    });
+    if (typeof newStateObj === 'object' && newStateObj?.onEntry) {
+      console.log(`🎬 [FSM ${fsmConfig.nodeId}] Executing ${newStateObj.onEntry.length} onEntry action(s) for state "${transition.to}"`);
       newStateObj.onEntry.forEach((action: any) => {
         get()._executeFSMAction(fsmConfig, fsmState, action, newTime);
       });
@@ -2675,8 +3035,29 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
         }, newTime);
 
         get()._transitionNodeState(destNodeConfig.nodeId, 'sink_idle', newTime, 'token_consumed');
+      
+      } else {
+        // Generic handling for other node types: StateMultiplexer, ProcessNode, Queue, etc.
+        // Add token to input buffer using the destinationInputName
+        const inputBuffers = (destNodeState as any).inputBuffers || {};
+        const bufferKey = outputConfig.destinationInputName || 'input';
+        inputBuffers[bufferKey] = [...(inputBuffers[bufferKey] || []), token];
+        _updateNodeState(destNodeConfig.nodeId, { inputBuffers });
+
+        console.log(`📬 [${destNodeConfig.type} ${destNodeConfig.nodeId}] Received token from FSM ${fsmConfig.displayName}`, {
+          token: token.id,
+          value: token.value,
+          input: bufferKey
+        });
+
+        _logNodeActivity(destNodeConfig.nodeId, {
+          action: "token_received",
+          value: token.value,
+          details: `Token ${token.id} from FSM ${fsmConfig.displayName} → input "${bufferKey}"`,
+        }, newTime);
+
+        // Node-specific processing will happen in the main simulation tick
       }
-      // Add more destination types as needed (Queue, ProcessNode, etc.)
     }
   },
 

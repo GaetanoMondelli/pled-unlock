@@ -250,6 +250,16 @@ export default function TemplateEditorPage() {
   useEffect(() => {
     // Ensure page starts at top on reload
     window.scrollTo(0, 0);
+    
+    // CRITICAL: Reset simulation state on page mount to clear any stale data from previous session
+    const currentScenario = useSimulationStore.getState().scenario;
+    if (currentScenario) {
+      console.log("🔄 [PAGE MOUNT] Resetting simulation state to clear stale data");
+      // Force reload the scenario to reset all node states, buffers, and counters
+      useSimulationStore.getState().loadScenario(currentScenario).catch((err) => {
+        console.error("Failed to reset scenario on mount:", err);
+      });
+    }
   }, []);
 
   // Set up event sourcing integration

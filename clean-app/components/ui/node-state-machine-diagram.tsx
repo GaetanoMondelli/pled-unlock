@@ -266,7 +266,13 @@ export const NodeStateMachineDiagram: React.FC<NodeStateMachineDiagramProps> = (
         case 'FSMProcessNode':
           // For FSM nodes, get states from the FSM definition
           const fsmNode = nodeConfig as any;
-          return fsmNode.fsm?.states || ['idle'];
+          const rawStates = fsmNode.fsm?.states || ['idle'];
+          // Handle mixed format: strings or objects with 'name' property
+          return rawStates.map((state: any) => {
+            if (typeof state === 'string') return state;
+            if (typeof state === 'object' && state.name) return String(state.name);
+            return String(state); // Fallback
+          }).filter(Boolean);
         case 'Sink':
           return ['sink_idle', 'sink_processing'];
         default:
@@ -302,10 +308,11 @@ export const NodeStateMachineDiagram: React.FC<NodeStateMachineDiagramProps> = (
         case 'FSMProcessNode':
           // For FSM nodes, get transitions from the FSM definition
           const fsmNode = nodeConfig as any;
-          return fsmNode.fsm?.transitions?.map((t: any) => ({
-            from: t.from,
-            to: t.to,
-            label: t.trigger + (t.condition ? ` [${t.condition}]` : '')
+          return fsmNode.fsm?.transitions?.map((t: any, idx: number) => ({
+            from: String(t.from || ''), // Ensure string
+            to: String(t.to || ''), // Ensure string
+            label: String(t.trigger || '') + (t.condition ? ` [${t.condition}]` : ''),
+            _index: idx // Add index for unique keys
           })) || [];
         case 'Sink':
           return [
@@ -352,14 +359,16 @@ export const NodeStateMachineDiagram: React.FC<NodeStateMachineDiagramProps> = (
 
     // Create React Flow edges ONLY for actual transitions (no ghost edges!)
     const rfEdges: Edge[] = transitions.map((transition, index) => {
-      const isActive = currentState === transition.from;
-      const isSelectedTransition = overrideActiveState === transition.from;
-      const isSelfLoop = transition.from === transition.to;
+      const fromState = String(transition.from || '');
+      const toState = String(transition.to || '');
+      const isActive = currentState === fromState;
+      const isSelectedTransition = overrideActiveState === fromState;
+      const isSelfLoop = fromState === toState;
 
       return {
-        id: `edge-${transition.from}-${transition.to}-${index}`,
-        source: transition.from,
-        target: transition.to,
+        id: `edge-${fromState}-${toState}-${index}`,
+        source: fromState,
+        target: toState,
         label: transition.label,
         type: isSelfLoop ? 'default' : 'smoothstep', // Use smoothstep for better curves
         animated: isActive,

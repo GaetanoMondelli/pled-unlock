@@ -89,22 +89,24 @@ export class StateMultiplexer {
    */
   private evaluateCondition(condition: string, stateContext: StateContext): boolean {
     try {
-      // Simple condition evaluation
-      // Replace input.data.currentState with actual value
-      const processedCondition = condition
-        .replace(/input\.data\.currentState/g, `"${stateContext.currentState}"`)
-        .replace(/input\.data\.previousState/g, stateContext.previousState ? `"${stateContext.previousState}"` : 'null')
-        .replace(/input\.data\.context\./g, 'context.');
+      // Create input object that matches the token structure used in simulation
+      const input = {
+        value: stateContext.currentState, // For conditions like: input.value === 'idle'
+        data: {
+          currentState: stateContext.currentState,
+          previousState: stateContext.previousState,
+        },
+      };
 
       // Create a safe evaluation context
       const context = stateContext.context || {};
       const variables = stateContext.variables || {};
 
-      // Simple evaluation function
-      const func = new Function('context', 'variables', `return ${processedCondition}`);
-      return func(context, variables);
+      // Evaluate with input, context, and variables available
+      const func = new Function('input', 'context', 'variables', `return ${condition}`);
+      return func(input, context, variables);
     } catch (error) {
-      console.error('Condition evaluation error:', error);
+      console.error('Condition evaluation error:', error, 'Condition:', condition);
       return false;
     }
   }

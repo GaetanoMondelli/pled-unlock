@@ -245,12 +245,22 @@ export const FSMOutputConfigSchema = z.object({
 export type FSMOutputConfig = z.infer<typeof FSMOutputConfigSchema>;
 
 // FSM Definition - much cleaner structure
+// State can be either a simple string or an object with actions
+export const FSMStateSchema = z.union([
+  z.string(), // Simple state name like "idle"
+  z.object({
+    name: z.string(),
+    onEntry: z.any().optional(), // Actions on state entry (flexible format)
+    onExit: z.any().optional(),  // Actions on state exit (flexible format)
+  })
+]);
+
 export const FSMDefinitionSchema = z.object({
-  states: z.array(z.string()), // simple state names: ["idle", "processing", "emitting"]
+  states: z.array(FSMStateSchema), // States can be strings or objects with actions
   initialState: z.string(), // clearly defined initial state
   transitions: z.array(FSMTransitionSchema),
   variables: z.record(z.string(), z.any()).optional(), // state variables
-  stateActions: z.record(z.string(), FSMStateActionsSchema).optional(), // state_name: actions
+  stateActions: z.record(z.string(), FSMStateActionsSchema).optional(), // state_name: actions (legacy)
   outputs: z.array(z.string()).optional(), // output names that can be emitted
 });
 export type FSMDefinition = z.infer<typeof FSMDefinitionSchema>;

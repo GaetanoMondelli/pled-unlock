@@ -44,6 +44,9 @@ const FSMConfigModal: React.FC<FSMConfigModalProps> = ({
   // JSON editor state
   const [jsonConfig, setJsonConfig] = useState("");
   const [jsonError, setJsonError] = useState("");
+  
+  // Track which tab we're saving from
+  const [activeTab, setActiveTab] = useState<string>("fsl");
 
   // Reset form when modal opens
   useEffect(() => {
@@ -65,8 +68,10 @@ const FSMConfigModal: React.FC<FSMConfigModalProps> = ({
 
       setFslCode(parsed.fsl || "");
       setJsonError("");
+      return parsed; // Return parsed config for saving
     } catch (error) {
       setJsonError(error instanceof Error ? error.message : 'Invalid JSON');
+      return null;
     }
   };
 
@@ -79,17 +84,39 @@ const FSMConfigModal: React.FC<FSMConfigModalProps> = ({
   };
 
   const handleSave = () => {
-    const updatedConfig = {
-      ...currentConfig,
-      fsl: fslCode
-    };
+    let updatedConfig;
+    
+    // Check which tab we're saving from
+    if (activeTab === "json") {
+      // Save from JSON editor - parse and validate first
+      const parsed = updateFromJSON();
+      if (!parsed) {
+        console.error("❌ [FSM CONFIG] Invalid JSON, cannot save");
+        return;
+      }
+      updatedConfig = parsed;
+      console.log("💾 [FSM CONFIG] Saving from JSON editor");
+      console.log("💾 [FSM CONFIG] Parsed outputs:", parsed.outputs);
+    } else {
+      // Save from FSL editor - only update FSL field
+      updatedConfig = {
+        ...currentConfig,
+        fsl: fslCode
+      };
+      console.log("💾 [FSM CONFIG] Saving from FSL editor");
+      console.log("💾 [FSM CONFIG] Current outputs:", currentConfig.outputs);
+    }
+
+    console.log("💾 [FSM CONFIG] Saving configuration for node:", nodeId);
+    console.log("💾 [FSM CONFIG] Updated config outputs:", updatedConfig.outputs);
+    console.log("💾 [FSM CONFIG] Full updated config:", updatedConfig);
 
     const success = updateNodeConfigInStore(nodeId, updatedConfig);
     if (success) {
-      console.log("FSM configuration saved successfully");
+      console.log("✅ [FSM CONFIG] Configuration saved successfully");
       onClose();
     } else {
-      console.error("Failed to save FSM configuration");
+      console.error("❌ [FSM CONFIG] Failed to save configuration");
     }
   };
 
@@ -107,7 +134,7 @@ const FSMConfigModal: React.FC<FSMConfigModalProps> = ({
         </DialogHeader>
 
         <div className="flex-1 overflow-hidden">
-          <Tabs defaultValue="fsl" className="h-full flex flex-col">
+          <Tabs defaultValue="fsl" className="h-full flex flex-col" onValueChange={setActiveTab}>
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="fsl" className="flex items-center gap-2">
                 <Settings className="h-4 w-4" />
